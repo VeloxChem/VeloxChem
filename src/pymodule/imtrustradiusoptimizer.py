@@ -61,6 +61,11 @@ class IMTrustRadiusOptimizer:
     InterpolationDriver. A structure with an invalid weight state gets the
     penalty loss 1e20 with gradient -1e4.
 
+    With permutation_symmetry in impes_dict the interpolation sums over the
+    relabelled copies of every datapoint (InterpolationDriver). The copies
+    share the radius of their datapoint, so dL/dR_j sums the terms of all
+    copies of datapoint j.
+
     The radii are written into the datapoint objects dps themselves
     (dp.confidence_radius) at every evaluation, so after fun or jac the
     datapoints hold the last trial radii; callers that need the original
@@ -204,7 +209,9 @@ class IMTrustRadiusOptimizer:
         E_interp = drv.get_energy()                  # Hartree
         G_interp = drv.get_gradient().reshape(-1)    # Hartree/Bohr
 
-        # per-datapoint potentials (M,) and gradients (M, D) of the driver
+        # the potentials (K,) and gradients (K, D) of the terms of the
+        # driver: K = M datapoints, or M times the number of permutations
+        # with permutation_symmetry (drv.term_datapoint_indices)
         P = np.asarray(drv.potentials, dtype=np.float64)
         G = np.asarray(drv.gradients, dtype=np.float64).reshape(len(P), -1)
 
@@ -348,9 +355,16 @@ class IMTrustRadiusOptimizer:
         else:
             dL_dg_sub = 2.0 * g_sub / nsub
 
-        grad_force_part = dG_dα_sub @ dL_dg_sub                     # (M,)
-        grad_energy_part = 2.0 * e_x * dE_res * dE_dα                # (M,)
-        grad_s = grad_energy_part + 0.5 * (1.0 - e_x) * grad_force_part   # (M,)
+        # one entry per term of the Shepard sum (see below)
+        grad_force_part = dG_dα_sub @ dL_dg_sub
+        grad_energy_part = 2.0 * e_x * dE_res * dE_dα
+        grad_terms = grad_energy_part + 0.5 * (1.0 - e_x) * grad_force_part
+
+        # dL/dR_j is the sum over the terms of datapoint j. Without
+        # permutation_symmetry every datapoint has one term and this is a
+        # copy; with it, every datapoint has one term per permutation (its
+        # relabelled copies), all with the radius R_j.
+        grad_s = np.bincount(drv.term_datapoint_indices, weights=grad_terms, minlength=self.M)   # (M,)
         return float(loss_s), grad_s, float(L_e), float(L_F)
 
     @staticmethod
@@ -598,6 +612,12 @@ class IMTrustRadiusPairTerms:
     fixed radius (sum w, sum w T, sum grad w, sum (w grad T + T grad w)), which
     is exact. All vectors are flattened Cartesian vectors of length 3 natoms.
 
+    With permutation_symmetry the Shepard sum has one term per datapoint and
+    permutation, term k belonging to datapoint term_datapoint_indices[k]
+    (InterpolationDriver.term_datapoint_indices). The terms of a datapoint
+    are its copies: each enters as above with the radius of its datapoint,
+    and the radius gradient of a datapoint is the sum over its copies.
+
     :param n_ref:
         The number of reference structures.
     :param natoms:
@@ -613,9 +633,12 @@ class IMTrustRadiusPairTerms:
         tc_imp_gate_lambda of the driver.
     :param gate_clip:
         tc_imp_gate_exp_clip of the driver.
+    :param term_datapoint_indices:
+        The datapoint of every term; None (default): one term per datapoint.
     """
 
-    def __init__(self, n_ref, natoms, radii, free_idx, exponent_p_q, gate_lambda, gate_clip):
+    def __init__(self, n_ref, natoms, radii, free_idx, exponent_p_q, gate_lambda, gate_clip,
+                 term_datapoint_indices=None):
         """
         Allocates the terms (see the class docstring for the parameters).
         """
@@ -632,7 +655,22 @@ class IMTrustRadiusPairTerms:
         self.gate_lambda = float(gate_lambda)
         self.gate_clip = float(gate_clip)
 
-        nfree = self.free_idx.size
+        # the datapoint of every term and its position in free_idx (-1: fixed)
+        if term_datapoint_indices is None:
+            self.term_dp = np.arange(self.n_dp)
+        else:
+            self.term_dp = np.asarray(term_datapoint_indices, dtype=np.int64).reshape(-1)
+        position = np.full(self.n_dp, -1, dtype=np.int64)
+        position[self.free_idx] = np.arange(self.free_idx.size)
+        term_position = position[self.term_dp]
+        # the stored terms: those of the free datapoints, in the order of
+        # free_idx (one term per datapoint: the terms free_idx)
+        free_terms = np.flatnonzero(term_position >= 0)
+        self.free_terms = free_terms[np.argsort(term_position[free_terms], kind='stable')]
+        self.free_term_pos = term_position[self.free_terms]
+        self.fixed_terms = term_position < 0
+
+        nfree = self.free_terms.size
         ndof = 3 * self.natoms
 
         self.dist = np.zeros((self.n_ref, nfree))
@@ -652,7 +690,8 @@ class IMTrustRadiusPairTerms:
     @staticmethod
     def memory_estimate(n_ref, natoms, n_free):
         """
-        Returns the memory of the stored terms in bytes.
+        Returns the memory of the stored terms in bytes; n_free is the number
+        of stored terms (the free datapoints times the permutations).
         """
 
         ndof = 3 * int(natoms)
@@ -732,11 +771,11 @@ class IMTrustRadiusPairTerms:
 
     def set_reference(self, s, dist, V, A, GA, T, GT):
         """
-        Stores the terms of reference s: dist, A, T (M,) and V, GA, GT
-        (M, 3 natoms), for all datapoints.
+        Stores the terms of reference s: dist, A, T (K,) and V, GA, GT
+        (K, 3 natoms), for all K terms (term_datapoint_indices).
         """
 
-        free = self.free_idx
+        free = self.free_terms
         self.dist[s] = dist[free]
         self.A[s] = A[free]
         self.T[s] = T[free]
@@ -744,9 +783,9 @@ class IMTrustRadiusPairTerms:
         self.GA[s] = GA[free]
         self.GT[s] = GT[free]
 
-        fixed = self.fixed_mask
+        fixed = self.fixed_terms
         if np.any(fixed):
-            w, cv, cg = self.weight_terms(dist[fixed], A[fixed], self.radii[fixed])
+            w, cv, cg = self.weight_terms(dist[fixed], A[fixed], self.radii[self.term_dp[fixed]])
             gw = cv[:, None] * V[fixed] + cg[:, None] * GA[fixed]
             self.fixed_w[s] = np.sum(w)
             self.fixed_w_max[s] = np.max(w)
@@ -767,19 +806,21 @@ class IMTrustRadiusPairTerms:
             raise ValueError("IMTrustRadiusPairTerms: the radii of the fixed datapoints changed")
         return R
 
-    def _evaluate(self, rows, R, train_pos=None):
+    def _evaluate(self, rows, R, train_cols=None):
         """
         Returns E (n,), G (n, 3 natoms), the sum of the weights, its gradient
         and the rows without a positive weight, all with the weights divided
-        by a per-row scale. With train_pos (positions in free_idx) it also
-        returns the scaled dw/dR (n, t) and d(grad w)/dR (n, t, 3 natoms).
+        by a per-row scale. With train_cols (stored terms, see free_terms) it
+        also returns the scaled dw/dR (n, t) and d(grad w)/dR (n, t, 3 natoms)
+        of these terms, each with respect to the radius of its datapoint.
         """
 
-        Rf = R[self.free_idx]
+        # every stored term at the radius of its datapoint
+        Rf = R[self.free_idx[self.free_term_pos]]
         dist, A, T = self.dist[rows], self.A[rows], self.T[rows]
         V, GA, GT = self.V[rows], self.GA[rows], self.GT[rows]
 
-        if train_pos is None:
+        if train_cols is None:
             w, cv, cg = self.weight_terms(dist, A, Rf)
         else:
             w, cv, cg, dw, dv, dg = self.weight_terms(dist, A, Rf, radius_derivatives=True)
@@ -801,10 +842,10 @@ class IMTrustRadiusPairTerms:
               + self.fixed_grad_wT[rows] * inv[:, None]) / S[:, None]
              - E[:, None] * gS / S[:, None])
 
-        if train_pos is None:
+        if train_cols is None:
             return E, G, S, gS, no_weight
 
-        t = train_pos
+        t = train_cols
         dw_t = dw[:, t] * inv[:, None]
         dgw_t = (dv[:, t] * inv[:, None])[..., None] * V[:, t] + (dg[:, t] * inv[:, None])[..., None] * GA[:, t]
 
@@ -836,8 +877,9 @@ class IMTrustRadiusPairTerms:
         Returns the loss terms of IMTrustRadiusOptimizer._eval_structure for
         the references rows at the radii: loss_s, L_e and L_F (n,) and the
         gradient of loss_s with respect to the radii train_pos (positions in
-        free_idx), (n, t). A reference without a positive weight gets the
-        penalty of the optimizer (loss 1e20, gradient -1e4).
+        free_idx), (n, t), summed over the copies of every datapoint. A
+        reference without a positive weight gets the penalty of the optimizer
+        (loss 1e20, gradient -1e4).
 
         :param qm_e:
             The reference energies of rows (Hartree), (n,).
@@ -850,6 +892,16 @@ class IMTrustRadiusPairTerms:
         R = self._check_radii(radii)
         rows = np.asarray(rows, dtype=np.int64).reshape(-1)
         train_pos = np.asarray(train_pos, dtype=np.int64).reshape(-1)
+        # the stored terms of the trainable datapoints (all their copies) and
+        # the position in train_pos of their datapoint; one term per
+        # datapoint: train_pos and 0, 1, 2, ...
+        train_cols, owner = [], []
+        for i, pos in enumerate(train_pos):
+            cols = np.flatnonzero(self.free_term_pos == pos)
+            train_cols.extend(cols)
+            owner.extend([i] * cols.size)
+        train_cols = np.asarray(train_cols, dtype=np.int64)
+        owner = np.asarray(owner, dtype=np.int64)
         qm_e = np.asarray(qm_e, dtype=np.float64).reshape(-1)
         qm_g_flat = np.asarray(qm_g_flat, dtype=np.float64)
 
@@ -865,7 +917,7 @@ class IMTrustRadiusPairTerms:
         for start in range(0, rows.size, chunk):
             sl = slice(start, start + chunk)
             sub = rows[sl]
-            E, G, S, gS, no_weight, dw_t, dgw_t = self._evaluate(sub, R, train_pos)
+            E, G, S, gS, no_weight, dw_t, dgw_t = self._evaluate(sub, R, train_cols)
 
             dE = (E - qm_e[sl]) * conv
             g = (G[:, idx] - qm_g_flat[sl][:, idx]) * conv_g
@@ -889,14 +941,18 @@ class IMTrustRadiusPairTerms:
                              + (2.0 * (1.0 - gate[:, None]) / nsub) * g,
                              2.0 * g / nsub)
 
-            Pm = self.T[sub][:, train_pos] - E[:, None]
+            Pm = self.T[sub][:, train_cols] - E[:, None]
             dE_dR = dw_t * Pm * (conv / S[:, None])
-            GT_t = self.GT[sub][:, train_pos]
+            GT_t = self.GT[sub][:, train_cols]
             dG_dR = (dgw_t * Pm[..., None]
                      + dw_t[..., None] * (GT_t - G[:, None, :])
                      - (dw_t * Pm)[..., None] * gS[:, None, :] / S[:, None, None]) * (conv_g / S[:, None, None])
-            grad_c = (2.0 * e_x * dE[:, None] * dE_dR
-                      + 0.5 * (1.0 - e_x) * np.einsum('ntd,nd->nt', dG_dR[..., idx], dL_dg))
+            grad_terms = (2.0 * e_x * dE[:, None] * dE_dR
+                          + 0.5 * (1.0 - e_x) * np.einsum('ntd,nd->nt', dG_dR[..., idx], dL_dg))
+            # dL/dR_j is the sum over the terms of datapoint j (its copies
+            # share R_j)
+            grad_c = np.zeros((sub.size, train_pos.size))
+            np.add.at(grad_c, (slice(None), owner), grad_terms)
 
             invalid = no_weight | ~np.isfinite(loss_c) | ~np.all(np.isfinite(grad_c), axis=1)
             loss_c = np.where(invalid, 1.0e20, loss_c)

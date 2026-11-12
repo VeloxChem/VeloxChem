@@ -113,6 +113,11 @@ class InterpolationDatapoint:
           z-matrix orientation, used by the target-customised weights.
         - identify_imp_int_coord: write and read imp_int_coordinates.
         - atom_labels: the atom labels, or None.
+        - described_key, described_p0, described_gradient,
+          described_hessian, described_sums: g and H in the rows of a
+          RowDescription (set by apply_row_description, never written to the
+          database); described_key is the key of that description, None
+          before. Reset described_key to None if gradient or hessian change.
     """
 
     def __init__(self, z_matrix=None, atom_labels=None, comm=None, ostream=None):
@@ -188,6 +193,13 @@ class InterpolationDatapoint:
         self.internal_coordinates_values = None
         self.cartesian_coordinates = None
         self._b_matrix_row_cache = None
+
+        # g and H in the rows of a RowDescription (apply_row_description)
+        self.described_key = None
+        self.described_p0 = None
+        self.described_gradient = None
+        self.described_hessian = None
+        self.described_sums = None
 
         self._input_keywords = {
             'im_settings': {
@@ -519,6 +531,55 @@ class InterpolationDatapoint:
         cartesian_hessian = np.linalg.multi_dot([self.b_matrix.T, self.internal_hessian, self.b_matrix]) + self.b2_gradient
 
         return cartesian_hessian
+
+    def apply_row_description(self, row_description):
+        """
+        Computes g and H of the datapoint in the rows of a RowDescription from
+        the Cartesian gradient and Hessian (no new QM) and stores them in
+        described_p0, described_gradient, described_hessian and
+        described_sums, with described_key = row_description.key.
+        internal_gradient, internal_hessian, the B-matrix and the internal
+        coordinate values are left as they were.
+
+        gradient and hessian must be in the metric of inv_sqrt_masses (the
+        metric of the database, attribute 'mass_weighted').
+
+        :param row_description:
+            The RowDescription.
+        """
+
+        assert_msg_critical(
+            not self.use_eq_bond_length,
+            'InterpolationDatapoint: the row description needs inverse or '
+            'plain bond lengths, not eq bond lengths.')
+        assert_msg_critical(
+            self.gradient is not None and self.hessian is not None,
+            'InterpolationDatapoint: the row description needs the Cartesian '
+            'gradient and Hessian of the datapoint.')
+
+        saved = (self.use_inverse_bond_length, self.b_matrix, self.b2_matrix,
+                 self.original_b_matrix, self.internal_coordinates_values)
+
+        # B, B2 and the values with the bonds as r
+        self.use_inverse_bond_length = False
+        try:
+            if self.internal_coordinates is None:
+                self.define_internal_coordinates()
+            self.calculate_b_matrix()
+            self.calculate_b2_matrix()
+            self.compute_internal_coordinates_values()
+            p0 = np.array(self.internal_coordinates_values, dtype=np.float64)
+            g, h = row_description.internal_derivatives(
+                p0, self.b_matrix, self.b2_matrix, self.gradient, self.hessian)
+        finally:
+            (self.use_inverse_bond_length, self.b_matrix, self.b2_matrix,
+             self.original_b_matrix, self.internal_coordinates_values) = saved
+
+        self.described_p0 = p0
+        self.described_gradient = g
+        self.described_hessian = h
+        self.described_sums = row_description.group_sums(g, h)
+        self.described_key = row_description.key
 
     def transform_gradient_and_hessian(self):
         """

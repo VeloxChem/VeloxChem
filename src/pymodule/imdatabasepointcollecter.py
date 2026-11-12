@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+import networkx as nx
 import numpy as np
 import h5py
 import copy
@@ -61,6 +62,8 @@ from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .interpolationdriver import InterpolationDriver
 from .interpolationdatapoint import InterpolationDatapoint
+from .imrowdescription import RowDescription
+from .superimpose import svd_superimpose
 from .imtrustradiusoptimizer import (IMTrustRadiusOptimizer, IMTrustRadiusPairTerms,
                                      IMTrustRadiusCachedOptimizer)
 
@@ -87,7 +90,8 @@ class IMDatabasePointCollecter:
     proximity gate decides when the model is checked against QM (energy and
     gradient). If the error exceeds the thresholds, the structure is added
     as a new datapoint (optionally after a constrained re-optimisation) to the
-    HDF5 database, the trajectory is reset to its start and continues;
+    HDF5 database, the trajectory is reset to its start and continues (with
+    reset_to_added_point it continues from the added datapoint instead);
     structures that pass the check are stored as references in an HDF5
     reference file. The run stops when the database holds
     desired_datapoint_density datapoints, when converged_cycle cycles of
@@ -153,7 +157,7 @@ class IMDatabasePointCollecter:
           'angle' or 'torsion', 'atoms', 'min_nm'/'max_nm'/'width_nm' or
           'min_deg'/'max_deg'/'width_deg', 'periodic'}. Torsion atoms are
           1-based, distance and angle atoms 0-based. All hills are cleared at
-          every reset of the trajectory.
+          every reset of the trajectory (kept with reset_to_added_point).
         interpolation_settings and sampling_interpolation_settings are dicts
         keyed by root, {0: InterpolationDriver settings including
         'imforcefield_file'}.
@@ -179,7 +183,11 @@ class IMDatabasePointCollecter:
           evaluates the interpolation once per reference and fit and fits
           the radii in closed form (IMTrustRadiusPairTerms). The groups are
           the same, and the loss and gradient equal those of
-          IMTrustRadiusOptimizer to round-off. Default False.
+          IMTrustRadiusOptimizer to round-off. With permutation_symmetry
+          every copy of a datapoint is a term of its own. Where the closed
+          form does not apply (e.g. weights in internal coordinates, additive
+          tc weights), the fit warns and uses the default path. Default
+          False.
         - identify_relevant_int_coordinates: (bool, user constraints); if
           True, new datapoints are re-optimised with their important internal
           coordinates frozen, together with the user constraints (1-based
@@ -188,6 +196,19 @@ class IMDatabasePointCollecter:
           re-optimised structure leaves the region it should describe. This
           may contaminate the database; use it only if the construction does
           not improve otherwise. Default False.
+        - ring_pucker_constraints: if True, the re-optimisation also freezes
+          N - 3 ring torsions of every flexible ring (_ring_pucker_torsions)
+          that the important coordinates touch, so the new datapoint keeps
+          the ring pucker of the structure that triggered it; such
+          datapoints store no important coordinates. Default False.
+        - reset_to_added_point: if False (default), the trajectory is reset
+          to its start after every addition and every deferred reference:
+          start positions, velocities drawn at 0.5 T (NVT/NPT) or the start
+          velocities (NVE), metadynamics hills cleared. If True, it is not
+          reset: after an addition with re-optimisation the MD continues from
+          the re-optimised datapoint, where the interpolation is exact
+          (_restart_at_added_point); otherwise (no re-optimisation, deferred
+          reference) it continues from the current structure.
         - platform: OpenMM platform name.
 
     Other instance variables:
@@ -349,6 +370,12 @@ class IMDatabasePointCollecter:
 
         # toggle + optional fixed list for important internal-coordinate constraints
         self.identify_relevant_int_coordinates = (True, [])
+        # opt-in: keep the ring pucker in that optimisation; those datapoints store no important coordinates
+        self.ring_pucker_constraints = False
+        # opt-in: continue the MD from the re-optimised datapoint after an addition;
+        # (added molecule, number of frozen coordinates) until the restart is done
+        self.reset_to_added_point = False
+        self._added_point_restart = None
 
         # [enabled, mode, initial confidence radius, energy weight e_x];
         # same default as IMForceFieldGenerator.use_opt_confidence_radius
@@ -2217,6 +2244,65 @@ class IMDatabasePointCollecter:
         positions_nm = state.getPositions(asNumpy=True).value_in_unit(unit.nanometer)
         return np.asarray(positions_nm[self.qm_atoms], dtype=np.float64)
 
+    def _restart_at_added_point(self, context):
+        """
+        reset_to_added_point: continues the MD from the re-optimised datapoint
+        just added, where the interpolation reproduces the QM energy and
+        gradient. The datapoint is superimposed onto the current QM positions
+        and replaces them; MM atoms keep their positions.
+
+        The velocities of the QM atoms keep their direction and are rescaled
+        to T_start = T (n_kin + n_relaxed) / n_kin, with n_relaxed = 3 N_QM - 6
+        - (frozen coordinates of the re-optimisation): the relaxed
+        coordinates start at their minimum, without their thermal potential
+        energy of about n_relaxed kT / 2. Started at T, the temperature would
+        drop to about 0.6 T within tens of fs (equipartition) and recover only
+        over picoseconds; the extra kinetic energy keeps it at T.
+
+        :param context:
+            The OpenMM context object.
+        """
+
+        added_molecule, n_frozen = self._added_point_restart
+        self._added_point_restart = None
+
+        qm = list(self.qm_atoms)
+        state = context.getState(getPositions=True, getVelocities=True)
+        positions = state.getPositions(asNumpy=True).value_in_unit(unit.nanometer)
+        velocities = state.getVelocities(asNumpy=True).value_in_unit(unit.nanometer / unit.picosecond)
+
+        # positions: the datapoint in the frame of the current QM positions
+        current = np.asarray(positions[qm], dtype=np.float64)
+        added = added_molecule.get_coordinates_in_angstrom() * 0.1
+        _, rot, trans = svd_superimpose(added, current)
+        positions[qm] = np.matmul(added, rot) + trans
+        rmsd_angstrom = np.sqrt(np.mean(np.sum((positions[qm] - current)**2, axis=1))) * 10.0
+        context.setPositions(unit.Quantity(positions, unit.nanometer))
+
+        # velocities: rescaled to T_start (kinetic energy in kJ/mol)
+        if self.temperature is None:
+            context.setVelocities(unit.Quantity(velocities, unit.nanometer / unit.picosecond))
+            self.ostream.print_info(f'Restart at the added datapoint: RMSD {rmsd_angstrom:.3f} A, '
+                                    'velocities kept (no temperature set).')
+            self.ostream.flush()
+            return
+
+        n_qm = len(qm)
+        n_kin = self._count_degrees_of_freedom() if n_qm == self.system.getNumParticles() else 3 * n_qm
+        n_relaxed = max(3 * n_qm - 6 - n_frozen, 0)
+        kT = (unit.MOLAR_GAS_CONSTANT_R * self.temperature).value_in_unit(unit.kilojoule_per_mole)
+        masses = np.array([self.system.getParticleMass(i).value_in_unit(unit.dalton) for i in qm])
+        kinetic = 0.5 * np.sum(masses[:, None] * velocities[qm]**2)
+        target = 0.5 * (n_kin + n_relaxed) * kT
+        if kinetic > 0.0:
+            velocities[qm] = velocities[qm] * np.sqrt(target / kinetic)
+        context.setVelocities(unit.Quantity(velocities, unit.nanometer / unit.picosecond))
+
+        t_start = self.temperature.value_in_unit(unit.kelvin) * (n_kin + n_relaxed) / n_kin
+        self.ostream.print_info(f'Restart at the added datapoint: RMSD {rmsd_angstrom:.3f} A to the current structure, '
+                                f'QM velocities rescaled to T_start = {t_start:.0f} K ({n_relaxed} relaxed coordinates).')
+        self.ostream.flush()
+
     def _get_latest_qm_molecule(self, qm_positions_nm=None):
         """
         Returns the most recent QM molecule used in interpolation.
@@ -2274,8 +2360,9 @@ class IMDatabasePointCollecter:
         """
         Evaluates the interpolation at the current positions, applies the forces
         to the QM atoms and decides whether a QM check is needed (proximity gate);
-        runs the QM check and, after an addition or a reference collection,
-        resets positions and velocities to the start of the trajectory.
+        runs the QM check and, after an addition or a deferred reference,
+        resets positions and velocities to the start of the trajectory, or,
+        with reset_to_added_point, continues from the added datapoint.
 
         :param context:
             The OpenMM context object.
@@ -2379,14 +2466,21 @@ class IMDatabasePointCollecter:
         if self.point_checker == 0:
 
             self.current_state = self.starting_state
-            context.setPositions(self.coordinates[0])
-            if self._metadynamics is not None and self.metadynamics_enabled:
-                self._reset_metadynamics_bias(context)
-            # Set initial velocities if the ensemble is NVT or NPT
-            if self.ensemble in ['NVT', 'NPT']:
-                context.setVelocitiesToTemperature(self.temperature * 0.5)
+            if self.reset_to_added_point:
+                # continue from the datapoint just added (if it was re-optimised;
+                # otherwise the current structure is the datapoint or a reference)
+                if self._added_point_restart is not None:
+                    self._restart_at_added_point(context)
             else:
-                context.setVelocities(self.start_velocities)
+                # reset the trajectory to its start
+                context.setPositions(self.coordinates[0])
+                if self._metadynamics is not None and self.metadynamics_enabled:
+                    self._reset_metadynamics_bias(context)
+                # Set initial velocities if the ensemble is NVT or NPT
+                if self.ensemble in ['NVT', 'NPT']:
+                    context.setVelocitiesToTemperature(self.temperature * 0.5)
+                else:
+                    context.setVelocities(self.start_velocities)
 
             qm_positions = self._extract_qm_positions_nm(context)
             gradient_2 = self.update_gradient(qm_positions)
@@ -2684,14 +2778,12 @@ class IMDatabasePointCollecter:
                     used_labels = [label_idx for label_idx, _ in current_weights.items()]
                     # Sort labels and weights by descending weight
                     sorted_items_org = sorted(zip(used_labels, weights), key=lambda x: x[1], reverse=True)
-                    total_weight = sum(weights)
-                    cumulative_weight = 0.0
-                    internal_coordinate_datapoints = []
-                    for label, weight in sorted_items_org:
-                        cumulative_weight += weight
-                        internal_coordinate_datapoints.append((self.qm_data_point_dict[state_to_optim][label], weight))
-                        if cumulative_weight >= 0.8 * total_weight:
-                            break
+                    # the terms with 80 % of the weight: the datapoints, or with
+                    # permutation_symmetry the copies that carry the weight, each
+                    # with its permutation (diagnosed at the relabelled geometry)
+                    internal_coordinate_datapoints = [
+                        (self.qm_data_point_dict[state_to_optim][label], weight, perm)
+                        for label, weight, perm in self.impes_drivers[state_to_optim].heaviest_terms(0.8)]
                     _, candidate_constraints, _, fallback_constraints = self.impes_drivers[state_to_optim].determine_important_internal_coordinates(state_specific_gradients[state_to_optim][0], molecule, self.root_z_matrix[state_to_optim], internal_coordinate_datapoints)
                     selected = list(candidate_constraints)
                     selected = [tuple(int(x) for x in c) for c in selected]
@@ -2711,6 +2803,18 @@ class IMDatabasePointCollecter:
                         touches_fault = bool(selected_atoms.intersection(dih))
                         if touches_fault and dih not in main_constraint_list:
                             constraints.append(dih)
+
+                    # ring_pucker_constraints: also freeze the pucker torsions of every flexible ring
+                    # the selection touches, so the optimisation keeps the ring pucker of this structure
+                    ring_torsions = []
+                    if self.ring_pucker_constraints:
+                        for ring_atoms, torsions in self._ring_pucker_torsions(
+                                self.root_z_matrix[state_to_optim], molecule.get_labels()):
+                            if selected_atoms.intersection(ring_atoms):
+                                ring_torsions += [t for t in torsions if t not in ring_torsions]
+                        for t in ring_torsions:
+                            if t not in main_constraint_list and t not in constraints:
+                                constraints.append(t)
 
                     main_constraint_list.extend(constraints)
                     full_z = (
@@ -2735,6 +2839,14 @@ class IMDatabasePointCollecter:
                     self.ostream.print_blank()
                     self.ostream.print_info("Selected constraints for the optimization: ")
                     self.ostream.print_line(f"Filtered constraints: {constraint_mask}")
+                    if ring_torsions:
+                        self.ostream.print_line(
+                            f"Ring pucker torsions (1-based): {[tuple(a + 1 for a in t) for t in ring_torsions]}")
+                        dropped = [t for t in ring_torsions if tuple(t) not in [tuple(c) for c in constraint_mask]]
+                        if dropped:
+                            self.ostream.print_warning(
+                                'Ring pucker torsions dropped as dependent on the other constraints '
+                                f'(1-based): {[tuple(a + 1 for a in t) for t in dropped]}')
                     if self._user_constraints():
                         self.ostream.print_line(f"User constraints (1-based): {self._user_constraints()}")
                     self.ostream.flush()
@@ -2834,6 +2946,10 @@ class IMDatabasePointCollecter:
                                 main_constraint_list = guarded_constraints.copy()
                                 converged = True
 
+                    if ring_torsions:
+                        # ring_pucker_constraints: a datapoint that keeps a ring pucker stores no
+                        # important coordinates (distance-only weights)
+                        imp_coord_constraint = []
                     imp_int_coord = {'bonds': [], 'angles': [], 'dihedrals': [], 'impropers': []}
                     for element in imp_coord_constraint:
 
@@ -2847,6 +2963,12 @@ class IMDatabasePointCollecter:
                             imp_int_coord['impropers'].append(element)
 
                     state_specific_molecules.append((optimized_molecule, current_basis, [state_to_optim], imp_int_coord))
+
+                    # reset_to_added_point: continue the MD from the re-optimised structure
+                    # (not if the locality fallback kept the current structure)
+                    if self.reset_to_added_point and optimized_molecule is not molecule:
+                        n_frozen = len(self._with_user_constraints(constraint_mask))
+                        self._added_point_restart = (optimized_molecule, n_frozen)
 
                 self.add_point(state_specific_molecules)
                 self.last_point_added = self.point_checker - 1
@@ -2897,6 +3019,61 @@ class IMDatabasePointCollecter:
                 constraint_mask.append(coord)
                 active_rows.append(row)
         return constraint_mask
+
+    def _ring_pucker_torsions(self, z_matrix, labels):
+        """
+        The ring torsions that hold the pucker of the flexible rings
+        (ring_pucker_constraints). A flexible ring is a ring of 4 to 8 atoms
+        (minimum cycle basis of the z-matrix bonds) with at least one atom
+        that is not sp2-like (RowDescription._atom_types), e.g. 1,4-dioxane
+        or cyclohexane, not benzene. A ring of N atoms has N - 3 pucker
+        coordinates; the torsions about the ring bonds 0, 2, 4, ... and then
+        1, 3, ... up to N - 3 are frozen (ring bonds counted from the lowest
+        atom index towards its lower-index ring neighbour). For a
+        six-membered ring these are the torsions about every second ring
+        bond (tested for six-membered rings only).
+
+        :param z_matrix:
+            The z-matrix dictionary (0-based index tuples).
+        :param labels:
+            The element labels.
+
+        :return:
+            A list of (set of ring atoms, list of z-matrix dihedrals).
+        """
+
+        bonds = [tuple(int(x) for x in b) for b in z_matrix['bonds']]
+        dihedrals = [tuple(int(x) for x in d) for d in z_matrix['dihedrals']]
+        sp2 = RowDescription._atom_types(bonds, labels)['sp2']
+        graph = nx.Graph(bonds)
+
+        rings = []
+        for cycle in nx.minimum_cycle_basis(graph):
+            n = len(cycle)
+            ring_graph = graph.subgraph(cycle)
+            if not 4 <= n <= 8 or all(sp2[a] for a in cycle) or any(d != 2 for _, d in ring_graph.degree()):
+                continue
+
+            # the ring atoms in ring order
+            order = [min(cycle)]
+            order.append(min(ring_graph.neighbors(order[0])))
+            while len(order) < n:
+                order.append(next(a for a in ring_graph.neighbors(order[-1]) if a != order[-2]))
+
+            torsions = []
+            for k in (list(range(0, n, 2)) + list(range(1, n, 2)))[:n - 3]:
+                # the torsion about the ring bond order[k]-order[k+1]
+                t = tuple(order[(k + i) % n] for i in (-1, 0, 1, 2))
+                if t in dihedrals:
+                    torsions.append(t)
+                elif t[::-1] in dihedrals:
+                    torsions.append(t[::-1])
+                else:
+                    self.ostream.print_warning(
+                        f'Ring pucker torsion {tuple(a + 1 for a in t)} (1-based) is not in the z-matrix; not frozen.')
+            rings.append((set(cycle), torsions))
+
+        return rings
 
     def _print_impes_diagnostics(self, state, sorted_items, delta_e, rmsd_gradient,
                                  gradient_target=None):
@@ -3620,6 +3797,7 @@ class IMDatabasePointCollecter:
             drv.tc_imp_dihedral_sigma_degrees, drv.tc_imp_improper_sigma_degrees, drv.tc_imp_min_sigma,
             drv.use_inverse_bond_length, drv.use_eq_bond_length,
             [int(a) for a in sym_dict[3]], [int(a) for a in sym_dict[4]], z_matrix,
+            drv.permutation_symmetry,
         ))
 
     @staticmethod
@@ -3669,42 +3847,55 @@ class IMDatabasePointCollecter:
         clones = drv.qm_data_points
         key = self._trust_radius_driver_key(drv, sym_dict, z_matrix)
 
+        # the copies of every datapoint (permutation_symmetry; [None] without),
+        # in the order of InterpolationDriver.shepard_interpolation; the
+        # driver takes the atom labels from its molecule
+        drv.molecule = molecules[0]
+        permutations = drv._get_permutations()
+        n_perm = len(permutations)
+
         cache = self._trust_radius_grouping_cache
         if (cache is None or cache['key'] != key
                 or len(cache['molecules']) > n_ref or len(cache['datapoints']) > n_dp
                 or any(a is not b for a, b in zip(cache['molecules'], molecules))
                 or any(a is not b for a, b in zip(cache['datapoints'], datapoints))):
             cache = {'key': key, 'molecules': [], 'datapoints': [],
-                     'raw_weights': np.zeros((0, 0)), 'distances': np.zeros((0, 0))}
+                     'raw_weights': np.zeros((0, n_perm, 0)), 'distances': np.zeros((0, n_perm, 0))}
 
         n_old_ref = len(cache['molecules'])
         n_old_dp = len(cache['datapoints'])
-        raw_weights = np.zeros((n_ref, n_dp))
-        distances = np.zeros((n_ref, n_dp))
-        raw_weights[:n_old_ref, :n_old_dp] = cache['raw_weights']
-        distances[:n_old_ref, :n_old_dp] = cache['distances']
+        # one entry per reference, permutation and datapoint
+        raw_weights = np.zeros((n_ref, n_perm, n_dp))
+        distances = np.zeros((n_ref, n_perm, n_dp))
+        raw_weights[:n_old_ref, :, :n_old_dp] = cache['raw_weights']
+        distances[:n_old_ref, :, :n_old_dp] = cache['distances']
 
         for s, mol in enumerate(molecules):
             first_new = n_old_dp if s < n_old_ref else 0
             if first_new == n_dp:
                 continue
-            drv.define_impes_coordinate(mol.get_coordinates_in_bohr())
-            for j in range(first_new, n_dp):
-                drv._check_datapoint_z_matrix(clones[j])
-                distance, _, denominator, _, _, _, _, _ = drv.cartesian_distance(clones[j], store_alpha_gradients=False)
-                distances[s, j] = distance
-                raw_weights[s, j] = 1.0 / (denominator)
+            coordinates = mol.get_coordinates_in_bohr()
+            for g, perm in enumerate(permutations):
+                drv.define_impes_coordinate(coordinates if perm is None else coordinates[perm])
+                for j in range(first_new, n_dp):
+                    drv._check_datapoint_z_matrix(clones[j])
+                    distance, _, denominator, _, _, _, _, _ = drv.cartesian_distance(clones[j], store_alpha_gradients=False)
+                    distances[s, g, j] = distance
+                    raw_weights[s, g, j] = 1.0 / (denominator)
 
         self._trust_radius_grouping_cache = {
             'key': key, 'molecules': list(molecules), 'datapoints': list(datapoints),
-            'raw_weights': raw_weights, 'distances': distances,
+            'raw_weights': raw_weights, 'distances': distances, 'n_perm': n_perm,
         }
 
-        # normalisation of InterpolationDriver.shepard_interpolation
+        # normalisation of InterpolationDriver.shepard_interpolation over the
+        # terms (permutation-major), then the sum over the copies of every
+        # datapoint, in the order of the driver
+        term_dp = np.tile(np.arange(n_dp), n_perm)
         weights = np.zeros((n_dp, n_ref), dtype=np.float64)
         eps = float(getattr(drv, "weight_eps", 1.0e-12))
         for s in range(n_ref):
-            w_i = np.array(raw_weights[s], dtype=np.float64)
+            w_i = np.array(raw_weights[s].reshape(-1), dtype=np.float64)
             S_raw = float(np.sum(w_i))
             finite_positive = np.isfinite(w_i) & (w_i > 0.0)
             if np.any(finite_positive):
@@ -3712,10 +3903,11 @@ class IMDatabasePointCollecter:
                     w_norm = w_i
                 else:
                     w_norm = np.where(finite_positive, w_i / float(np.max(w_i[finite_positive])), 0.0)
-                weights[:, s] = w_norm / float(np.sum(w_norm))
+                np.add.at(weights[:, s], term_dp, w_norm / float(np.sum(w_norm)))
             else:
-                metric = np.where(np.isfinite(distances[s]), np.abs(distances[s]), np.inf)
-                weights[int(np.argmin(metric)), s] = 1.0
+                metric = distances[s].reshape(-1)
+                metric = np.where(np.isfinite(metric), np.abs(metric), np.inf)
+                weights[term_dp[int(np.argmin(metric))], s] = 1.0
 
         return weights
 
@@ -3755,13 +3947,22 @@ class IMDatabasePointCollecter:
         active_atoms = np.delete(np.arange(natoms), sym_dict[4])
         active_dofs = np.array([3 * a + i for a in active_atoms for i in range(3)], dtype=int)
 
+        # the terms of the Shepard sum: every datapoint once per permutation
+        # (permutation_symmetry; once without), in the order of
+        # InterpolationDriver.term_datapoint_indices
+        drv.molecule = molecules[0]
+        term_dp = np.tile(np.arange(n_dp), len(drv._get_permutations()))
+        n_terms = term_dp.size
+
         pair_terms = IMTrustRadiusPairTerms(
             len(molecules), natoms, initial_alphas, free_idx, exponent_p_q,
-            drv.tc_imp_gate_lambda, drv.tc_imp_gate_exp_clip)
+            drv.tc_imp_gate_lambda, drv.tc_imp_gate_exp_clip, term_datapoint_indices=term_dp)
 
-        cols_wo_last = np.arange(n_dp - 1 if n_dp >= 2 else n_dp)
-        alphas_wo_last = np.asarray(initial_alphas, dtype=np.float64)[cols_wo_last]
-        half = np.full(n_dp, 0.5)
+        # the radius of every term is that of its datapoint
+        alphas_terms = np.asarray(initial_alphas, dtype=np.float64)[term_dp]
+        cols_wo_last = np.flatnonzero(term_dp != n_dp - 1) if n_dp >= 2 else np.arange(n_terms)
+        alphas_wo_last = alphas_terms[cols_wo_last]
+        half = np.full(n_terms, 0.5)
 
         energies_wo_last, gradients_wo_last = [], []
         energies_half, gradients_half = [], []
@@ -3774,22 +3975,22 @@ class IMDatabasePointCollecter:
             finally:
                 drv.pair_term_records = None
 
-            if len(records) != n_dp:
-                return None, None, None, f'{len(records)} distance records for {n_dp} datapoints'
+            if len(records) != n_terms or not np.array_equal(drv.term_datapoint_indices, term_dp):
+                return None, None, None, f'{len(records)} distance records for {n_terms} terms'
 
             dist = np.array([rec[0] for rec in records], dtype=np.float64)
-            V = np.zeros((n_dp, ndof))
-            A = np.zeros(n_dp)
-            GA = np.zeros((n_dp, ndof))
+            V = np.zeros((n_terms, ndof))
+            A = np.zeros(n_terms)
+            GA = np.zeros((n_terms, ndof))
             for j, (_, v, a_imp, grad_a_imp) in enumerate(records):
                 V[j, active_dofs] = v.reshape(-1)
                 if a_imp is not None:
                     A[j] = a_imp
                     GA[j, active_dofs] = grad_a_imp.reshape(-1)
             T = np.asarray(drv.potentials, dtype=np.float64)
-            GT = np.asarray(drv.gradients, dtype=np.float64).reshape(n_dp, ndof)
+            GT = np.asarray(drv.gradients, dtype=np.float64).reshape(n_terms, ndof)
 
-            e_cf, g_cf = pair_terms.interpolate_reference(dist, V, A, GA, T, GT, initial_alphas)
+            e_cf, g_cf = pair_terms.interpolate_reference(dist, V, A, GA, T, GT, alphas_terms)
             e_diff = abs(e_cf - float(drv.get_energy()))
             g_diff = float(np.max(np.abs(g_cf - np.asarray(drv.get_gradient(), dtype=np.float64).reshape(-1))))
             if not (e_diff <= 1.0e-8 and g_diff <= 1.0e-7):
@@ -3809,7 +4010,7 @@ class IMDatabasePointCollecter:
             gradients_half.append(g_s)
 
         result_wo_last = self._interpolation_error_summary(
-            scenario_name="without_last_datapoint", n_dp=cols_wo_last.size,
+            scenario_name="without_last_datapoint", n_dp=n_dp - 1 if n_dp >= 2 else n_dp,
             im_energies=energies_wo_last, im_gradients=gradients_wo_last,
             qm_energies=qm_energies, qm_gradients=qm_gradients, weights_refs=None)
         result_half = self._interpolation_error_summary(
@@ -4372,7 +4573,9 @@ class IMDatabasePointCollecter:
         if use_cache:
             free_idx = sorted({int(j) for group in groups['groups'] for j in group['datapoint_indices']})
             natoms = datapoints[0].cartesian_coordinates.shape[0]
-            needed = IMTrustRadiusPairTerms.memory_estimate(len(molecules), natoms, len(free_idx))
+            # one set of terms per copy of a datapoint (permutation_symmetry)
+            n_perm = self._trust_radius_grouping_cache['n_perm']
+            needed = IMTrustRadiusPairTerms.memory_estimate(len(molecules), natoms, len(free_idx) * n_perm)
             available = self._available_memory_bytes()
             message = None
             if available is not None and needed > 0.5 * available:

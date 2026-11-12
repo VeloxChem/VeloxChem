@@ -41,6 +41,8 @@ from contextlib import redirect_stderr
 from io import StringIO
 
 from .interpolationdatapoint import (InterpolationDatapoint)
+from .imrowdescription import RowDescription, ROTOR_FORMS
+from .impermutations import PERMUTATION_KINDS, feasible_permutations
 from .outputstream import OutputStream
 from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .errorhandler import assert_msg_critical
@@ -114,6 +116,32 @@ class InterpolationDriver:
           qm_data_points is None.
         - labels: the datapoint labels to read (default: all).
         - confidence_radius: unused; the radii are stored per datapoint.
+        - bond_scale, bond_rule, angle_rule, exo_sat_lever, rotor_form,
+          c5_window_deg: the row description of the Taylor models
+          (imrowdescription.RowDescription), independent switches. Defaults
+          1.0, False, False, False, 'none', 150.0 give VeloxChem's own model
+          (the row description is then not used). bond_scale = c alone is
+          the inverse bond coordinate scaled by c. Any other value needs
+          inverse or plain bonds; g and H of the description are computed
+          from the stored Cartesian gradient and Hessian when a datapoint is
+          first used, and the database is not changed. The diagnostics
+          bond_rmsd, angle_rmsd and dihedral_rmsd stay those of VeloxChem's
+          coordinates. Frozen runs (OpenMMIMDynamics) must get the same keys
+          in their interpolation settings.
+        - permutation_symmetry: 'none' (default), 'methyl', 'ring' or 'all'.
+          Sums the Shepard interpolation over the feasible permutations P of
+          identical atoms (impermutations): CX3 rotations by 120 deg, flips
+          of rings hanging on one rotatable bond, and all their products,
+              E(x) = sum_P sum_i w_i(P x) T_i(P x) / sum_P sum_i w_i(P x).
+          Every datapoint then also acts at its symmetry-equivalent
+          geometries, with exact energies and permuted forces there, without
+          new data; E stays as smooth as the single terms. The cost grows
+          with the number of permutations (3 per methyl, 2 per ring, at most
+          1024). The permuted atoms must be in the weights
+          (symmetry_information[4]). The confidence-radius fit
+          (calc_optim_trust_radius) and its cached form (pair_term_records)
+          are supported: the copies of a datapoint share its radius, and the
+          fit sums their terms (term_datapoint_indices).
 
     Parameters that are attributes only (set them directly)
         - tc_imp_gate_lambda (0.7), tc_imp_bond_sigma_angstrom (0.04),
@@ -148,23 +176,38 @@ class InterpolationDriver:
     analysis scripts)
         - impes_coordinate.energy (Hartree) and impes_coordinate.gradient
           (Hartree/bohr, (natoms, 3)); see get_energy and get_gradient.
-        - weights: dictionary {index in qm_data_points: W_i}.
+        - weights: dictionary {index in qm_data_points: W_i}; with
+          permutation_symmetry, W_i is summed over the permutations.
         - potentials, gradients: T_i and grad T_i of every datapoint.
         - raw_weights_array, normalized_weights_array: w_i and W_i.
+          With permutation_symmetry, potentials, gradients and the weight
+          arrays have one entry per (permutation, datapoint), permutation
+          by permutation; the first len(qm_data_points) entries belong to
+          the identity. bond_rmsd, angle_rmsd and dihedral_rmsd are those of
+          the identity only.
+        - term_datapoint_indices: the index in qm_data_points of every entry
+          ("term") of potentials, gradients, the weight arrays and the radius
+          derivatives (0, 1, ..., M-1, repeated once per permutation).
+        - term_permutations: the permutation of every term (None for the
+          identity); heaviest_terms lists the terms that carry the weight.
         - sum_of_weights and raw_sum_of_weights (the same value),
           sum_of_weights_grad, effective_sum_of_weights(_grad) (after the
           rescaling), weight_rescale_factor, used_weight_rescale,
           used_weight_fallback (no finite positive weight: the nearest
           datapoint gets W = 1 and grad W = 0).
         - dw_dalpha_list, dw_dX_dalpha_list: dw_i/dR_i and d(grad w_i)/dR_i
-          (only with calc_optim_trust_radius; "alpha" is the radius R).
+          (only with calc_optim_trust_radius; "alpha" is the radius R), one
+          entry per term; d(grad w_i)/dR_i is per atom of the current
+          geometry, also for the terms of a permutation.
         - pair_term_records: None by default. If it is set to a list before
           compute, cartesian_distance appends (d, v, A, grad A) for every
-          datapoint: the distance, the aligned displacement of the atoms in
-          the weights, and the multiplicative tc gate metric with its
-          gradient (None, None in the other weight modes). These terms do
-          not depend on the radius; the cached confidence-radius fit of
-          IMDatabasePointCollecter reads them.
+          term (one per datapoint and permutation, in the order of
+          term_datapoint_indices): the distance, the aligned displacement of
+          the atoms in the weights, and the multiplicative tc gate metric
+          with its gradient (None, None in the other weight modes); v and
+          grad A per atom of the current geometry, also for the terms of a
+          permutation. These terms do not depend on the radius; the cached
+          confidence-radius fit of IMDatabasePointCollecter reads them.
         - bond_rmsd, angle_rmsd, dihedral_rmsd: per datapoint the L2 norms
           (not RMS values) of the bond, angle and proper-dihedral parts of s.
     """
@@ -217,6 +260,8 @@ class InterpolationDriver:
         self.weights = {}
         self.potentials = []
         self.gradients = []
+        self.term_datapoint_indices = []
+        self.term_permutations = []
 
         # HDF5 database with the QM datapoints
         self.imforcefield_file = None
@@ -238,6 +283,22 @@ class InterpolationDriver:
         self.use_inverse_bond_length = True
         self.use_eq_bond_length = False
         self.use_mass_weight = False
+
+        # row description of the Taylor models (RowDescription); the
+        # defaults give VeloxChem's own model and leave it unused
+        self.bond_scale = 1.0
+        self.bond_rule = False
+        self.angle_rule = False
+        self.exo_sat_lever = False
+        self.rotor_form = 'none'
+        self.c5_window_deg = 150.0
+        # built by compute from the z-matrix and the atom labels
+        self.row_description = None
+
+        # permutation-symmetric interpolation ('none': VeloxChem's own);
+        # the permutations are built by compute
+        self.permutation_symmetry = 'none'
+        self.permutations = None
 
         # General target customized schemes
         self.use_tc_weights = False
@@ -280,6 +341,13 @@ class InterpolationDriver:
                     'tc_weight_mode':('str', 'the mode for the target customized weights (multiplicative/additive)'),
                     'use_mass_weight':('bool', 'construction setting; the metric follows impes_coordinate.inv_sqrt_masses'),
                 'labels': ('seq_fixed_str', 'the list of QM data point labels'),
+                'bond_scale': ('float', 'weight factor c of every bond row (alone: q = c/r)'),
+                'bond_rule': ('bool', 'shape (r0/2)(1 - r0^2/r^2) for heavy-atom bonds, weight 2 for ring bonds'),
+                'angle_rule': ('bool', 'cosine shape for angles with an H end outside rings'),
+                'exo_sat_lever': ('bool', 'weight 1/4 on the exocyclic dihedrals of saturated rings'),
+                'rotor_form': ('str_lower', "collective rotor term: 'none', 'b1' or 'c5'"),
+                'c5_window_deg': ('float', 'start of the C5 window in degree'),
+                'permutation_symmetry': ('str_lower', "feasible permutations of identical atoms: 'none', 'methyl', 'ring' or 'all'"),
             }
         }
 
@@ -340,6 +408,29 @@ class InterpolationDriver:
         else:
             self._derived_exponent_q = None
 
+        assert_msg_critical(
+            self.rotor_form in ROTOR_FORMS,
+            f"InterpolationDriver: rotor_form must be one of {ROTOR_FORMS}, "
+            f"not '{self.rotor_form}'.")
+        assert_msg_critical(
+            self.bond_scale > 0.0,
+            'InterpolationDriver: bond_scale must be positive.')
+        assert_msg_critical(
+            0.0 < self.c5_window_deg < 180.0,
+            'InterpolationDriver: c5_window_deg must lie between 0 and 180.')
+        assert_msg_critical(
+            not (self.uses_row_description() and self.use_eq_bond_length),
+            'InterpolationDriver: bond_scale, bond_rule, angle_rule, '
+            'exo_sat_lever and rotor_form need inverse or plain bond lengths; '
+            'set use_eq_bond_length to False.')
+        assert_msg_critical(
+            self.permutation_symmetry in PERMUTATION_KINDS,
+            f'InterpolationDriver: permutation_symmetry must be one of '
+            f"{PERMUTATION_KINDS}, not '{self.permutation_symmetry}'.")
+        # rebuilt by the next compute with the new settings
+        self.row_description = None
+        self.permutations = None
+
         valid_tc_modes = {"multiplicative", "additive_rhee"}
 
         if self.tc_weight_mode not in valid_tc_modes:
@@ -358,6 +449,62 @@ class InterpolationDriver:
                 "The additive Rhee target-customized formalism is currently "
                 "implemented only for Cartesian base weighting coordinates."
             )
+
+    def uses_row_description(self):
+        """
+        True if a switch of the row description differs from its default;
+        the Taylor models then use the RowDescription.
+        """
+
+        return (self.bond_scale != 1.0 or bool(self.bond_rule) or
+                bool(self.angle_rule) or bool(self.exo_sat_lever) or
+                self.rotor_form != 'none')
+
+    def _get_row_description(self):
+        """
+        Returns the RowDescription of the settings, built from the z-matrix
+        and the atom labels of the molecule of the last compute.
+        """
+
+        if self.row_description is None:
+            assert_msg_critical(
+                getattr(self, 'molecule', None) is not None,
+                'InterpolationDriver: the row description needs the molecule; '
+                'call compute first.')
+            self.row_description = RowDescription(
+                self.impes_coordinate.z_matrix_dict, self.molecule.get_labels(),
+                bond_scale=self.bond_scale, bond_rule=self.bond_rule,
+                angle_rule=self.angle_rule, exo_sat_lever=self.exo_sat_lever)
+        return self.row_description
+
+    def _get_permutations(self):
+        """
+        Returns the permutations of the Shepard sum: [None] (the current
+        geometry only) for permutation_symmetry = 'none', otherwise the
+        feasible permutations of impermutations (identity first, as None),
+        built once from the z-matrix bonds and the atom labels.
+        """
+
+        if self.permutation_symmetry == 'none':
+            return [None]
+        if self.permutations is None:
+            perms = feasible_permutations(self.impes_coordinate.z_matrix_dict['bonds'],
+                                          self.molecule.get_labels(),
+                                          self.permutation_symmetry)
+            moved = sorted({int(a) for perm in perms for a in np.flatnonzero(perm != np.arange(perm.size))})
+            excluded = set(int(a) for a in self.symmetry_information[4])
+            assert_msg_critical(
+                not (excluded & set(moved)),
+                'InterpolationDriver: permutation_symmetry needs the permuted atoms '
+                f'{[a + 1 for a in moved]} (1-based) in the weights, but symmetry_information[4] '
+                'excludes some of them. Set use_symmetry = False (OpenMMIMDynamics) or '
+                'exclude_non_core = False (IMForceFieldGenerator).')
+            self.permutations = [None] + perms[1:]
+            self.ostream.print_info(
+                f'Permutation symmetry ({self.permutation_symmetry}): {len(perms)} permutations '
+                f'of the atoms {[a + 1 for a in moved]} (1-based).')
+            self.ostream.flush()
+        return self.permutations
 
     def mark_runtime_data_cache_dirty(self):
         """
@@ -548,6 +695,7 @@ class InterpolationDriver:
         weights_cart = []
         weight_gradients_cart = []
         used_labels = []
+        used_permutations = []
         self.potentials = []
         self.gradients = []
         self.dw_dalpha_list = []
@@ -568,57 +716,111 @@ class InterpolationDriver:
                 sqrt_masses * inv_sqrt_masses, 1.0, rtol=0.0, atol=1.0e-12):
             sqrt_masses = 1.0 / np.asarray(inv_sqrt_masses, dtype=np.float64)
 
-        distances_and_gradients = []
+        # The Shepard sum runs over the permutations of permutation_symmetry
+        # ([None]: the current geometry only, VeloxChem's own interpolation).
+        # For a permutation P the geometry is relabelled to P x; every
+        # datapoint then contributes w_i(P x) T_i(P x).
+        coordinates = self.impes_coordinate.cartesian_coordinates.copy()
+        permutations = self._get_permutations()
 
-        if self.weightfunction_type == 'cartesian':
-            for dp_index, data_point in enumerate(self.qm_data_points[:]):
+        for perm in permutations:
 
-                self._check_datapoint_z_matrix(data_point)
+            if perm is not None:
+                self.define_impes_coordinate(coordinates[perm])
+                # the QM-check diagnostics stay those of the identity
+                n_diagnostics = len(self.bond_rmsd)
+                # the radius derivatives that this pass appends (radius fit)
+                n_radius_terms = len(self.dw_dX_dalpha_list)
+                # the records that this pass appends (cached radius fit)
+                n_records = len(self.pair_term_records or [])
 
-                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, _ = self.cartesian_distance(data_point)
+            distances_and_gradients = []
 
-                distances_and_gradients.append((distance, dihedral_dist, dp_index, denominator, weight_gradient, distance_vec))
+            if self.weightfunction_type == 'cartesian':
+                for dp_index, data_point in enumerate(self.qm_data_points[:]):
 
-        elif self.weightfunction_type == 'internal':
-            for dp_index, data_point in enumerate(self.qm_data_points[:]):
+                    self._check_datapoint_z_matrix(data_point)
 
-                self._check_datapoint_z_matrix(data_point)
+                    distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, _ = self.cartesian_distance(data_point)
 
-                distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, _ = self.internal_distance(data_point)
+                    distances_and_gradients.append((distance, dihedral_dist, dp_index, denominator, weight_gradient, distance_vec))
 
-                distances_and_gradients.append((distance, dihedral_dist, dp_index, denominator, weight_gradient, distance_vec))
+            elif self.weightfunction_type == 'internal':
+                for dp_index, data_point in enumerate(self.qm_data_points[:]):
 
-        else:
-            errtxt = "Unrecognized weight function type: "
-            errtxt += self.weightfunction_type
-            raise ValueError(errtxt)
+                    self._check_datapoint_z_matrix(data_point)
 
-        close_distances = [
-            (self.qm_data_points[index], distance, dihedral_dist, denom, wg, distance_vec, index)
-            for distance, dihedral_dist, index, denom, wg, distance_vec in distances_and_gradients]
+                    distance, dihedral_dist, denominator, weight_gradient, distance_vec, _, _, _ = self.internal_distance(data_point)
 
-        for (qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, _, label_idx) in close_distances:
+                    distances_and_gradients.append((distance, dihedral_dist, dp_index, denominator, weight_gradient, distance_vec))
 
-            weight_cart = 1.0 / (denominator_cart)
+            else:
+                errtxt = "Unrecognized weight function type: "
+                errtxt += self.weightfunction_type
+                raise ValueError(errtxt)
 
-            potential, gradient_mw, _ = self.compute_potential(
-                qm_data_point,
-                self.impes_coordinate.internal_coordinates_values,
-            )
+            if perm is not None:
+                # cartesian_distance / internal_distance stored d(grad w)/dR
+                # for the atoms of the relabelled geometry; map them back like
+                # grad w and grad T below (dw/dR is a number and needs nothing)
+                for k in range(n_radius_terms, len(self.dw_dX_dalpha_list)):
+                    self.dw_dX_dalpha_list[k] = self._unpermuted(self.dw_dX_dalpha_list[k], perm)
+                # the same for v and grad A of the records (d and A are numbers)
+                if self.pair_term_records is not None:
+                    for k in range(n_records, len(self.pair_term_records)):
+                        distance, v, a_imp, grad_a_imp = self.pair_term_records[k]
+                        self.pair_term_records[k] = (
+                            distance, self._unpermuted_in_weights(v, perm), a_imp,
+                            None if grad_a_imp is None else self._unpermuted_in_weights(grad_a_imp, perm))
 
-            gradient = gradient_mw
-            if mass_weighted_b_matrix:
-                gradient = sqrt_masses * gradient_mw.reshape(-1)
-                gradient = gradient.reshape(gradient_mw.shape)
-            gradients.append(gradient)
+            close_distances = [
+                (self.qm_data_points[index], distance, dihedral_dist, denom, wg, distance_vec, index)
+                for distance, dihedral_dist, index, denom, wg, distance_vec in distances_and_gradients]
 
-            potentials.append(potential)
-            used_labels.append(label_idx)
-            weights_cart.append(weight_cart)
-            self.potentials.append(potential)
-            self.gradients.append(gradient)
-            weight_gradients_cart.append(weight_grad_cart)
-            weight_fallback_metrics.append(float(abs(distance)) if np.isfinite(distance) else np.inf)
+            for (qm_data_point, distance, dihedral_dist, denominator_cart, weight_grad_cart, _, label_idx) in close_distances:
+
+                weight_cart = 1.0 / (denominator_cart)
+
+                potential, gradient_mw, _ = self.compute_potential(
+                    qm_data_point,
+                    self.impes_coordinate.internal_coordinates_values,
+                )
+
+                gradient = gradient_mw
+                if mass_weighted_b_matrix:
+                    gradient = sqrt_masses * gradient_mw.reshape(-1)
+                    gradient = gradient.reshape(gradient_mw.shape)
+                if perm is not None:
+                    # gradients at P x belong to the relabelled atoms; map them
+                    # back: d/dx f(x[perm]) has the entries of (grad f)(x[perm])
+                    # at the rows perm
+                    gradient = self._unpermuted(gradient, perm)
+                    weight_grad_cart = self._unpermuted(weight_grad_cart, perm)
+                gradients.append(gradient)
+
+                potentials.append(potential)
+                used_labels.append(label_idx)
+                used_permutations.append(perm)
+                weights_cart.append(weight_cart)
+                self.potentials.append(potential)
+                self.gradients.append(gradient)
+                weight_gradients_cart.append(weight_grad_cart)
+                weight_fallback_metrics.append(float(abs(distance)) if np.isfinite(distance) else np.inf)
+
+            if perm is not None:
+                del self.bond_rmsd[n_diagnostics:]
+                del self.angle_rmsd[n_diagnostics:]
+                del self.dihedral_rmsd[n_diagnostics:]
+
+        if permutations[-1] is not None:
+            # back to the current geometry for the callers
+            self.define_impes_coordinate(coordinates)
+
+        # the datapoint of every term (entry of potentials, gradients, the
+        # weight arrays and the radius derivatives); the radius fit sums the
+        # terms of a datapoint, whose copies share its radius
+        self.term_datapoint_indices = list(used_labels)
+        self.term_permutations = used_permutations
 
         # --- initialise accumulators -------------------------------------------------
         self.impes_coordinate.energy = 0.0
@@ -718,7 +920,33 @@ class InterpolationDriver:
 
         # --- 4.  book-keeping (optional) ---------------------------------------------
         for lbl, Wi in zip(used_labels, W_i):
-            self.weights[lbl] = Wi
+            # summed over the permutations of a datapoint
+            self.weights[lbl] = self.weights.get(lbl, 0.0) + Wi
+
+    @staticmethod
+    def _unpermuted(array, perm):
+        """
+        Maps a per-atom array (natoms, 3) of the relabelled geometry x[perm]
+        back to the atoms of x.
+        """
+
+        out = np.empty_like(array)
+        out[perm] = array
+        return out
+
+    def _unpermuted_in_weights(self, array, perm):
+        """
+        Maps a per-atom array over the atoms in the weights (all atoms but
+        symmetry_information[4], in increasing order) of the relabelled
+        geometry x[perm] back to the atoms of x. The permutations do not move
+        the other atoms (_get_permutations).
+        """
+
+        natoms = perm.size
+        weight_atoms = np.delete(np.arange(natoms), self.symmetry_information[4])
+        full = np.zeros((natoms, 3))
+        full[weight_atoms] = np.reshape(array, (-1, 3))
+        return self._unpermuted(full, perm)[weight_atoms].reshape(np.shape(array))
 
     def _check_datapoint_z_matrix(self, data_point):
         """
@@ -827,6 +1055,9 @@ class InterpolationDriver:
             impropers, 1 otherwise). The L2 norms of the bond, angle and
             proper-dihedral parts of s are appended to bond_rmsd,
             angle_rmsd and dihedral_rmsd.
+
+            If uses_row_description(), T_i is the model of the RowDescription
+            (see _compute_described_potential); the diagnostics are the same.
         """
 
         natm = data_point.cartesian_coordinates.shape[0]
@@ -838,8 +1069,6 @@ class InterpolationDriver:
         dihedral_end = int(bounds['dihedral_end'])
 
         energy = data_point.energy
-        grad = data_point.internal_gradient.copy()
-        hessian = data_point.internal_hessian.copy()
         dist_org = (org_int_coords.copy() - data_point.internal_coordinates_values)
         dist_check = (org_int_coords.copy() - data_point.internal_coordinates_values)
         chain = np.ones_like(dist_org)
@@ -858,6 +1087,12 @@ class InterpolationDriver:
         self.angle_rmsd.append(np.sqrt(np.mean(np.sum(dist_org[bond_end:angle_end]**2))))
         self.dihedral_rmsd.append(np.sqrt(np.mean(np.sum(dist_check[dihedral_start:dihedral_end]**2))))
 
+        if self.uses_row_description():
+            return self._compute_described_potential(data_point, org_int_coords)
+
+        grad = data_point.internal_gradient.copy()
+        hessian = data_point.internal_hessian.copy()
+
         pes = (
             energy
             + np.matmul(dist_check.T, grad)
@@ -870,6 +1105,34 @@ class InterpolationDriver:
 
         pes_prime = np.matmul(self.impes_coordinate.b_matrix.T, (grad + dist_hessian_eff)).reshape(natm, 3)
         return pes, pes_prime, (grad + dist_hessian_eff)
+
+    def _compute_described_potential(self, data_point, org_int_coords):
+        """
+        The Taylor model T_i in the rows of the RowDescription of the
+        settings, with the rotor form rotor_form. g and H of the datapoint are
+        computed from its Cartesian gradient and Hessian when the datapoint
+        is first used with this description (InterpolationDatapoint.
+        apply_row_description). Returns the same triple as compute_potential;
+        the gradient is in the metric of impes_coordinate.b_matrix, the
+        internal vector in the rows of the description.
+        """
+
+        desc = self._get_row_description()
+        if getattr(data_point, 'described_key', None) != desc.key:
+            data_point.apply_row_description(desc)
+
+        coordinate = self.impes_coordinate
+        p, b_matrix = desc.plain_bonds(org_int_coords, coordinate.b_matrix,
+                                       desc.n_bonds,
+                                       coordinate.use_inverse_bond_length)
+        energy, gradient, internal = desc.potential(
+            data_point.energy, data_point.described_gradient,
+            data_point.described_hessian, data_point.described_sums, p,
+            data_point.described_p0, b_matrix, rotor_form=self.rotor_form,
+            window_deg=self.c5_window_deg)
+
+        natm = data_point.cartesian_coordinates.shape[0]
+        return energy, gradient.reshape(natm, 3), internal
 
     def _iter_imp_internal_coordinate_rows(self, data_point):
         """
@@ -1944,6 +2207,68 @@ class InterpolationDriver:
         p = scores / s
         return 1.0 / (np.sum(p * p) + eps)
 
+    def heaviest_terms(self, fraction):
+        """
+        Returns the terms of the last compute that carry the given fraction
+        of the normalised weight, heaviest first, as (datapoint index,
+        weight, permutation) tuples: one term per datapoint, or with
+        permutation_symmetry one per copy of a datapoint (permutation None
+        for the identity). These are the entries that
+        determine_important_internal_coordinates diagnoses.
+
+        :param fraction:
+            The fraction of the weight (e.g. 0.8).
+        """
+
+        terms = sorted(zip(self.term_datapoint_indices, self.normalized_weights_array,
+                           self.term_permutations), key=lambda term: term[1], reverse=True)
+        total = sum(self.normalized_weights_array)
+        chosen, cumulative = [], 0.0
+        for term in terms:
+            cumulative += term[1]
+            chosen.append(term)
+            if cumulative >= fraction * total:
+                break
+        return chosen
+
+    @staticmethod
+    def _permuted_rows(perm, coords_flat, kinds_flat):
+        """
+        Returns, for every row of the flattened z-matrix, the row that
+        measures at the current geometry x the coordinate that it measures
+        at the relabelled geometry x[perm] (atom a of x[perm] is atom
+        perm[a] of x), or None if the z-matrix does not hold every
+        relabelled row. Bonds, angles and dihedrals read the same backwards;
+        impropers must match exactly.
+        """
+
+        def key(kind, atoms):
+            return kind, (atoms if kind == 'improper' else min(atoms, atoms[::-1]))
+
+        index = {key(kind, tuple(coord)): r for r, (coord, kind) in enumerate(zip(coords_flat, kinds_flat))}
+        rows = [index.get(key(kind, tuple(int(perm[a]) for a in coord)))
+                for coord, kind in zip(coords_flat, kinds_flat)]
+        if None in rows or len(set(rows)) != len(rows):
+            return None
+        return np.array(rows, dtype=np.int64)
+
+    @staticmethod
+    def _rows_of_current_geometry(value, rows, n):
+        """
+        Maps a per-row array, (n,) or (n, n), of the relabelled geometry to
+        the rows of the current geometry (rows of _permuted_rows); any other
+        value is returned as it is.
+        """
+
+        if not isinstance(value, np.ndarray) or value.shape not in ((n,), (n, n)):
+            return value
+        out = np.empty_like(value)
+        if value.ndim == 1:
+            out[rows] = value
+        else:
+            out[np.ix_(rows, rows)] = value
+        return out
+
     def determine_important_internal_coordinates(
         self,
         qm_gradient,
@@ -1974,8 +2299,12 @@ class InterpolationDriver:
         :param z_matrix:
             The z-matrix dictionary.
         :param datapoints:
-            A list of (InterpolationDatapoint, weight) pairs, normally the
-            datapoints that carry most of the interpolation weight.
+            A list of (InterpolationDatapoint, weight) pairs or
+            (InterpolationDatapoint, weight, permutation) triples, normally
+            the terms that carry most of the interpolation weight
+            (heaviest_terms). An entry with a permutation is the copy of the
+            datapoint that the interpolation evaluates at x[permutation]; it
+            is diagnosed there, see the per-datapoint pass.
 
         :return:
             A 4-tuple (primary_constraint, candidate_constraints,
@@ -2049,11 +2378,37 @@ class InterpolationDriver:
         # ------------------------------------------------------------------
         # Per-datapoint diagnostic pass
         # ------------------------------------------------------------------
-        for datapoint, total_weight_contribution in datapoints:
+        # An entry with a permutation (permutation_symmetry) is the copy of
+        # the datapoint that the interpolation evaluates at the relabelled
+        # geometry x[perm] (shepard_interpolation). It is diagnosed there,
+        # with the relabelled QM gradient, and its scores are mapped back to
+        # the rows of x. Diagnosed at x, the datapoint would be compared
+        # across the permutation (e.g. a methyl turned by 120 deg) and the
+        # selection would blame coordinates that the model gets right.
+        coordinates = self.impes_coordinate.cartesian_coordinates.copy()
+
+        for entry in datapoints:
+            datapoint, total_weight_contribution = entry[0], entry[1]
+            perm = entry[2] if len(entry) > 2 else None
+            rows = None if perm is None else self._permuted_rows(perm, coords_flat, kinds_flat)
+            if perm is not None and rows is None:
+                self.ostream.print_warning(
+                    'determine_important_internal_coordinates: the z-matrix does not hold '
+                    'the relabelled coordinates of a permutation; the copy is diagnosed '
+                    'at the current geometry.')
+                self.ostream.flush()
+                perm = None
+            q_now, g_qm_now = q_current, pred_qm_G_int
+            if perm is not None:
+                self.define_impes_coordinate(coordinates[perm])
+                q_now = np.asarray(self.impes_coordinate.internal_coordinates_values, dtype=float)
+                g_qm_now = self.transform_gradient_to_internal_coordinates(
+                    molecule, qm_gradient_mw.reshape(-1, 3)[perm], self.impes_coordinate.b_matrix)
+
             q_dp = np.asarray(datapoint.internal_coordinates_values, dtype=float)
 
             dq_raw, dq_eff, chain = self._compute_internal_differences(
-                q_current=q_current,
+                q_current=q_now,
                 q_ref=q_dp,
                 z_matrix=z_matrix,
             )
@@ -2065,9 +2420,9 @@ class InterpolationDriver:
                 datapoint=datapoint,
                 molecule=molecule,
                 z_matrix=z_matrix,
-                q_current=q_current,
+                q_current=q_now,
                 q_ref=q_dp,
-                g_qm_int=np.asarray(pred_qm_G_int, dtype=float),
+                g_qm_int=np.asarray(g_qm_now, dtype=float),
             )
 
             response_score = np.asarray(diag_result["response_score"], dtype=float)
@@ -2098,7 +2453,7 @@ class InterpolationDriver:
                 k_support = max(1, int(np.ceil(support_top_frac * N)))
                 support_mask[order_dp[:k_support]] = 1.0
 
-            per_dp_results.append({
+            result = {
                 "datapoint": datapoint,
                 "dp_weight": float(total_weight_contribution),
                 "dq_raw": dq_raw.copy(),
@@ -2112,7 +2467,13 @@ class InterpolationDriver:
                 "local_coord_score": local_coord_score.copy(),
                 "support_mask": support_mask.copy(),
                 "norm_displacement": norm_displacement.copy(),
-            })
+            }
+            if perm is not None:
+                # back to the current geometry; the scores to the rows of x
+                self.define_impes_coordinate(coordinates)
+                result = {key: self._rows_of_current_geometry(value, rows, N)
+                          for key, value in result.items()}
+            per_dp_results.append(result)
 
         if not per_dp_results:
             return [], [], [], []

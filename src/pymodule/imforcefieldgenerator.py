@@ -125,6 +125,29 @@ class IMForceFieldGenerator:
         - tc_weight_mode: 'multiplicative' (default) or 'additive_rhee'.
         - use_mass_weight: Mass-weighted Cartesian gradients and Hessians.
           Default: True.
+        - bond_scale, bond_rule, angle_rule, exo_sat_lever, rotor_form,
+          c5_window_deg: Row description of the Taylor models, independent
+          switches (InterpolationDriver, imrowdescription.RowDescription).
+          bond_scale: weight factor c of every bond row, alone the inverse
+          bond coordinate scaled by c (q = c/r); bond_rule: shape
+          (r0/2)(1 - r0^2/r^2) for heavy-atom bonds and weight 2 for ring
+          bonds; angle_rule: cosine shape for angles with an H end outside
+          rings; exo_sat_lever: weight 1/4 on the exocyclic dihedrals of
+          saturated rings; rotor_form: 'none', 'b1' (m-fold collective
+          torsion of every rotatable bond) or 'c5' (b1, continuous through
+          180 degrees, window from c5_window_deg). Defaults 1.0, False,
+          False, False, 'none', 150.0: VeloxChem's own model. Other values
+          need use_eq_bond_length = False. The database format does not
+          change; frozen runs need the same settings.
+        - permutation_symmetry: 'none' (default), 'methyl', 'ring' or 'all':
+          the interpolation sums over the feasible permutations of identical
+          atoms (CX3 rotations, flips of rings on one rotatable bond), so
+          every datapoint also acts at its symmetry-equivalent geometries
+          without new QM (InterpolationDriver). Not with exclude_non_core.
+          With use_opt_confidence_radius the copies of a datapoint share
+          its fitted radius (also with trust_radius_fit_cache).
+          Frozen runs need the same setting (and
+          OpenMMIMDynamics.use_symmetry = False).
         - exclude_non_core: Exclude H atoms (and non-core atoms) from the
           weight distance. Default: False.
         - consider_locality: Allow more constraints in the constrained
@@ -217,6 +240,18 @@ class IMForceFieldGenerator:
         - identify_relevant_int_coordinates: Constraint-optimise new
           datapoints along their important internal coordinates. Default:
           True. (identfy_relevant_int_coordinates is a deprecated alias.)
+        - ring_pucker_constraints: In that constrained optimisation, also
+          keep the pucker of every flexible ring the important coordinates
+          touch (N - 3 ring torsions frozen); such datapoints store no
+          important coordinates. Default: False.
+        - reset_to_added_point: If False (default), the construction MD is
+          reset to its start structure after every addition (and every
+          deferred reference). If True, it is not reset: after an addition it
+          continues from the re-optimised datapoint (where the interpolation
+          is exact), superimposed onto the current structure, with the QM
+          velocities rescaled for the thermal energy the re-optimisation
+          removed; without re-optimisation it continues from the current
+          structure. Default: False.
         - use_opt_confidence_radius: [fit the confidence radii to the
           reference structures (default False), fit mode ('multi_grad'),
           initial radius of every new datapoint in bohr (0.5), energy weight
@@ -232,7 +267,7 @@ class IMForceFieldGenerator:
           cache of the raw weights at radius 0.5, and the fit in closed form.
           The groups are the same, and the loss and gradient equal those of
           the default fit to round-off. Memory: 8 x references x free
-          datapoints x (9 natoms + 3) bytes. Default: False.
+          datapoints x permutations x (9 natoms + 3) bytes. Default: False.
         - sampling_settings: xTB pre-screen of the QM checks, {'enabled':
           False, 'e_thrsh_kcal_per_atom': 0.1} (no other key is read).
         - metadynamics_settings: Well-tempered metadynamics of the dynamics,
@@ -418,6 +453,16 @@ class IMForceFieldGenerator:
         self.use_tc_weights = True
         self.tc_weight_mode = "multiplicative"  # "additive_rhee"
         self.use_mass_weight = True  # set True as it is standard in the YM scheme --> small differences
+        # row description of the Taylor models (InterpolationDriver); the
+        # defaults give VeloxChem's own model
+        self.bond_scale = 1.0 
+        self.bond_rule = False # True or chose self.bond_scaling=100 is also possible
+        self.angle_rule = False
+        self.exo_sat_lever = False
+        self.rotor_form = 'none'
+        self.c5_window_deg = 150.0
+        # permutation-symmetric interpolation (InterpolationDriver)
+        self.permutation_symmetry = 'none'
         self.consider_locality = False
 
         self.eq_bond_length = None
@@ -476,6 +521,10 @@ class IMForceFieldGenerator:
 
         # constraint-optimise new datapoints of the collector along their important internal coordinates
         self.identify_relevant_int_coordinates = True
+        # opt-in: keep the ring pucker in that optimisation; those datapoints store no important coordinates
+        self.ring_pucker_constraints = False
+        # opt-in: no reset to the start after an addition; continue from the re-optimised datapoint
+        self.reset_to_added_point = False
         self._identfy_alias_warned = False
         # [fit the confidence radii, fit mode, initial radius of every new datapoint (bohr), energy weight of the fit]
         self.use_opt_confidence_radius = [False, 'multi_grad', 0.5, 0.3]
@@ -748,7 +797,31 @@ class IMForceFieldGenerator:
             bond_consistency_checK = False
         assert_msg_critical(bond_consistency_checK,
                             "The choice of the bond description needs to be unique! eq can not be used with rinv!")
-        
+
+        # the row description: checked here, before any QM
+        assert_msg_critical(
+            str(self.rotor_form).lower() in ('none', 'b1', 'c5'),
+            f"IMForceFieldGenerator: rotor_form must be 'none', 'b1' or 'c5', not '{self.rotor_form}'.")
+        assert_msg_critical(float(self.bond_scale) > 0.0,
+                            'IMForceFieldGenerator: bond_scale must be positive.')
+        assert_msg_critical(0.0 < float(self.c5_window_deg) < 180.0,
+                            'IMForceFieldGenerator: c5_window_deg must lie between 0 and 180.')
+        row_description = (float(self.bond_scale) != 1.0 or bool(self.bond_rule) or bool(self.angle_rule) or
+                           bool(self.exo_sat_lever) or str(self.rotor_form).lower() != 'none')
+        assert_msg_critical(
+            not (row_description and self.use_eq_bond_length),
+            'IMForceFieldGenerator: bond_scale, bond_rule, angle_rule, exo_sat_lever and rotor_form '
+            'need inverse or plain bond lengths; set use_eq_bond_length = False.')
+        permutation_symmetry = str(self.permutation_symmetry).lower()
+        assert_msg_critical(
+            permutation_symmetry in ('none', 'methyl', 'ring', 'all'),
+            "IMForceFieldGenerator: permutation_symmetry must be 'none', 'methyl', 'ring' or 'all', "
+            f"not '{self.permutation_symmetry}'.")
+        assert_msg_critical(
+            permutation_symmetry == 'none' or not self.exclude_non_core,
+            'IMForceFieldGenerator: permutation_symmetry is not supported with exclude_non_core '
+            '(the permuted atoms must be in the weights).')
+
         def filter_rotatable_bonds(rotatable_bonds, exclude_rot_bonds):
             """
             Removes user-defined bonds from the rotatable bond list.
@@ -1098,6 +1171,13 @@ class IMForceFieldGenerator:
                 'use_tc_weights': self.use_tc_weights,
                 'tc_weight_mode': self.tc_weight_mode,
                 'use_mass_weight': self.use_mass_weight,
+                'bond_scale': self.bond_scale,
+                'bond_rule': self.bond_rule,
+                'angle_rule': self.angle_rule,
+                'exo_sat_lever': self.exo_sat_lever,
+                'rotor_form': self.rotor_form,
+                'c5_window_deg': self.c5_window_deg,
+                'permutation_symmetry': self.permutation_symmetry,
             }
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]] = self.states_interpolation_settings[self.roots_to_follow[0]].copy()
             self.sampling_states_interpolation_settings[self.roots_to_follow[0]]['imforcefield_file'] = self.sampling_imforcefieldfiles[self.roots_to_follow[0]]
@@ -1361,6 +1441,8 @@ class IMForceFieldGenerator:
             'gate_distance_prefilter': self.gate_distance_prefilter,
             'trust_radius_fit_cache': self.trust_radius_fit_cache,
             'identify_relevant_int_coordinates': self.identify_relevant_int_coordinates,
+            'ring_pucker_constraints': self.ring_pucker_constraints,
+            'reset_to_added_point': self.reset_to_added_point,
             'use_minimized_structures': self.use_minimized_structures,
             'exclude_non_core': self.exclude_non_core,
             'temperature_K': self.temperature,
@@ -1420,6 +1502,14 @@ class IMForceFieldGenerator:
                             'IMForceFieldGenerator: the database construction supports a single MPI rank only.')
 
         self._check_user_settings()
+
+        assert_msg_critical(isinstance(self.ring_pucker_constraints, bool),
+                            'IMForceFieldGenerator: ring_pucker_constraints must be True or False.')
+        assert_msg_critical(isinstance(self.reset_to_added_point, bool),
+                            'IMForceFieldGenerator: reset_to_added_point must be True or False.')
+        if self.ring_pucker_constraints and not self.identify_relevant_int_coordinates:
+            self.ostream.print_warning('IMForceFieldGenerator: ring_pucker_constraints has no effect without '
+                                       'identify_relevant_int_coordinates.')
 
         # the basis-set labels per state: the argument, completed by gs_basis_set_label and es_basis_set_label
         default_basis = {'gs': self.gs_basis_set_label, 'es': self.es_basis_set_label}
@@ -1807,6 +1897,8 @@ class IMForceFieldGenerator:
 
             # set optimization features in the construction run
             im_database_driver.identify_relevant_int_coordinates = (self.identify_relevant_int_coordinates, self.use_minimized_structures[1])
+            im_database_driver.ring_pucker_constraints = self.ring_pucker_constraints
+            im_database_driver.reset_to_added_point = self.reset_to_added_point
             im_database_driver.use_opt_confidence_radius = self.use_opt_confidence_radius
             im_database_driver.gate_distance_prefilter = self.gate_distance_prefilter
             im_database_driver.trust_radius_fit_cache = self.trust_radius_fit_cache
@@ -2577,7 +2669,7 @@ class IMForceFieldGenerator:
                         self.eq_bond_length.append(molecule.get_distance([element[0] + 1, element[1] + 1], 'bohr'))
                     elif len(element) == 2:
                         self.eq_bond_length.append(0.0)
-
+            
             # (molecule, basis, states, 1-based constraints) per electronic-state block
             if 0 in entries[2]:
                 adjusted_molecule['gs'].append((entries[0], entries[1], [0], entries[3]))
@@ -4200,7 +4292,11 @@ class IMForceFieldGenerator:
         """
         Builds an InterpolationDriver with all datapoints of a database file
         in memory, set up as the confirmation step does (mass weighting,
-        symmetry information, eq bond lengths from the first point).
+        symmetry information, eq bond lengths from the first point). The
+        datapoints get the metric of the database (inv_sqrt_masses with
+        use_mass_weight), as in the collector: with the row description they
+        rebuild their Taylor models from the stored Cartesian gradient and
+        Hessian, which are in that metric.
 
         :param molecule:
             The molecule (for the masses).
@@ -4229,11 +4325,14 @@ class IMForceFieldGenerator:
 
         im_labels, _ = impes_driver.read_labels()
         impes_driver.qm_data_points = []
+        # the metric of the stored Cartesian gradient and Hessian
+        datapoint_inv_sqrt_masses = inv_sqrt_masses if im_settings[root]['use_mass_weight'] else None
 
         for label in im_labels:
             qm_data_point = InterpolationDatapoint(self.roots_z_matrix[root])
             qm_data_point.update_settings(im_settings[root])
             qm_data_point.read_hdf5(datafile, label)
+            qm_data_point.inv_sqrt_masses = datapoint_inv_sqrt_masses
 
             if impes_driver.impes_coordinate.eq_bond_lengths is None:
                 impes_driver.impes_coordinate.eq_bond_lengths = qm_data_point.eq_bond_lengths
@@ -4578,6 +4677,7 @@ class IMForceFieldGenerator:
         opt_drv = OptimizationDriver(optimization_driver)
         opt_drv.ostream.mute()
         opt_drv.transition = transition
+        opt_drv.hessian = "first"
 
         if constraints is not None:
             opt_drv.constraints = self._build_opt_constraint_list(constraints, index_offset=index_offset)

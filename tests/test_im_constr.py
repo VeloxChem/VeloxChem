@@ -34,9 +34,22 @@ Sections, one test class each:
                          construction with trust_radius_fit_cache, except the
                          reference comparison: the run may amplify the
                          round-off of the fit beyond the reference tolerances
+    4  the insertion variants (default off):
+       TestConstructionWithRestartAtAddedPoint   the tests of TestConstruction
+                         on a construction with reset_to_added_point: after
+                         every addition the dynamics continues at the added
+                         datapoint with the thermal energy the re-optimisation
+                         removed, instead of being reset to its start
+       TestRingPuckerConstraints   the ring torsions ring_pucker_constraints
+                         freezes in the re-optimisation (no QM)
+
+The construction runs with the generator's optimisations as they are: every
+geomeTRIC optimisation of the seed stage starts from an exact Hessian
+(opt_drv.hessian = 'first'); the reference run in data/ was made that way.
 """
 
 from contextlib import contextmanager
+from itertools import combinations
 from pathlib import Path
 import json
 import os
@@ -51,6 +64,7 @@ import h5py
 import numpy as np
 import openmm as mm
 import openmm.unit as unit
+import pytest
 
 import veloxchem
 from veloxchem.molecule import Molecule
@@ -65,6 +79,7 @@ from veloxchem.imdatabasepointcollecter import IMDatabasePointCollecter
 from veloxchem.interpolationdatapoint import InterpolationDatapoint
 from veloxchem.interpolationdriver import InterpolationDriver
 from veloxchem.openmmimdynamics import OpenMMIMDynamics
+from veloxchem.superimpose import svd_superimpose
 from veloxchem.veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol, hartree_in_kjpermol
 
 DATA = Path(__file__).parent / 'data'
@@ -465,6 +480,34 @@ class TestConstruction:
         assert all(1.0e-3 <= radius <= 1.0 for radius in radii)
         assert any(radius != SETTINGS['use_opt_confidence_radius'][2] for radius in radii)
 
+    def test_trajectory_after_an_addition(self):
+        """
+        reset_to_added_point off (default): after every addition, and after
+        every check kept as a reference before 20 references exist, the
+        trajectory is reset to its start structure (with the start velocities
+        in NVE; those are compared step by step in test_same_as_reference_run).
+        The later steps of the dynamics record at the start structure are
+        exactly these resets, except one after a QM check at the first step
+        (the start structure is far from the seed, so the first check may come
+        at once; it is then the first reference and resets to where the
+        trajectory already is). (The recorded kinetic energy is not compared:
+        OpenMM's leapfrog Verlet reports it half a step ahead, with the forces
+        of the database at that step, which changes with every addition.)
+        """
+
+        decisions = re.findall(r'Add datapoint:\s+(yes|no \(threshold exceeded|no)', self.output)
+        resets = decisions.count('yes') + decisions.count('no (threshold exceeded')
+        record = dynamics_record(self.generator)
+        first_reference = references(self.path / REFERENCES)['coordinates'][0]
+        reset_at_the_start = (np.max(np.abs(first_reference - record['coordinates'][0])) < 1.0e-8 and
+                              decisions[0] != 'no')
+
+        at_start = [k for k in range(1, len(record['kinetic_energy']))
+                    if np.max(np.abs(record['coordinates'][k] - record['coordinates'][0])) < 1.0e-10]
+        assert resets >= 1
+        assert len(at_start) == resets - int(reset_at_the_start)
+        assert 'Restart at the added datapoint' not in self.output
+
     def frozen_dynamics(self, timestep, nsteps):
         """
         OpenMMIMDynamics on the constructed database, with the interpolation
@@ -856,9 +899,122 @@ class TestConstructionWithFitCache(TestConstruction):
         assert history(self.path / DATABASE)[-1]['trust_radius_fit_cache'] is True
 
 
+# ---------------------------------------------------------------------------
+# 4. The insertion variants (default off)
+# ---------------------------------------------------------------------------
+
+
+class TestConstructionWithRestartAtAddedPoint(TestConstruction):
+    """
+    The construction of TestConstruction with reset_to_added_point. The
+    trajectory is never reset to its start: after an addition it continues at
+    the re-optimised datapoint, where the interpolation is exact, and the
+    velocities are rescaled for the thermal energy the re-optimisation
+    removed. temperature (otherwise unused in NVE) is the temperature of that
+    rescaling, here the temperature of the start state. The known answers of
+    TestConstruction hold; the run is another trajectory than the reference
+    run.
+    """
+
+    settings = {'reset_to_added_point': True, 'temperature': START_TEMPERATURE}
+
+    # another trajectory than the reference run
+    test_same_as_reference_run = None
+
+    def test_trajectory_after_an_addition(self):
+        """
+        After every addition the dynamics record holds the added datapoint (up
+        to a rigid motion: it is superimposed onto the current structure) at
+        the temperature T_start = T (dof + n_relaxed) / dof: the kinetic energy
+        of the dof degrees of freedom at T plus kT/2 for each of the n_relaxed
+        coordinates the re-optimisation relaxed (3N - 6 minus the frozen ones,
+        printed by the collector). OpenMM's leapfrog Verlet reports the
+        kinetic energy half a step ahead (velocities plus half a step of
+        acceleration), so the recorded temperature is T_start within 3 %;
+        neighbouring n_relaxed differ by T / dof (7 % at T = 600 K), so the
+        temperature identifies n_relaxed. No step returns to the start.
+        """
+
+        decisions = re.findall(r'Add datapoint:\s+(yes|no \(threshold exceeded|no)', self.output)
+        restarts = re.findall(r'Restart at the added datapoint: RMSD \S+ A to the current structure, '
+                              r'QM velocities rescaled to T_start = (\S+) K \((\d+) relaxed coordinates\)',
+                              self.output)
+        added = [point['coordinates'] for point in list(datapoints(self.path / DATABASE).values())[1:]]
+        record = dynamics_record(self.generator)
+        natoms = h2o2().number_of_atoms()
+        dof = 3 * natoms - 3
+
+        assert len(restarts) == decisions.count('yes') == len(added) >= 1
+
+        previous_step = 0
+        for coordinates, (printed_t_start, printed_n_relaxed) in zip(added, restarts):
+            # the step at which the trajectory continues at this datapoint
+            steps = [k for k in range(previous_step + 1, len(record['kinetic_energy']))
+                     if svd_superimpose(record['coordinates'][k], coordinates)[0] < 1.0e-6]
+            assert len(steps) == 1
+            step = previous_step = steps[0]
+
+            # the temperature there: T_start of a whole number n_relaxed, the one printed
+            candidates = [n for n in range(3 * natoms - 6 + 1)
+                          if abs(record['temperature'][step] / (START_TEMPERATURE * (dof + n) / dof) - 1.0) < 0.03]
+            assert candidates == [int(printed_n_relaxed)]
+            t_start = START_TEMPERATURE * (dof + candidates[0]) / dof
+            assert abs(float(printed_t_start) - t_start) <= 0.5
+
+        at_start = [k for k in range(1, len(record['kinetic_energy']))
+                    if np.max(np.abs(record['coordinates'][k] - record['coordinates'][0])) < 1.0e-10]
+        assert at_start == []
+
+    def test_settings_are_recorded(self):
+
+        assert history(self.path / DATABASE)[-1]['reset_to_added_point'] is True
+
+
+class TestRingPuckerConstraints:
+    """
+    ring_pucker_constraints: the torsions the re-optimisation of a new
+    datapoint freezes to keep the pucker of a flexible ring. A ring of N atoms
+    has N - 3 pucker coordinates; the collector takes the torsions about every
+    second ring bond, in the orientation of the generator's z-matrix, so that
+    the constrained optimisation can freeze them. An aromatic ring has none.
+    Without QM the choice is not visible from outside, so this test looks
+    inside the collector; the z-matrix is the one set_up_the_system builds
+    (no QM).
+    """
+
+    @pytest.mark.parametrize('smiles, n_torsions', [('C1COCCO1', 3), ('C1CCOC1', 2), ('c1ccccc1', 0)],
+                             ids=['1,4-dioxane', 'tetrahydrofuran', 'benzene'])
+    def test_ring_pucker_torsions(self, tmp_path, smiles, n_torsions):
+
+        molecule = Molecule.read_smiles(smiles)
+        with working_directory(tmp_path):
+            generator = IMForceFieldGenerator(pbe_driver(), ostream=OutputStream(None))
+            generator.add_conformal_structures = False
+            generator.sampling_settings = SETTINGS['sampling_settings']
+            generator.set_up_the_system(molecule)
+        z_matrix = generator.roots_z_matrix[0]
+        bonds = {frozenset(bond) for bond in z_matrix['bonds']}
+
+        collector = IMDatabasePointCollecter(ostream=OutputStream(None))
+        rings = collector._ring_pucker_torsions(z_matrix, molecule.get_labels())
+        torsions = [tuple(torsion) for _, ring_torsions in rings for torsion in ring_torsions]
+
+        assert len(torsions) == n_torsions
+        for ring_atoms, ring_torsions in rings:
+            assert len(ring_torsions) == len(ring_atoms) - 3
+        for torsion in torsions:
+            # a z-matrix dihedral along three bonds of one ring
+            assert torsion in [tuple(dihedral) for dihedral in z_matrix['dihedrals']]
+            assert any(set(torsion) <= set(ring_atoms) for ring_atoms, _ in rings)
+            assert all(frozenset(torsion[i:i + 2]) in bonds for i in range(3))
+        # about every second ring bond: the central bonds share no atom
+        for first, second in combinations(torsions, 2):
+            assert not set(first[1:3]) & set(second[1:3])
+
+
 if __name__ == '__main__':
 
     if sys.argv[1:] == ['--write-reference']:
         write_reference()
     else:
-        print('usage: python test_step3_construction.py --write-reference')
+        print('usage: python test_im_constr.py --write-reference')

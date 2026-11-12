@@ -9,7 +9,7 @@ entry points and check those files.
 
 Sections, one test class each:
     1  TestEntryChecks     settings that cannot work are refused by
-                           set_up_the_system, before any QM
+                           set_up_the_system or compute, before any QM
     2  TestDatapointFile   a datapoint is read back from the database as it
                            was written
     3  TestFrozenSettings  settings changed after set_up_the_system are
@@ -179,9 +179,9 @@ def history(filename):
 
 class TestEntryChecks:
     """
-    set_up_the_system refuses settings that cannot work, before any QM runs.
-    The error then names the wrong setting, instead of a failure later in a
-    long construction.
+    set_up_the_system and compute refuse settings that cannot work, before
+    any QM runs. The error then names the wrong setting, instead of a failure
+    later in a long construction.
     """
 
     def test_two_bond_modes_are_refused(self, tmp_path):
@@ -209,6 +209,72 @@ class TestEntryChecks:
 
         assert restart.drivers['gs'][0].calls == 0
         assert [entry['event'] for entry in history(tmp_path / DATABASE)] == ['seed stage finished']
+
+    @pytest.mark.parametrize('settings', [
+        {'use_inverse_bond_length': False, 'use_eq_bond_length': True, 'bond_rule': True},
+        {'use_inverse_bond_length': False, 'use_eq_bond_length': True, 'rotor_form': 'c5'},
+        {'rotor_form': 'b2'},
+        {'bond_scale': 0.0},
+        {'permutation_symmetry': 'yes'},
+        {'permutation_symmetry': 'methyl', 'exclude_non_core': True},
+    ], ids=['eq-bond_rule', 'eq-rotor_form', 'rotor_form', 'bond_scale', 'permutation_symmetry',
+            'permutation-exclude_non_core'])
+    def test_invalid_row_description_is_refused(self, tmp_path, settings):
+        """
+        The row description needs inverse or plain bonds and valid switch
+        values; the permutation symmetry a valid kind and the permuted atoms
+        in the weights. set_up_the_system refuses the settings before any QM.
+        """
+
+        with working_directory(tmp_path):
+            generator = pbe_generator(**settings)
+            with pytest.raises(VeloxChemError):
+                generator.set_up_the_system(h2o2())
+
+        assert generator.drivers['gs'][0].calls == 0
+        assert not (tmp_path / DATABASE).exists()
+
+    def test_row_description_reaches_the_interpolation_settings(self, tmp_path):
+        """
+        The switches of the row description are frozen with the other
+        interpolation settings in set_up_the_system; every interpolation
+        driver of the construction (collector, radius fit, seed stage, xTB
+        mirror) gets them from this dictionary, and the history of the
+        database records it. The permutation symmetry is accepted together
+        with the radius fit.
+        """
+
+        switches = {'bond_scale': 100.0, 'bond_rule': True, 'angle_rule': True,
+                    'exo_sat_lever': True, 'rotor_form': 'c5', 'c5_window_deg': 160.0,
+                    'permutation_symmetry': 'all'}
+
+        with working_directory(tmp_path):
+            generator = pbe_generator(use_opt_confidence_radius=[True, 'multi_grad', 0.5, 0.3], **switches)
+            generator.set_up_the_system(h2o2())
+
+        frozen = generator.states_interpolation_settings[0]
+        for name, value in switches.items():
+            assert frozen[name] == value
+        assert generator.sampling_states_interpolation_settings[0]['rotor_form'] == 'c5'
+        assert generator.drivers['gs'][0].calls == 0
+
+    @pytest.mark.parametrize('setting', ['ring_pucker_constraints', 'reset_to_added_point'])
+    def test_insertion_switches_must_be_true_or_false(self, tmp_path, setting):
+        """
+        ring_pucker_constraints and reset_to_added_point decide how a new
+        datapoint is re-optimised and where the dynamics continues after it. A
+        value other than True or False, e.g. the string 'False' (which is
+        true), is refused by compute before any QM.
+        """
+
+        with working_directory(tmp_path):
+            generator = pbe_generator(**{setting: 'False'})
+            generator.set_up_the_system(h2o2())
+            with pytest.raises(VeloxChemError):
+                generator.compute(h2o2())
+
+        assert generator.drivers['gs'][0].calls == 0
+        assert not (tmp_path / DATABASE).exists()
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +342,44 @@ class TestDatapointFile:
             attrs = h5f[f'point_1_{suffix}_dihedral_cartesian_hessian'].attrs
             assert bool(attrs['mass_weighted']) == mass_weighted
             assert attrs['bond_mode'] == suffix
+
+    def test_final_check_reads_the_database_in_its_metric(self, tmp_path):
+        """
+        The final quality check and the error-driven growth of the network
+        seed stage evaluate the database with the driver of
+        IMForceFieldGenerator._load_interpolation_driver. With the row
+        description on, every datapoint rebuilds its Taylor model from the
+        stored Cartesian gradient and Hessian, which are mass-weighted (the
+        default). The loader must give the datapoints that metric, as the
+        collector does (known issue K56). At the datapoint the switches of
+        the row description do not change the model, so the energy and
+        gradient equal those without the row description (both differ from
+        the PBE gradient only by its translation and rotation part, 2e-5
+        Eh/bohr). Without the metric the gradient was off by 6e-3 Eh/bohr
+        and the final check reported the errors of another PES. The test
+        looks inside the generator because the effect shows only in the
+        energies of the final check.
+        """
+
+        molecule = h2o2()
+        results = {}
+        for name, switches in (('native', {}), ('row description', {'bond_rule': True, 'angle_rule': True})):
+            directory = tmp_path / name.replace(' ', '_')
+            directory.mkdir()
+            written, _ = self.datapoint(molecule, 'inverse', mass_weighted=True)
+            written.write_hdf5(directory / DATABASE, 'point_1')
+
+            with working_directory(directory):
+                generator = pbe_generator(**switches)
+                generator.set_up_the_system(molecule)
+                driver = generator._load_interpolation_driver(
+                    molecule, 0, generator.states_interpolation_settings, DATABASE)
+            driver.compute(molecule)
+            results[name] = (driver.get_energy(), np.array(driver.get_gradient()))
+            assert generator.drivers['gs'][0].calls == 0
+
+        assert abs(results['row description'][0] - self.qm_data[0]) < 1.0e-10
+        assert np.max(np.abs(results['row description'][1] - results['native'][1])) < 1.0e-10
 
 
 # ---------------------------------------------------------------------------
