@@ -548,6 +548,14 @@ class ReactionSystemBuilder():
         if self.CNT or self.graphene or self.solvent:
             box = self._configure_pbc(system, topology, nb_force, box)  # A
             if self.solvent:
+                if self.pdb is not None and self.neutralize:
+                    # The molecule read from the PDB file has charge 0, so
+                    # SolvationBuilder would add no counter-ions.
+                    pdb_charge = self._pdb_total_charge(nb_force)
+                    vlx_mol.set_charge(pdb_charge)
+                    self.ostream.print_info(
+                        f"Total charge of the PDB system: {pdb_charge:d}")
+                    self.ostream.flush()
                 box = self._add_solvent(system, vlx_mol, self.solvent, topology,
                                         nb_force, self.neutralize, self.padding,
                                         box)
@@ -578,6 +586,33 @@ class ReactionSystemBuilder():
 
         self.ostream.flush()
         return system, nb_force, E_field
+
+    def _pdb_total_charge(self, nb_force):
+        """Integer total charge of a PDB-route system, before solvation.
+
+        The fragment atoms and the cut hosts do not carry their final charges
+        yet (they are set per lambda), so their NonbondedForce charges are
+        replaced by the fragment's net charge: the fragment atoms keep their
+        fragment charges, and each host carries its H cap's.
+        """
+
+        fragment = {atom.index for atom in self.reaction_atoms.values()}
+        fragment.update(host.index for host in self._cut_caps.values())
+        total = sum(
+            nb_force.getParticleParameters(i)[0].value_in_unit(
+                mmunit.elementary_charge)
+            for i in range(nb_force.getNumParticles())
+            if i not in fragment)
+        if not self.no_reactant:
+            total += sum(
+                atom['charge'] for atom in self.reactant.atoms.values())
+        assert_msg_critical(
+            abs(total - round(total)) < 1e-4,
+            f"ReactionSystemBuilder: the PDB system carries a total charge of "
+            f"{total:.6f} e, not an integer, so it cannot be neutralized. "
+            "Check the fragment charges and the charges of the residues in "
+            "pdb_active_res, including the rest of any cut residue.")
+        return int(round(total))
 
     def _system_from_pdb(self):
         if self.pdb[-4:] == '.cif':
