@@ -153,11 +153,17 @@ class EvbSystemBuilder:
 
         self.graphene = False
         self.graphene_size_nm = 4
+        self.graphene_distance_angstrom = 5.0
         self.CNT = False
         self.CNT_radius_nm = 0.5
 
         self.begin_index = 0
-        self.water_model: str
+        self.water_model: str = 'spce'
+        self.solvent_molecules = None
+        self.solvent_proportions = None
+        self.target_density = None  # total packed system, including graphene
+        self.solvent_forcefields = None  # optional, in solvent_molecules order
+        self.solvation_builder = None
         self.decompose_bonded = True
         self.decompose_nb: list | None = None
 
@@ -192,6 +198,11 @@ class EvbSystemBuilder:
             "dynamic_bond_fc_factor": float,
             "pressure": float,
             "solvent": str,
+            "water_model": str,
+            "solvent_molecules": list,
+            "solvent_proportions": list,
+            "target_density": float,
+            "solvent_forcefields": list,
             "padding": float,
             "no_reactant": bool,
             "E_field": list,
@@ -208,6 +219,7 @@ class EvbSystemBuilder:
             "nb_switching_function": bool,
             'graphene': bool,
             'graphene_size_nm': float,
+            'graphene_distance_angstrom': float,
             "CNT": bool,
             "CNT_radius_nm": float,
             "decompose_nb": list,
@@ -327,7 +339,7 @@ class EvbSystemBuilder:
             self._add_implicit_solvent(system, topology, nb_force)
 
         E_field = None
-        if np.any(np.array(self.E_field) > 0.001):
+        if np.any(np.abs(np.array(self.E_field)) > 0.001):
             E_field = self._add_E_field(system, self.E_field)
 
         self.topology: mmapp.Topology = topology
@@ -746,7 +758,9 @@ class EvbSystemBuilder:
             "comment": 'Graphene torsion, X -X -c -o GAFF parameters'
         }
 
-        sigma = 0.3851
+        # UFF C_R: x = 3.851 A is the LJ minimum distance (r_min), not sigma;
+        # sigma = r_min / 2^(1/6), as in uffparameters.get_uff_parameters()
+        sigma = 0.3851 / 2.0**(1.0 / 6.0)
         epsilon = 0.4396
 
         bonds = {}
@@ -767,7 +781,9 @@ class EvbSystemBuilder:
         if self.graphene:
             x_offset = middle_x - X / 2
             y_offset = middle_y - Y / 2
-            z_offset = min_z - 5
+            if self.graphene_distance_angstrom <= 0:
+                raise ValueError('graphene_distance_angstrom must be positive.')
+            z_offset = min_z - self.graphene_distance_angstrom
         else:
             x_offset = middle_x - X / 2
             y_offset = min_y - 0.7 * (R + 1)
@@ -1038,33 +1054,47 @@ class EvbSystemBuilder:
 
         vlxsysbuilder = SolvationBuilder(ostream=self.ostream)
 
-        mols_per_nm3, density, smiles_code = vlxsysbuilder._solvent_properties(
-            solvent)
-        vlxsysbuilder.solvate(
-            solute=system_mol,
-            solvent=solvent,
-            padding=padding,
-            neutralize=neutralize,
-            target_density=density,
-            box=box  # A
-        )
+        self.solvation_builder = vlxsysbuilder
+        if self.solvent_molecules is not None:
+            if self.solvent_proportions is None:
+                raise ValueError('solvent_proportions is required for a mixture.')
+            if self.solvent_forcefields is not None and len(self.solvent_forcefields) != len(self.solvent_molecules):
+                raise ValueError('Supply one force field per solvent species.')
+            vlxsysbuilder.custom_solvate(
+                solute=system_mol,
+                solvents=self.solvent_molecules,
+                proportion=self.solvent_proportions,
+                box_size=box,
+                padding=padding,
+                target_density=self.target_density,
+                neutralize=neutralize,
+            )
+        else:
+            _, density, _ = vlxsysbuilder._solvent_properties(solvent)
+            vlxsysbuilder.solvate(
+                solute=system_mol, solvent=solvent, padding=padding,
+                neutralize=neutralize, target_density=density, box=box)
 
-        self.positions = vlxsysbuilder.system_molecule.get_coordinates_in_angstrom(
-        )
+        self.positions = vlxsysbuilder.system_molecule.get_coordinates_in_angstrom()
         box = [side * 0.1 for side in vlxsysbuilder.box]
+        solvents = list(vlxsysbuilder.solvents)
+        solvent_counts = list(vlxsysbuilder.added_solvent_counts)
+        resnames = [f'S{i+1:02d}' for i in range(len(solvents))]
+        supplied_ffs = (list(self.solvent_forcefields)
+                        if self.solvent_forcefields is not None else [None] * len(solvents))
+        if vlxsysbuilder.added_counterions > 0:
+            counterion = vlxsysbuilder.counterion
+            # Reuse an explicitly provided force field for the same monatomic ion.
+            counterion_ff = next((ff for mol, ff in zip(solvents, supplied_ffs)
+                                 if mol.get_labels() == counterion.get_labels()
+                                 and mol.get_charge() == counterion.get_charge()), None)
+            solvents.append(counterion)
+            solvent_counts.append(vlxsysbuilder.added_counterions)
+            resnames.append('ION')
+            supplied_ffs.append(counterion_ff)
 
-        solvents = vlxsysbuilder.solvents
-        solvent_counts = vlxsysbuilder.added_solvent_counts
-        resnames = ["SOL"] * len(vlxsysbuilder.added_solvent_counts)
-        if hasattr(vlxsysbuilder, "added_counterions"):
-            if vlxsysbuilder.added_counterions > 0:
-                solvents = solvents + [vlxsysbuilder._counterion_molecules()
-                                       ] * vlxsysbuilder.added_counterions
-                solvent_counts = solvent_counts + [
-                    vlxsysbuilder.added_counterions
-                ]
-                resnames = resnames + ["ION"]
-
+        self.solvent_atom_ids = []
+        self.solvent_ff_generators = []
         for i, (solvent_count, vlx_solvent_molecule,
                 resname) in enumerate(zip(solvent_counts, solvents, resnames)):
 
@@ -1085,26 +1115,27 @@ class EvbSystemBuilder:
             solvent_nb_atom_count = 0
             solvent_system_atom_count = 0
             solvent_chain = topology.addChain()
-            solvent_ff = MMForceFieldGenerator(ostream=self.ostream)
+            solvent_ff = supplied_ffs[i]
+            if solvent_ff is None:
+                solvent_ff = MMForceFieldGenerator(ostream=self.ostream)
+                # A monatomic ion's charge is known exactly; avoid RESP fitting.
+                if num_solvent_atoms_per_molecule == 1:
+                    solvent_ff.partial_charges = np.array([vlx_solvent_molecule.get_charge()], dtype=float)
+                solvent_ff.create_topology(
+                    vlx_solvent_molecule,
+                    water_model=self.water_model if vlx_solvent_molecule.is_water_molecule() else None)
+            if solvent_ff.molecule.get_labels() != elements:
+                raise ValueError(f'Force-field atom order does not match solvent species {i}.')
+            ff_charge = sum(atom['charge'] for atom in solvent_ff.atoms.values())
+            if not np.isclose(ff_charge, vlx_solvent_molecule.get_charge(), atol=1e-5, rtol=0):
+                raise ValueError(f'Incorrect force-field charge for solvent species {i}: {ff_charge}.')
+            for atom in solvent_ff.atoms.values():
+                if (not np.all(np.isfinite([atom['charge'], atom['sigma'], atom['epsilon']]))
+                        or atom['sigma'] < 0 or atom['epsilon'] < 0
+                        or (atom['sigma'] == 0 and atom['epsilon'] != 0)):
+                    raise ValueError(f'Invalid nonbonded parameters for solvent species {i}.')
+            self.solvent_ff_generators.append(solvent_ff)
 
-            solvent_ff.create_topology(vlx_solvent_molecule,
-                                       water_model=self.water_model)
-
-            atom_types = [atom['type'] for atom in solvent_ff.atoms.values()]
-            if 'ow' in atom_types and 'hw' in atom_types and len(
-                    atom_types) == 3:
-                water_model = get_water_parameters()[self.water_model]
-                for atom_id, atom in solvent_ff.atoms.items():
-                    solvent_ff.atoms[atom_id] = copy.copy(
-                        water_model[atom['type']])
-                    solvent_ff.atoms[atom_id]['name'] = solvent_ff.atoms[
-                        atom_id]['name'][0] + str(atom_id)
-                for bond_id in solvent_ff.bonds.keys():
-                    solvent_ff.bonds[bond_id] = water_model['bonds']
-                for ang_id in solvent_ff.angles.keys():
-                    solvent_ff.angles[ang_id] = water_model['angles']
-
-            self.solvent_atom_ids = []
             for i in range(solvent_count):
 
                 solvent_residue = topology.addResidue(name=resname,
@@ -1128,6 +1159,7 @@ class EvbSystemBuilder:
                 # add all bonded interactions in this molecule
                 for key, bond in solvent_ff.bonds.items():
                     atom_ids = self._key_to_id(key, local_solvent_atoms)
+                    topology.addBond(local_solvent_atoms[key[0]], local_solvent_atoms[key[1]])
                     self._add_bond(
                         harmonic_bond_force,
                         atom_ids,
@@ -1170,7 +1202,7 @@ class EvbSystemBuilder:
                                 "Sigma is 0 while epsilon is not, which will cause division by 0"
                             )
                     solvent_nb_atom_count += 1
-                    nb_force.addParticle(atom["charge"], atom["sigma"],
+                    nb_force.addParticle(atom["charge"], sigma,
                                          atom["epsilon"])
                 # #Loop over all atoms, and check if their id's are part of any exceptions
                 for i in solvent_ff.atoms.keys():

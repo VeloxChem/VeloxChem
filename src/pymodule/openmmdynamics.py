@@ -2276,7 +2276,7 @@ class OpenMMDynamics:
         self.ostream.flush()
 
         # Add custom hessian forces
-        force_expression = mm.CustomExternalForce("-fx*x-fy*y-fz*z")
+        force_aression = mm.CustomExternalForce("-fx*x-fy*y-fz*z")
         self.system.addForce(force_expression)
         force_expression.addPerParticleParameter("fx")
         force_expression.addPerParticleParameter("fy")

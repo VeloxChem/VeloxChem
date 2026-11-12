@@ -321,116 +321,164 @@ class SolvationBuilder:
                 self.ostream.flush()
                 self.equilibration_flag = True
 
-    def custom_solvate(self, solute, solvents, proportion, box_size):
-        """
-        Solvate the solute
+    def custom_solvate(self, solute, solvents, proportion, box_size=None,
+                       *, padding=1.0, target_density=None, neutralize=False,
+                       strict=True):
+        """Pack a mixture using relative numbers of molecules.
 
-        :param solute:
-            The VeloxChem molecule object of the solute
-        :param solvents:
-            The list of VeloxChem molecule objects of the solvent molecules
-        :param proportion:
-            The proportion of solvent molecules in term of number of molecules.
-        :param box_size:
-            The array with the dimensions of the box (x, y, z)
-        """
+        proportion: nonnegative molecular ratios (not absolute counts).
+        box_size: explicit box lengths in angstrom, overriding padding.
+        padding: nm; used when box_size is omitted.
+        target_density: total initial system density in kg/m^3, including
+            solute and counterions. None retains the legacy 28 non-H/nm^3
+            estimate. Integer counts approximate the requested density.
+        neutralize: balance the rounded mixture AND solute charge using
+            pcharge/ncharge (Na/Cl by default), as additional counterions.
+        strict: raise if packing does not insert all requested molecules.
 
+        This method packs coordinates only. It does not set pH, generate
+        force fields or run dynamics. All use must be single-rank.
+        """
         from scipy.spatial import cKDTree
 
-        # Reset solvent name
+        weights = np.asarray(proportion, dtype=float)
+        if (len(solvents) == 0 or weights.shape != (len(solvents),)
+                or not np.all(np.isfinite(weights))
+                or np.any(weights < 0) or weights.sum() <= 0):
+            raise ValueError('Provide one finite nonnegative proportion per solvent, with a positive sum.')
+        if not np.isfinite(padding) or padding < 0:
+            raise ValueError('padding must be finite and nonnegative (nm).')
+        if target_density is not None and (
+                not np.isfinite(target_density) or target_density <= 0):
+            raise ValueError('target_density must be positive (kg/m^3).')
+        if box_size is not None:
+            box_size = np.asarray(box_size, dtype=float)
+            if (box_size.shape != (3,) or not np.all(np.isfinite(box_size))
+                    or np.any(box_size <= 0)):
+                raise ValueError('box_size must contain three positive lengths in angstrom.')
+
         self.solvent_name = None
         self.equilibration_flag = False
-
-        # Add the solute to the system
+        self.solute_ff = None
+        self.solvent_ffs = []
         self._load_solute_molecule(solute)
         solute_volume = self._get_volume(solute) * 1e-3
+        available_volume, box_center = self._prepare_solvation_box(
+            solute, solute_volume, padding, box_size)
+        self._reset_solvation_state()
+        fractions = weights / weights.sum()
+        masses = np.array([sum(m.get_masses()) for m in solvents])
+        charges = np.array([m.get_charge() for m in solvents], dtype=float)
+        solute_charge = float(solute.get_charge())
+        if neutralize and (not np.allclose(charges, np.rint(charges), rtol=0, atol=1e-8)
+                           or abs(solute_charge - round(solute_charge)) > 1e-8):
+            raise ValueError('Neutralisation requires integer molecular charges.')
+        solute_mass = sum(solute.get_masses())
+        volume_nm3 = float(np.prod(self.box)) * 1e-3
 
-        solute_nonh_count = 0
-        for atom_label in solute.get_labels():
-            if atom_label != 'H':
-                solute_nonh_count += 1
+        # Reuse the existing counterion definitions and masses.
+        ion_molecules = {}
+        if neutralize:
+            for ion_name in (self.pcharge, self.ncharge):
+                self.ion_name = ion_name
+                ion_molecules[ion_name] = self._counterion_molecules()
+            if (ion_molecules[self.pcharge].get_charge() != 1
+                    or ion_molecules[self.ncharge].get_charge() != -1):
+                raise ValueError('pcharge/ncharge must identify +1/-1 counterions.')
 
-        # Define the box
-        self._define_box(*box_size)
+        def counterion_info(net_charge):
+            if not neutralize or net_charge == 0:
+                return None, 0.0
+            name = self.ncharge if net_charge > 0 else self.pcharge
+            return name, abs(net_charge) * sum(ion_molecules[name].get_masses())
 
-        # Estimate quantities
-        # normalize proportion
-        assert_msg_critical(
-            len(solvents) == len(proportion),
-            'SolvationBuilder: The number of solvents and proportions must match.'
-        )
-        assert_msg_critical(
-            len(proportion) > 0,
-            'SolvationBuilder: At least one solvent proportion must be provided.'
-        )
-        assert_msg_critical(
-            all(p > 0 for p in proportion),
-            'SolvationBuilder: All custom solvent proportions must be positive.'
-        )
-        sum_proportion = sum(proportion)
-        normalized_proportion = [p / sum_proportion for p in proportion]
-        # Make rough estimation of quantities based on the empirical
-        # observation that the density of nonhydrogen atoms is around 30 per
-        # nm^3. To give the solvation builder a bit more room for insertion we
-        # use an approximate density of 28 nonhydrogen atoms per nm^3.
-        norm_nonh_count = 0
-        for solvent, norm_prop in zip(solvents, normalized_proportion):
-            for atom_label in solvent.get_labels():
-                if atom_label != 'H':
-                    norm_nonh_count += norm_prop
-        assert_msg_critical(
-            norm_nonh_count > 0.0,
-            'SolvationBuilder: Custom solvents must contain at least one non-hydrogen atom '
-            'to estimate packing.')
-        box_volume_nm3 = box_size[0] * box_size[1] * box_size[2] * 1e-3
-        available_volume_nm3 = box_volume_nm3 - solute_volume
-        assert_msg_critical(
-            available_volume_nm3 > 0.0,
-            'SolvationBuilder: The available solvent volume must be positive. '
-            'Increase the box size or padding.')
-        max_nonh_count = available_volume_nm3 * 28
-        assert_msg_critical(
-            max_nonh_count > 0.0,
-            'SolvationBuilder: The custom solvation box is too small to fit any solvent molecules. '
-            'Increase the box size.')
-        total_solvent_count = int(max_nonh_count / norm_nonh_count)
-        assert_msg_critical(
-            total_solvent_count > 0,
-            'SolvationBuilder: The custom solvation box is too small to fit any solvent molecules. '
-            'Increase the box size.')
-        raw_solvent_counts = np.array(
-            normalized_proportion) * total_solvent_count
-        solvent_counts = np.floor(raw_solvent_counts).astype(int)
-        remaining_count = total_solvent_count - int(solvent_counts.sum())
-        if remaining_count > 0:
-            fractional_parts = raw_solvent_counts - solvent_counts
-            order = np.argsort(-fractional_parts)
-            for solvent_idx in order[:remaining_count]:
-                solvent_counts[solvent_idx] += 1
-        quantities = list(solvent_counts)
+        def composition(total):
+            raw = fractions * total
+            counts = np.floor(raw).astype(int)
+            remainder = total - int(counts.sum())
+            order = np.argsort(-(raw - counts), kind='stable')
+            counts[order[:remainder]] += 1
+            net = solute_charge + float(counts @ charges)
+            if neutralize:
+                net = int(round(net))
+            ion_name, ion_mass = counterion_info(net)
+            mass = solute_mass + float(counts @ masses) + ion_mass
+            return counts, net, ion_name, mass
 
-        # Load the solvent molecules
-        self._clear_system()
-        self._clear_solvent_molecules()
-        self._clear_counterions()
-        for solvent, quantity in zip(solvents, quantities):
-            self._load_solvent_molecule(solvent, quantity)
+        if target_density is None:
+            nonh = np.array([sum(a != 'H' for a in m.get_labels()) for m in solvents])
+            mean_nonh = float(fractions @ nonh)
+            if mean_nonh <= 0:
+                raise ValueError('Legacy packing requires solvent heavy atoms; supply target_density instead.')
+            total = int(28 * available_volume / mean_nonh)
+        else:
+            # Mass in dalton (numerically g/mol); use the same Avogadro
+            # constant as _compute_density for consistent reporting.
+            target_mass = target_density * volume_nm3 * 6.022e-1
+            if target_mass <= composition(0)[3]:
+                raise ValueError('The solute and its counterions already exceed the target mass.')
+            mean_mass = float(fractions @ masses)
+            mean_charge = float(fractions @ charges)
+            lo, hi = 0.0, (target_mass - solute_mass) / mean_mass
+            for _ in range(60):
+                mid = (lo + hi) / 2
+                _, ion_mass = counterion_info(solute_charge + mid * mean_charge)
+                if solute_mass + mid * mean_mass + ion_mass < target_mass:
+                    lo = mid
+                else:
+                    hi = mid
+            estimate = int((lo + hi) / 2)
+            # Compare nearby integer compositions including their counterions.
+            radius = max(16, 2 * len(solvents))
+            candidates = range(max(1, estimate - radius), estimate + radius + 2)
+            total = min(candidates, key=lambda n: abs(composition(n)[3] - target_mass))
 
-        box_center = 0.5 * np.array(self.box)
+        if total <= 0:
+            raise ValueError('The box is too small to contain the mixture.')
+        counts, net, ion_name, mass = composition(total)
+        for molecule, count in zip(solvents, counts):
+            self._load_solvent_molecule(molecule, int(count))
+        requested_ions = abs(int(net)) if neutralize else 0
+        if requested_ions:
+            self.ion_name = ion_name
+            self.counterion = ion_molecules[ion_name]
+            self.added_counterions = requested_ions
+
+        if target_density is not None:
+            self.ostream.print_info(f'Target density: {target_density:.3f} kg/m^3')
+            self.ostream.print_info(
+                f'Density from requested integer counts: {mass / (volume_nm3 * 0.6022):.3f} kg/m^3')
         tree = self._center_solute_and_build_tree(box_center, cKDTree)
-
-        # Solvate the solute with the solvent molecules. For mixed solvents we
-        # insert them in an interleaved order so the achieved composition stays
-        # closer to the requested ratio when the box becomes saturated.
+        # Place neutralising ions before the box becomes crowded. The mixture
+        # packer groups its output; move these ions to the end for exporters.
+        if requested_ions:
+            self._insert_counterions(cKDTree, tree, requested_ions)
+            tree = cKDTree(np.array([atom[-1] for atom in self.system]))
+        ion_end = len(self.system)
         self._pack_solvent_mixture(cKDTree, tree)
-        self.ostream.print_info(
-            'The density of the system after packing is: ' +
-            f'{self._compute_density(box_volume_nm3)} kg/m^3'
-        )
-        self.ostream.print_blank()
-        self.ostream.flush()
-
+        n_solute = solute.number_of_atoms()
+        self.system[:] = (self.system[:n_solute] + self.system[ion_end:]
+                          + self.system[n_solute:ion_end])
         self.system_molecule = self._save_molecule()
+        actual_charge = solute_charge + float(np.array(self.added_solvent_counts) @ charges)
+        if self.counterion is not None:
+            actual_charge += self.added_counterions * self.counterion.get_charge()
+        self.system_molecule.set_charge(actual_charge)
+        self.ostream.print_info(
+            f'The density of the system after packing is: {self._compute_density(volume_nm3)} kg/m^3')
+        self.ostream.print_info(f'Total system charge: {actual_charge:g}')
+        self.ostream.flush()
+        complete = (list(self.added_solvent_counts) == list(counts)
+                    and self.added_counterions == requested_ions)
+        if not complete:
+            message = ('Packing did not reach the requested composition/density: '
+                       f'requested {list(counts)}, inserted {self.added_solvent_counts}; '
+                       f'counterions {self.added_counterions}/{requested_ions}. '
+                       'Inspect the packing threshold/attempts before dynamics.')
+            if strict:
+                raise RuntimeError(message)
+            self.ostream.print_info('WARNING: ' + message)
+            self.ostream.flush()
 
     def _print_solvation_header(self, solvent, padding, equilibrate):
         """
@@ -632,6 +680,8 @@ class SolvationBuilder:
         always tries to insert the most underfilled solvent first.
         """
 
+        initial_count = len(self.system)
+        species_atoms = [[] for _ in self.solvents]
         solvent_count = len(self.solvents)
         added_counts = [0] * solvent_count
         failure_counts = [0] * solvent_count
@@ -660,6 +710,7 @@ class SolvationBuilder:
             idx = ordered_indices[0]
             result = self._insert_molecule(self.solvents[idx], tree)
             if result:
+                species_atoms[idx].extend(result)
                 self.system.extend(result)
                 tree = cKDTree(np.array([atom[-1] for atom in self.system]))
                 added_counts[idx] += 1
@@ -683,6 +734,7 @@ class SolvationBuilder:
             if not progress_made and not active_indices:
                 break
 
+        self.system[initial_count:] = [atom for atoms in species_atoms for atom in atoms]
         self.added_solvent_counts.extend(added_counts)
         for idx, (added_count,
                   quantity) in enumerate(zip(added_counts, self.quantities)):

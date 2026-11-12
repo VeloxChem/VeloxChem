@@ -143,6 +143,38 @@ def _bcast_from_rank0(obj):
     return MPI_CTRL_COMM.bcast(obj, root=0)
 
 
+def _mpi_root_value(action, stage):
+    """Run local Python work on rank 0; share its value or traceback."""
+    payload = None
+    if _is_rank0():
+        try:
+            payload = (action(), None)
+        except Exception:
+            payload = (None, traceback.format_exc())
+    value, error = _bcast_from_rank0(payload)
+    if error is not None:
+        raise RuntimeError(f"{stage} failed on rank 0:\n{error}")
+    return value
+
+
+def _mpi_compute(action, stage):
+    """All ranks enter a driver; share Python errors after it returns.
+
+    A native crash or a hang inside a driver still requires MPI/Slurm to stop
+    the job. This helper cannot recover a broken MPI collective.
+    """
+    value, error = None, None
+    try:
+        value = action()
+    except Exception:
+        error = f"Rank {MPI_RANK}:\n{traceback.format_exc()}"
+    errors = MPI_CTRL_COMM.allgather(error) if MPI_CTRL_COMM is not None else [error]
+    if any(item is not None for item in errors):
+        details = "\n".join(item for item in errors if item is not None)
+        raise RuntimeError(f"{stage} failed:\n{details}")
+    return value
+
+
 def _status(msg: str, *args) -> None:
     """Print and log a status message from MPI rank 0 only."""
     if not _is_rank0():
@@ -155,10 +187,10 @@ def _status(msg: str, *args) -> None:
 # ---------------------------------------------------------------------------
 # Physical constants
 # ---------------------------------------------------------------------------
-G_PROTON_AQ: float   = -0.43676   # au   G(H+, aq, 1M) = -274.1 kcal/mol
+G_PROTON_AQ: float   = -0.43073   # au   G(H+, aq, 1M) = -270.3 kcal/mol
                                    # Tissandier et al. J.Phys.Chem.A 1998 (-265.9 kcal/mol solvation)
                                    # + gas-phase H+ free energy (-6.28 kcal/mol)
-                                   # + 1 atm -> 1 M standard state correction (-1.89 kcal/mol)
+                                   # + 1 atm -> 1 M standard state correction (+1.89 kcal/mol)
                                    # used for DFT/SMD pKa calculations.
                                    # (Truhlar/Cramer convention; widely used with
                                    # implicit solvation models including SMD)
@@ -223,6 +255,8 @@ class GibbsResult:
     geometry_xyz : str
         XYZ block of the optimised geometry (Angstrom).
     is_fragmented:   bool  = False
+    used_vertical_fallback: bool = False
+    vertical_fallback_reason: str = ""
         True if the molecule broke apart during optimisation.
     skeleton_smiles : str
         Charge- and H-stripped canonical SMILES.
@@ -243,6 +277,8 @@ class GibbsResult:
     g_corr:          float = 0.0   # xTB thermal correction: G(xTB) - E_elec(xTB)
     geometry_xyz:    str   = ""
     is_fragmented:   bool  = False
+    used_vertical_fallback: bool = False
+    vertical_fallback_reason: str = ""
     skeleton_smiles: str   = ""
     atom_symbols:    str   = ""
     bond_edges:      str   = ""
@@ -886,6 +922,12 @@ def _load_gibbs_from_h5(path: str) -> GibbsResult:
     kwargs["g_corr"] = float(kwargs.get("g_corr", 0.0))
     kwargs["geometry_xyz"] = str(kwargs.get("geometry_xyz", ""))
     kwargs["is_fragmented"] = bool(kwargs.get("is_fragmented", False))
+    kwargs["used_vertical_fallback"] = bool(
+        kwargs.get("used_vertical_fallback", False)
+    )
+    kwargs["vertical_fallback_reason"] = str(
+        kwargs.get("vertical_fallback_reason", "")
+    )
     kwargs["skeleton_smiles"] = str(kwargs.get("skeleton_smiles", ""))
     kwargs["atom_symbols"] = str(kwargs.get("atom_symbols", ""))
     kwargs["bond_edges"] = str(kwargs.get("bond_edges", ""))
@@ -950,32 +992,28 @@ def _run_sp(
         drv.cpcm_epsilon = cpcm_epsilon
 
     basis = vlx.MolecularBasis.read(mol_obj, basis_name)
-    results = drv.compute(mol_obj, basis)
+    results = _mpi_compute(lambda: drv.compute(mol_obj, basis), "single-point SCF")
 
-    if return_objects:
-        results["scf_driver"] = drv
-        results["basis"] = basis
-        return results
-
-    # Keep only plain Python scalars needed downstream.
-    clean = {}
-
-    for key in (
-        "scf_energy",
-        "energy",
-        "smd_energy",
-        "smd_solvation_energy",
-        "solvation_energy",
-    ):
-        if key in results:
-            try:
+    def extract_scalars():
+        clean = {}
+        for key in ("scf_energy", "energy", "smd_energy",
+                    "smd_solvation_energy", "solvation_energy"):
+            if key in results:
                 clean[key] = float(results[key])
-            except Exception:
-                clean[key] = results[key]
+        if "scf_energy" not in clean and "energy" in clean:
+            clean["scf_energy"] = clean["energy"]
+        if "scf_energy" not in clean:
+            raise RuntimeError("SCF returned no electronic energy.")
+        return clean
 
-    # Your downstream code expects this key.
-    if "scf_energy" not in clean and "energy" in clean:
-        clean["scf_energy"] = clean["energy"]
+    clean = _mpi_root_value(extract_scalars, "single-point result")
+    if return_objects:
+        # Driver/basis objects stay local: never pickle/broadcast them.
+        local_results = dict(results) if isinstance(results, dict) else {}
+        local_results.update(clean)
+        local_results["scf_driver"] = drv
+        local_results["basis"] = basis
+        return local_results
 
     # Explicitly release big objects before the next SCF.
     del results
@@ -1017,7 +1055,7 @@ def _thermal_gibbs(
     For isoatomic reactions (ET: M -> M+, M -> M-) the trans/rot terms are
     nearly identical for both states and cancel in the energy difference.
     For proton-transfer reactions (pKa: M -> M_dep- + H+) the proton's
-    trans/rot contribution is already absorbed into G_PROTON_AQ = -0.43676 au
+    trans/rot contribution is already absorbed into G_PROTON_AQ = -0.43073 au
     (Tissandier 1998), so adding trans/rot again from the MM correction
     double-counts it and gives a wrong pKa.  Using only the vibrational
     correction avoids both problems.
@@ -1233,17 +1271,13 @@ def _xtb_gibbs_correction(
     
     vib.temperature = temperature
 
-    vib_results = vib.compute(mol_obj)
+    vib_results = _mpi_compute(lambda: vib.compute(mol_obj), "xTB frequencies")
 
-    gibbs  = float(vib_results['gibbs_free_energy'])
-    e_xtb  = float(vib.hessian_driver.elec_energy)
-    g_corr = gibbs - e_xtb
+    def extract_correction():
+        return (float(vib_results["gibbs_free_energy"])
+                - float(vib.hessian_driver.elec_energy))
 
-    log.debug(
-        "_xtb_gibbs_correction: G(xTB)=%.6f  E_elec(xTB)=%.6f  g_corr=%.6f au",
-        gibbs, e_xtb, g_corr,
-    )
-    return g_corr
+    return _mpi_root_value(extract_correction, "xTB Gibbs correction")
 
 
 
@@ -1284,38 +1318,42 @@ def _scf_gibbs_correction(
 
 
     basis = vlx.MolecularBasis.read(mol_obj, basis_name)
-    scf_results = scf_drv.compute(mol_obj, basis)
+    scf_results = _mpi_compute(lambda: scf_drv.compute(mol_obj, basis), "frequency SCF")
 
     vib = VibrationalAnalysis(scf_drv)
     vib.temperature = temperature
 
-    vib_results = vib.compute(mol_obj, basis)
+    vib_results = _mpi_compute(lambda: vib.compute(mol_obj, basis), "SCF frequencies")
 
-    gibbs = float(vib_results["gibbs_free_energy"])
+    def extract_correction():
+        gibbs = float(vib_results["gibbs_free_energy"])
 
-    e_scf = None
-    hess_drv = getattr(vib, "hessian_driver", None)
-    if hess_drv is not None and hasattr(hess_drv, "elec_energy"):
-        try:
-            e_scf = float(hess_drv.elec_energy)
-        except Exception:
-            e_scf = None
-    if e_scf is None and hasattr(scf_drv, "elec_energy"):
-        try:
-            e_scf = float(scf_drv.elec_energy)
-        except Exception:
-            e_scf = None
-    if e_scf is None and isinstance(scf_results, dict) and "scf_energy" in scf_results:
-        e_scf = float(scf_results["scf_energy"])
-    if e_scf is None:
-        raise RuntimeError("Could not determine SCF electronic energy for Gibbs correction.")
+        e_scf = None
+        hess_drv = getattr(vib, "hessian_driver", None)
+        if hess_drv is not None and hasattr(hess_drv, "elec_energy"):
+            try:
+                e_scf = float(hess_drv.elec_energy)
+            except Exception:
+                e_scf = None
+        if e_scf is None and hasattr(scf_drv, "elec_energy"):
+            try:
+                e_scf = float(scf_drv.elec_energy)
+            except Exception:
+                e_scf = None
+        if e_scf is None and isinstance(scf_results, dict) and "scf_energy" in scf_results:
+            e_scf = float(scf_results["scf_energy"])
+        if e_scf is None:
+            raise RuntimeError("Could not determine SCF electronic energy for Gibbs correction.")
 
-    g_corr = gibbs - e_scf
-    log.debug(
-        "_scf_gibbs_correction: G(SCF)=%.6f  E_elec(SCF)=%.6f  g_corr=%.6f au",
-        gibbs, e_scf, g_corr,
-    )
-    return g_corr
+        g_corr = gibbs - e_scf
+        log.debug(
+            "_scf_gibbs_correction: G(SCF)=%.6f  E_elec(SCF)=%.6f  g_corr=%.6f au",
+            gibbs, e_scf, g_corr,
+        )
+        return g_corr
+
+    return _mpi_root_value(extract_correction, "SCF Gibbs correction")
+
 
 def _repair_ff_bonds(ff_gen, mol_obj, scale: float = 1.2) -> int:
     """
@@ -1620,6 +1658,19 @@ class RedoxCalculator:
         temperature: float = 298.15,
         ri_jk: bool = True,
         sp_dispersion: bool = True,
+        rerun_spin_density: bool = False,
+        conformer_dynamics_solvent: str = "explicit",
+        conformer_explicit_solvent: str = "spce",
+        conformer_explicit_neutralize: bool = False,
+        conformer_explicit_nonbonded_cutoff_nm: float = 1.0,
+        conformer_explicit_minimize_iterations: int = 2000,
+        conformer_explicit_equilibration_steps: int = 2000,
+        conformer_explicit_equilibration_temperature: float = 300.0,
+        conformer_explicit_sampling_steps: int = 20000,
+        conformer_explicit_sampling_snapshots: int = 200,
+        conformer_explicit_sampling_temperature: float = 1000.0,
+        conformer_explicit_langevin_friction_ps: float = 1.0,
+        conformer_explicit_timestep_fs: float = 0.5,
 
     ) -> None:
         self.output_folder = output_folder
@@ -1648,6 +1699,28 @@ class RedoxCalculator:
         self.temperature = temperature
         self.ri_jk = ri_jk
         self.sp_dispersion = sp_dispersion
+        self.rerun_spin_density = rerun_spin_density
+
+        # OpenMM conformer-dynamics solvent model.  The large-conformer branch
+        # defaults to explicit CSPC/E water.  Set conformer_dynamics_solvent=
+        # "implicit" to recover the previous GB-style OpenMM sampling path.
+        self.conformer_dynamics_solvent = str(conformer_dynamics_solvent).strip().lower()
+        if self.conformer_dynamics_solvent not in {"explicit", "implicit"}:
+            raise ValueError(
+                "conformer_dynamics_solvent must be 'explicit' or 'implicit', "
+                f"got {conformer_dynamics_solvent!r}."
+            )
+        self.conformer_explicit_solvent = str(conformer_explicit_solvent).strip().lower()
+        self.conformer_explicit_neutralize = bool(conformer_explicit_neutralize)
+        self.conformer_explicit_nonbonded_cutoff_nm = float(conformer_explicit_nonbonded_cutoff_nm)
+        self.conformer_explicit_minimize_iterations = int(conformer_explicit_minimize_iterations)
+        self.conformer_explicit_equilibration_steps = int(conformer_explicit_equilibration_steps)
+        self.conformer_explicit_equilibration_temperature = float(conformer_explicit_equilibration_temperature)
+        self.conformer_explicit_sampling_steps = int(conformer_explicit_sampling_steps)
+        self.conformer_explicit_sampling_snapshots = int(conformer_explicit_sampling_snapshots)
+        self.conformer_explicit_sampling_temperature = float(conformer_explicit_sampling_temperature)
+        self.conformer_explicit_langevin_friction_ps = float(conformer_explicit_langevin_friction_ps)
+        self.conformer_explicit_timestep_fs = float(conformer_explicit_timestep_fs)
 
         self._solvation_registry: dict[str, dict[str, float]] = {}
         if _is_rank0():
@@ -1834,42 +1907,110 @@ class RedoxCalculator:
         mol_obj,
         label: str,
         file_tag: str = "",
+        vertical_fallback_xyz: Optional[str] = None,
+        vertical_fallback_g_corr: Optional[float] = None,
+        vertical_fallback_corr_available: bool = True,
     ) -> Optional[GibbsResult]:
-        """
-        Reuse an ET state by exact filename first, then by structure-based
-        matching, otherwise compute it.
-        """
+
         charge = int(mol_obj.get_charge())
         mult = _valid_multiplicity(mol_obj, charge)
         mol_obj.set_multiplicity(mult)
 
         h5_path = self._state_h5_path(mol_obj, label, file_tag=file_tag)
+        existing = None
+        existing_path = h5_path
 
         if os.path.exists(h5_path):
             try:
+                existing = _load_gibbs_from_h5(h5_path)
                 log.info("Reusing existing ET state from %s", h5_path)
-                return _load_gibbs_from_h5(h5_path)
             except Exception as exc:
                 log.warning(
-                    "Could not load existing ET state %s (%s). Will try structure-based reuse.",
+                    "Could not load %s (%s). Trying structure-based reuse.",
                     h5_path,
                     exc,
                 )
 
-        existing, existing_path, existing_tag = self._find_existing_state_by_structure(
-            mol_obj,
-            exact_label=label,
-        )
-        if existing is not None:
-            log.info(
-                "Reusing ET state by structure from %s (tag=%s)",
-                existing_path,
-                existing_tag if existing_tag else '<empty>',
+        if existing is None:
+            existing, existing_path, existing_tag = (
+                self._find_existing_state_by_structure(
+                    mol_obj,
+                    exact_label=label,
+                )
             )
+
+        # Old fragmented ET results were adiabatic calculations on a broken or
+        # rearranged structure.  If the neutral reference geometry is now
+        # available, replace such a result with the vertical fallback.
+        if (
+            existing is not None
+            and label in ("M+", "M-")
+            and existing.is_fragmented
+            and not existing.used_vertical_fallback
+            and vertical_fallback_xyz
+        ):
+            log.warning(
+                "Existing %s state fragmented and has no vertical fallback; "
+                "recomputing it at the optimised neutral geometry.",
+                label,
+            )
+            existing = None
+
+        if existing is not None:
+            if self.rerun_spin_density and label in ("M+", "M_ox"):
+                _status("Rerunning M_ox SCF for spin-density output")
+
+                spin_mol = vlx.Molecule.read_xyz_string(existing.geometry_xyz)
+                spin_mol.set_charge(existing.charge)
+                spin_mol.set_multiplicity(existing.multiplicity)
+
+                sp_solv = _run_sp(
+                    spin_mol,
+                    self.basis_sp,
+                    self.xcfun_sp,
+                    self.ri_jk,
+                    self.sp_dispersion,
+                    self.solvation_model,
+                    existing.multiplicity,
+                    smd_solvent=self.smd_solvent,
+                    return_objects=True,
+                )
+
+                state_name = (
+                    str(existing.label)
+                    .replace("+", "plus")
+                    .replace("-", "minus")
+                    .replace("/", "_")
+                    .replace("\\", "_")
+                    .replace(" ", "_")
+                )
+
+                spin_path = self.calculate_spin_density_and_plot_from_scf(
+                    result=existing,
+                    mol_obj=spin_mol,
+                    basis=sp_solv["basis"],
+                    scf_driver=sp_solv["scf_driver"],
+                    file_tag=Path(existing_path).stem,
+                    state_name=state_name,
+                )
+
+                _print0(f"Saved M_ox spin-density plot: {spin_path}")
+
+                del sp_solv
+                _cleanup_memory("M_ox spin-density rerun finished")
+
             return existing
 
         seed = self._conformer_search(mol_obj, label)
-        return self.compute_gibbs(seed, label, file_tag=file_tag)
+        return self.compute_gibbs(
+            seed,
+            label,
+            file_tag=file_tag,
+            reuse_existing=False,
+            vertical_fallback_xyz=vertical_fallback_xyz,
+            vertical_fallback_g_corr=vertical_fallback_g_corr,
+            vertical_fallback_corr_available=vertical_fallback_corr_available,
+        )
 
     def _get_or_compute_state(self, mol_obj, label: str, file_tag: str = "") -> Optional[GibbsResult]:
         """
@@ -1883,30 +2024,37 @@ class RedoxCalculator:
         mult = _valid_multiplicity(mol_obj, charge)
         mol_obj.set_multiplicity(mult)
 
-        h5_path = self._state_h5_path(mol_obj, label, file_tag=file_tag)
+        def load_existing():
+            h5_path = self._state_h5_path(mol_obj, label, file_tag=file_tag)
 
-        if os.path.exists(h5_path):
-            try:
-                log.info("Reusing existing state from %s", h5_path)
-                return _load_gibbs_from_h5(h5_path)
-            except Exception as exc:
-                log.warning(
-                    "Could not load existing state %s (%s). Will try structure-based reuse.",
-                    h5_path,
-                    exc,
+            if os.path.exists(h5_path):
+                try:
+                    log.info("Reusing existing state from %s", h5_path)
+                    return _load_gibbs_from_h5(h5_path)
+                except Exception as exc:
+                    log.warning(
+                        "Could not load existing state %s (%s). Will try structure-based reuse.",
+                        h5_path,
+                        exc,
+                    )
+
+            existing, existing_path, existing_tag = self._find_existing_state_by_structure(mol_obj)
+            if existing is not None:
+                log.info(
+                    "Reusing state by structure from %s (saved label=%s, tag=%s)",
+                    existing_path,
+                    existing.label,
+                    existing_tag if existing_tag else '<empty>',
                 )
+                return existing
 
-        existing, existing_path, existing_tag = self._find_existing_state_by_structure(mol_obj)
+            return None
+
+        existing = _mpi_root_value(load_existing, f"{label}: cached state lookup")
         if existing is not None:
-            log.info(
-                "Reusing state by structure from %s (saved label=%s, tag=%s)",
-                existing_path,
-                existing.label,
-                existing_tag if existing_tag else '<empty>',
-            )
             return existing
-
         return self.compute_gibbs(mol_obj, label, file_tag=file_tag)
+
 
     def _load_existing_run_results(self, file_tag: str = "") -> list[GibbsResult]:
         """
@@ -2185,10 +2333,223 @@ class RedoxCalculator:
         filename = f"{file_tag}_{state_name}_spin.png"
         path = out_dir / filename
 
+                # Save atomic spin populations for the oxidised state only.
+        if result.label in ("M+", "M_ox"):
+            spin_df = pd.DataFrame({
+                "atom_index": np.arange(len(atom_spin)),
+                "element": mol_obj.get_labels(),
+                "spin_density": atom_spin,
+            })
+
+            csv_path = path.with_suffix(".csv")
+            spin_df.to_csv(csv_path, index=False)
+            print(f"Saved M_ox spin density: {csv_path}")
+
         img.save(str(path))
 
         return str(path)
     
+    def _explicit_solvent_openmm_sampling(self, input_data, label: str):
+        """Run rank-0 OpenMM conformational sampling in explicit solvent.
+
+        The workflow is intentionally the same as the tested standalone CSPC/E
+        preparation used for this project:
+
+        1. Build a GAFF solute force field using the molecule partial charges.
+        2. Pack an explicit CSPC/E water box with ``SolvationBuilder``.
+        3. Build a periodic PME OpenMM ``System`` without counterions by default.
+        4. Minimise the packed box and briefly equilibrate it at 300 K.
+        5. Load the relaxed box into ``vlx.OpenMMDynamics``.
+        6. Run high-temperature conformational sampling, returning solute-only
+           VeloxChem molecules for the existing DFT/SMD ranking step.
+
+        This helper is called only on MPI rank 0.  The sampled solute XYZ
+        geometries are subsequently broadcast by ``_conformer_search``.
+        """
+        if not _is_rank0():
+            raise RuntimeError(
+                "_explicit_solvent_openmm_sampling must only be called on MPI rank 0."
+            )
+
+        try:
+            import openmm as mm
+            from openmm import app, unit
+        except ImportError as exc:
+            raise ImportError(
+                "Explicit-solvent conformer dynamics requires OpenMM's Python package "
+                "(`import openmm`). Install OpenMM in the VeloxChem environment."
+            ) from exc
+
+        charge = int(input_data.get_charge())
+        multiplicity = int(input_data.get_multiplicity())
+
+        safe_label = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(label)).strip("_") or "state"
+        formula = _mol_formula(input_data)
+        run_id = uuid.uuid4().hex[:8]
+        box_dir = (
+            Path(self.output_folder)
+            / "_explicit_solvent_sampling"
+            / f"{formula}_q{charge}_m{multiplicity}_{safe_label}_{run_id}"
+        )
+        box_dir.mkdir(parents=True, exist_ok=False)
+
+        _status(
+            "[%s] Preparing explicit %s solvent box in %s",
+            label,
+            self.conformer_explicit_solvent,
+            box_dir,
+        )
+
+        # Build the solute force field on COMM_SELF because the complete
+        # explicit-solvent preparation is deliberately rank-0-only.
+        if MPI_COMM is not None:
+            try:
+                ff_gen = vlx.MMForceFieldGenerator(MPI.COMM_SELF)
+            except TypeError:
+                ff_gen = vlx.MMForceFieldGenerator()
+                if hasattr(ff_gen, "_comm"):
+                    ff_gen._comm = MPI.COMM_SELF
+        else:
+            ff_gen = vlx.MMForceFieldGenerator()
+
+        partial_charges = input_data.get_partial_charges(charge)
+        if partial_charges is not None:
+            ff_gen.partial_charges = partial_charges
+        ff_gen.create_topology(input_data)
+
+        # Pack explicit solvent.  Counterions remain disabled by default to
+        # reproduce the supplied/tested workflow exactly.
+        builder = vlx.SolvationBuilder()
+        builder.workdir = box_dir
+        builder.solvate(
+            input_data,
+            solvent=self.conformer_explicit_solvent,
+            neutralize=self.conformer_explicit_neutralize,
+            equilibrate=False,
+        )
+        builder.write_openmm_files(solute_ff=ff_gen)
+
+        pdb_path = box_dir / "system.pdb"
+        solute_xml = box_dir / "solute.xml"
+        solvent_xml = box_dir / "solvent_1.xml"
+        for required in (pdb_path, solute_xml, solvent_xml):
+            if not required.exists():
+                raise FileNotFoundError(
+                    f"Explicit-solvent preparation did not create expected file: {required}"
+                )
+
+        # Create the periodic OpenMM System with PME electrostatics.
+        pdb = app.PDBFile(str(pdb_path))
+        forcefield = app.ForceField(str(solute_xml), str(solvent_xml))
+        system = forcefield.createSystem(
+            pdb.topology,
+            nonbondedMethod=app.PME,
+            nonbondedCutoff=(
+                self.conformer_explicit_nonbonded_cutoff_nm * unit.nanometer
+            ),
+            constraints=app.HBonds,
+        )
+
+        system_xml = box_dir / "system.xml"
+        with system_xml.open("w") as handle:
+            handle.write(mm.XmlSerializer.serialize(system))
+
+        # Relax the packed box before the high-temperature conformational run.
+        equil_temperature = self.conformer_explicit_equilibration_temperature
+        integrator = mm.LangevinMiddleIntegrator(
+            equil_temperature * unit.kelvin,
+            self.conformer_explicit_langevin_friction_ps / unit.picosecond,
+            self.conformer_explicit_timestep_fs * unit.femtosecond,
+        )
+        simulation = app.Simulation(pdb.topology, system, integrator)
+        simulation.context.setPositions(pdb.positions)
+
+        _status(
+            "[%s] Minimising explicit-solvent box (max %d iterations)...",
+            label,
+            self.conformer_explicit_minimize_iterations,
+        )
+        simulation.minimizeEnergy(
+            maxIterations=self.conformer_explicit_minimize_iterations
+        )
+        state = simulation.context.getState(getEnergy=True)
+        min_energy = state.getPotentialEnergy().value_in_unit(
+            unit.kilojoules_per_mole
+        )
+        _status(
+            "[%s] Explicit-solvent energy after minimisation: %.3f kJ/mol",
+            label,
+            min_energy,
+        )
+
+        _status(
+            "[%s] Equilibrating explicit-solvent box at %.1f K for %d steps...",
+            label,
+            equil_temperature,
+            self.conformer_explicit_equilibration_steps,
+        )
+        simulation.context.setVelocitiesToTemperature(
+            equil_temperature * unit.kelvin
+        )
+        simulation.step(self.conformer_explicit_equilibration_steps)
+
+        state = simulation.context.getState(getPositions=True, getEnergy=True)
+        equil_energy = state.getPotentialEnergy().value_in_unit(
+            unit.kilojoules_per_mole
+        )
+        _status(
+            "[%s] Explicit-solvent energy after equilibration: %.3f kJ/mol",
+            label,
+            equil_energy,
+        )
+
+        relaxed_pdb = box_dir / "system_relaxed.pdb"
+        with relaxed_pdb.open("w") as handle:
+            app.PDBFile.writeFile(
+                pdb.topology,
+                state.getPositions(),
+                handle,
+                keepIds=True,
+            )
+
+        # Hand the prepared periodic system to VeloxChem/OpenMM.  Setting
+        # ``molecule`` and ``labels`` makes conformational_sampling return only
+        # the solute coordinates, while the dynamics still runs in the full
+        # explicit solvent box.
+        omm = vlx.OpenMMDynamics()
+        omm.load_system_from_files(str(system_xml), str(relaxed_pdb))
+        omm.molecule = input_data
+        omm.labels = input_data.get_labels()
+
+        _status(
+            "[%s] Explicit-solvent conformational sampling: %d steps, %d snapshots, %.1f K",
+            label,
+            self.conformer_explicit_sampling_steps,
+            self.conformer_explicit_sampling_snapshots,
+            self.conformer_explicit_sampling_temperature,
+        )
+        sampled = omm.conformational_sampling(
+            nsteps=self.conformer_explicit_sampling_steps,
+            snapshots=self.conformer_explicit_sampling_snapshots,
+            temperature=self.conformer_explicit_sampling_temperature,
+        )
+
+        if isinstance(sampled, dict):
+            molecules = sampled.get("molecules", [])
+        else:
+            molecules = sampled or []
+
+        for mol in molecules:
+            mol.set_charge(charge)
+            mol.set_multiplicity(multiplicity)
+
+        _status(
+            "[%s] Explicit-solvent dynamics returned %d solute conformer(s).",
+            label,
+            len(molecules),
+        )
+        return molecules
+
     def _conformer_search(self, input_data, label: str):
         """
         MPI-safe conformer search.
@@ -2204,7 +2565,10 @@ class RedoxCalculator:
              already MPI-aware internally.
            - only rank 0 receives/serializes the returned conformer dictionary.
         4. If combinations >= 10000 or counting fails:
-           - only rank 0 runs OpenMMDynamics.conformational_sampling().
+           - only rank 0 runs OpenMM conformational sampling.
+           - by default the dynamics is performed in an explicit CSPC/E water
+             box prepared with SolvationBuilder; the previous implicit path is
+             available with conformer_dynamics_solvent="implicit".
         5. Rank 0 serializes conformers to XYZ and broadcasts them to all ranks.
         6. All ranks enter the same SCF-ranking loop.
         7. Rank 0 selects the lowest-energy conformer and broadcasts it.
@@ -2373,35 +2737,46 @@ class RedoxCalculator:
                             n_combinations,
                         )
 
-                    if MPI_COMM is not None:
-                        try:
-                            ff_gen = vlx.MMForceFieldGenerator(MPI.COMM_SELF)
-                        except TypeError:
+                    if self.conformer_dynamics_solvent == "explicit":
+                        molecules_rank0 = self._explicit_solvent_openmm_sampling(
+                            input_data,
+                            label,
+                        )
+                    else:
+                        # Backward-compatible implicit-solvent OpenMM path.
+                        if MPI_COMM is not None:
+                            try:
+                                ff_gen = vlx.MMForceFieldGenerator(MPI.COMM_SELF)
+                            except TypeError:
+                                ff_gen = vlx.MMForceFieldGenerator()
+                                if hasattr(ff_gen, "_comm"):
+                                    ff_gen._comm = MPI.COMM_SELF
+                        else:
                             ff_gen = vlx.MMForceFieldGenerator()
-                            if hasattr(ff_gen, "_comm"):
-                                ff_gen._comm = MPI.COMM_SELF
-                    else:
-                        ff_gen = vlx.MMForceFieldGenerator()
 
-                    partial_charges = input_data.get_partial_charges(charge)
-                    if partial_charges is not None:
-                        ff_gen.partial_charges = partial_charges
-                    ff_gen.molecule_name = f"mol_{uuid.uuid4().hex[:8]}"
-                    ff_gen.create_topology(input_data)
+                        partial_charges = input_data.get_partial_charges(charge)
+                        if partial_charges is not None:
+                            ff_gen.partial_charges = partial_charges
+                        ff_gen.molecule_name = f"mol_{uuid.uuid4().hex[:8]}"
+                        ff_gen.create_topology(input_data)
 
-                    omm = vlx.OpenMMDynamics()
-                    omm.create_system_from_molecule(input_data, ff_gen, solvent="implicit")
-                    omm.solvent_dielectric = self.conformer_cpcm_epsilon
+                        omm = vlx.OpenMMDynamics()
+                        omm.create_system_from_molecule(
+                            input_data,
+                            ff_gen,
+                            solvent="implicit",
+                        )
+                        omm.solvent_dielectric = self.conformer_cpcm_epsilon
 
-                    sampled = omm.conformational_sampling(
-                        nsteps=10000,
-                        snapshots=100,
-                    )
+                        sampled = omm.conformational_sampling(
+                            nsteps=10000,
+                            snapshots=100,
+                        )
 
-                    if isinstance(sampled, dict):
-                        molecules_rank0 = sampled.get("molecules", [])
-                    else:
-                        molecules_rank0 = sampled or []
+                        if isinstance(sampled, dict):
+                            molecules_rank0 = sampled.get("molecules", [])
+                        else:
+                            molecules_rank0 = sampled or []
 
                     molecule_xyz = []
                     for mol in molecules_rank0:
@@ -2799,6 +3174,9 @@ class RedoxCalculator:
         label: str = "",
         file_tag: str = "",
         reuse_existing: bool = True,
+        vertical_fallback_xyz: Optional[str] = None,
+        vertical_fallback_g_corr: Optional[float] = None,
+        vertical_fallback_corr_available: bool = True,
     ) -> Optional[GibbsResult]:
         """
         Compute the composite Gibbs free energy for one electronic state.
@@ -2845,9 +3223,8 @@ class RedoxCalculator:
         h5_path = os.path.join(self.output_folder, f"{file_name_base}.h5")
 
         existing_payload = None
-        # When corrections are disabled, do not reuse old state H5 files that
-        # may contain a previous xTB/SCF g_corr folded into g_total.
-        if reuse_existing and self.gibbs_correction_method != "none":
+        
+        if reuse_existing:
             if _is_rank0() and os.path.exists(h5_path):
                 try:
                     log.info("compute_gibbs skip: loading existing state from %s", h5_path)
@@ -2901,9 +3278,16 @@ class RedoxCalculator:
 
         return self._compute_gibbs_in_workdir(
             mol_obj, label, file_name_base, charge, mult, workdir,
+            vertical_fallback_xyz=vertical_fallback_xyz,
+            vertical_fallback_g_corr=vertical_fallback_g_corr,
+            vertical_fallback_corr_available=vertical_fallback_corr_available,
         )
         
-    def _compute_gibbs_in_workdir(self, mol_obj, label, file_name_base, charge, mult, workdir):
+    def _compute_gibbs_in_workdir(
+        self, mol_obj, label, file_name_base, charge, mult, workdir,
+        vertical_fallback_xyz=None, vertical_fallback_g_corr=None,
+        vertical_fallback_corr_available=True,
+    ):
         """Inner implementation of compute_gibbs running inside the per-state work directory."""
 
         # ---- DFT geometry optimisation --------------------------------
@@ -2985,11 +3369,15 @@ class RedoxCalculator:
 
             _status("  [%s] DEBUG before OptimizationDriver.compute", label)
             _print0('optimizing here')
-            opt_res = opt_drv.compute(mol_obj, basis_opt)
+            opt_res = _mpi_compute(
+                lambda: opt_drv.compute(mol_obj, basis_opt), "geometry optimisation"
+            )
             _status("  [%s] DEBUG after OptimizationDriver.compute returned", label)
             _status("###########opt is done#########")
             _status("€%€%€%€%€%€%€%€%€%€%€%€%€%€%€%€%€%€%€")
-            final_xyz = opt_res["final_geometry"]
+            final_xyz = _mpi_root_value(
+                lambda: opt_res["final_geometry"], "optimised geometry"
+            )
             log.info("  [%s] Step 2 done: geometry converged", label)
 
             # ---- fragmentation check ----------------------------------
@@ -3021,6 +3409,9 @@ class RedoxCalculator:
 
             is_fragmented = more_fragments or rearranged
 
+            vertical_fallback_reason = ""
+            used_vertical_fallback = False
+
             if is_fragmented:
                 reason = "more fragments" if more_fragments else "bond rearrangement"
                 log.warning(
@@ -3028,6 +3419,23 @@ class RedoxCalculator:
                     "%d component(s) in -> %d out.",
                     label, reason, n_comp_in, n_comp_opt,
                 )
+
+                if label in ("M+", "M-") and vertical_fallback_xyz:
+                    vertical_fallback_reason = reason
+                    used_vertical_fallback = True
+                    final_xyz = vertical_fallback_xyz
+                    _status(
+                        "  [%s] VERTICAL FALLBACK: %s detected during charged-state "
+                        "optimisation; using the optimised neutral geometry for the "
+                        "charged-state single-points.",
+                        label,
+                        reason,
+                    )
+                    log.warning(
+                        "  [%s] Vertical fallback active. The resulting ET potential "
+                        "is vertical, not adiabatic.",
+                        label,
+                    )
 
             opt_mol = vlx.Molecule.read_xyz_string(final_xyz)
             opt_mol.set_charge(charge)
@@ -3037,7 +3445,20 @@ class RedoxCalculator:
             method = self.gibbs_correction_method
             log.info("  [%s] Step 3: %s Gibbs correction", label, method.upper())
             try:
-                if method == "none":
+                if used_vertical_fallback:
+                    # A frequency correction for the charged state at the
+                    # neutral geometry is not meaningful because that geometry
+                    # is not a charged-state stationary point. Reusing the
+                    # neutral correction makes it cancel exactly in the ET
+                    # energy difference, leaving a true vertical SP result.
+                    g_corr = float(vertical_fallback_g_corr or 0.0)
+                    log.warning(
+                        "  [%s] Vertical fallback: reusing neutral-state g_corr "
+                        "(%.6f au), which cancels in the ET potential.",
+                        label,
+                        g_corr,
+                    )
+                elif method == "none":
                     log.info(
                         "  [%s] Step 3 skipped: gibbs_correction_method='none' "
                         "so g_corr = 0.0 au",
@@ -3086,7 +3507,10 @@ class RedoxCalculator:
                     label, corr_exc,
                 )
                 g_corr = 0.0
-            mm_corr_ok = (g_corr != 0.0)
+            if used_vertical_fallback:
+                mm_corr_ok = bool(vertical_fallback_corr_available)
+            else:
+                mm_corr_ok = (g_corr != 0.0)
 
             # ---- DFT single-points --------------------------------------
             _print0('vac single point')
@@ -3148,18 +3572,8 @@ class RedoxCalculator:
                 sp_solv_energy     = sp_solv["scf_energy"]
                 scf_solvent_stored = sp_solv["scf_energy"]
 
-            # G_total = E_SP(solvent) + G_vib
-            #
-            # G_trans_rot is stored separately for inspection but NOT added
-            # to G_total used in thermochemistry.  For pKa calculations the
-            # proton reference G_PROTON_AQ already contains the proton's full
-            # translational free energy, so adding G_trans_rot to each state
-            # would double-count the proton contribution and shift all pKa
-            # values by ~18 units.  For ET reactions (M -> M+, M -> M-)
-            # G_trans_rot is nearly identical for both states and would cancel,
-            # but including it risks numerical noise from the mass difference
-            # of one electron.  G_corr_full (vib + trans + rot) is stored in
-            # the HDF5 for reference and post-processing if needed.
+            # Composite energy: solvent electronic energy plus the selected
+            # thermal correction (SCF/xTB: VibrationalAnalysis G - E).
             g_total = sp_solv_energy + g_corr
 
             atom_symbols, bond_edges = _connectivity_payload(final_xyz)
@@ -3173,6 +3587,8 @@ class RedoxCalculator:
                 g_corr            = g_corr,
                 geometry_xyz      = final_xyz,
                 is_fragmented     = is_fragmented,
+                used_vertical_fallback = used_vertical_fallback,
+                vertical_fallback_reason = vertical_fallback_reason,
                 skeleton_smiles   = _skeleton_smiles(final_xyz),
                 atom_symbols      = atom_symbols,
                 bond_edges        = bond_edges,
@@ -3224,7 +3640,8 @@ class RedoxCalculator:
             # _save_to_h5() is rank-0-only, so all ranks may call it safely,
             # but only MPI rank 0 touches the HDF5 file.
             _status("  [%s] HDF5 write starting: %s", label, h5_path)
-            _save_to_h5(h5_path, result)
+            _mpi_root_value(lambda: _save_to_h5(h5_path, result), "HDF5 save")
+            result = _bcast_from_rank0(result if _is_rank0() else None)
             _status("  [%s] HDF5 write done: %s", label, h5_path)
 
             log.info("compute_gibbs done: %s  G = %.6f au", label, g_total)
@@ -3300,7 +3717,22 @@ class RedoxCalculator:
             m_tmp.set_charge(init_charge + dq)
             m_tmp.set_multiplicity(_valid_multiplicity(m_tmp, init_charge + dq))
 
-            res = self._get_or_compute_et_state(m_tmp, lbl, file_tag=run_tag)
+            neutral_res = profile.M if attr in ("M_ox", "M_red") else None
+            res = self._get_or_compute_et_state(
+                m_tmp,
+                lbl,
+                file_tag=run_tag,
+                vertical_fallback_xyz=(
+                    neutral_res.geometry_xyz if neutral_res is not None else None
+                ),
+                vertical_fallback_g_corr=(
+                    neutral_res.g_corr if neutral_res is not None else None
+                ),
+                vertical_fallback_corr_available=(
+                    neutral_res.mm_corr_available
+                    if neutral_res is not None else True
+                ),
+            )
             setattr(profile, attr, res)
             _status("========== END ET state %s (%s): %s ==========", lbl, attr, "OK" if res is not None else "FAILED")
 
@@ -3440,6 +3872,8 @@ class RedoxCalculator:
                     continue
                 if res.is_fragmented:
                     tags.append(f"FRAG:{attr}")
+                if res.used_vertical_fallback:
+                    tags.append(f"VERTICAL:{attr}")
             missing = [
                 attr for attr in state_attrs
                 if getattr(profile, attr) is not None
@@ -3493,10 +3927,19 @@ class RedoxCalculator:
         ):
             res: Optional[GibbsResult] = getattr(profile, attr)
             if res and res.is_fragmented:
-                _print0(
-                    f"  [WARNING] {attr}: molecule fragmented during "
-                    "optimisation -- energies are unreliable."
-                )
+                if res.used_vertical_fallback:
+                    _print0(
+                        f"  [WARNING] {attr}: fragmentation/rearrangement "
+                        f"({res.vertical_fallback_reason}) occurred during "
+                        "optimisation. The reported ET potential uses a VERTICAL "
+                        "FALLBACK at the optimised neutral geometry; it is not an "
+                        "adiabatic potential."
+                    )
+                else:
+                    _print0(
+                        f"  [WARNING] {attr}: molecule fragmented during "
+                        "optimisation -- energies are unreliable."
+                    )
             if res and not res.mm_corr_available:
                 _print0(
                     f"  [WARNING] {attr}: MM Gibbs correction failed -- "
@@ -3530,26 +3973,35 @@ class pKaCalculator(RedoxCalculator):
         print(f"pKa = {profile.pKa_M:.2f}")
     """
 
-    def run(self, input_data) -> RedoxProfile:   # type: ignore[override]
-        """Run only pKa-relevant states: M, MH+, M_dep-."""
-        if isinstance(input_data, str):
-            mol_obj = _mol_from_smiles(input_data)
-        else:
-            mol_obj = input_data
+    def run(self, input_data, file_tag: str = "",
+            row_index: Optional[int] = None) -> RedoxProfile:
+        """Run pKa states with identical geometry, tags and site order on all ranks."""
+        def prepare_input():
+            molecule = _mol_from_smiles(input_data) if isinstance(input_data, str) else input_data
+            return (_xyz_block(molecule), int(molecule.get_charge()),
+                    int(molecule.get_multiplicity()))
 
-        init_charge = int(mol_obj.get_charge())
-        profile     = RedoxProfile()
+        xyz, init_charge, multiplicity = _mpi_root_value(prepare_input, "pKa input")
+        mol_obj = vlx.Molecule.read_xyz_string(xyz)
+        mol_obj.set_charge(init_charge)
+        mol_obj.set_multiplicity(multiplicity)
+        profile = RedoxProfile()
         run_formula = _mol_formula(mol_obj)
-        if _is_rank0():
-            run_tag = _next_formula_iso_tag(self.output_folder, run_formula)
-        else:
-            run_tag = None
-        run_tag = _bcast_from_rank0(run_tag)
+        run_tag = _mpi_root_value(
+            lambda: self._resolve_run_tag_for_molecule(
+                mol_obj, file_tag=file_tag, row_index=row_index
+            ), "pKa run tag"
+        )
         log.info("Using file tag %s for formula %s", run_tag, run_formula)
 
         profile.M = self._get_or_compute_state(mol_obj, "M", file_tag=run_tag)
 
-        acidic_H, basic_atoms = self.find_protic_sites(mol_obj)
+        if profile.M is None:
+            raise RuntimeError("Parent pKa state failed; see the preceding compute_gibbs traceback.")
+
+        acidic_H, basic_atoms = _mpi_root_value(
+            lambda: self.find_protic_sites(mol_obj), "pKa site detection"
+        )
 
         if basic_atoms and profile.M:
             best_plus, min_g = None, float("inf")
