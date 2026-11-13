@@ -130,3 +130,73 @@ class TestAutoCdamDriverSmoke:
             })
         assert result.objective == 7.0
         assert result.metrics == {"custom_loss": 7.0}
+
+
+class _ToyCalculator:
+    """Analytic IOD and CN of a CDAM proposal; no MD."""
+
+    def calculate(self, batch, parameters, targets, **options):
+        from veloxchem.autocdam import CalculationResult
+
+        sigma = batch.system.nonbonded_parameters["metal_lj_sigma_angstrom"]
+        return CalculationResult(values={"IOD": 1.30 + 0.30 * sigma, "CN": 6.0},
+                                 metadata={"IOD": {"unit": "angstrom"},
+                                           "CN": {"unit": "count"}})
+
+
+class TestAutoCdamAttributeInterface:
+
+    def test_fit_from_molecule_target_and_write_openmm_files(self, tmp_path):
+        import pytest
+        from veloxchem import Molecule, OutputStream
+        from veloxchem.errorhandler import VeloxChemError
+
+        mol = Molecule.read_smiles("[Al]")
+        mol.set_charge(3)
+
+        cdamfit = AutoCDAM(ostream=OutputStream(None))
+        with pytest.raises(VeloxChemError, match="before write_openmm_files"):
+            cdamfit.write_openmm_files("x")
+        cdamfit.target = mol
+        cdamfit.water_model = "spce"
+        cdamfit.calculator = _ToyCalculator()
+        cdamfit.cache = False
+        cdamfit.samples_per_stage = 4
+        cdamfit.max_iterations = 1
+        # the trailing comma makes a one-element tuple; it is unwrapped
+        cdamfit.properties = {
+            "IOD": {"value": 1.90, "tolerance": 0.05, "unit": "angstrom",
+                    "weight": 1.0},
+            "CN": {"value": 6.0, "tolerance": 0.3, "weight": 1.0}},
+        result = cdamfit.fit()
+
+        assert cdamfit.candidate.metal == "Al"
+        assert cdamfit.candidate.formal_charge == 3
+        assert cdamfit.candidate.water_model == "spce"
+        assert cdamfit.fit_result is result
+        assert result.diagnostics["n_calculations"] == 4
+
+        pdb, xml = cdamfit.write_openmm_files(str(tmp_path / "al"),
+                                              mol_name="ALX")
+        assert pdb.name == "al.pdb" and xml.name == "al.xml"
+        assert " ALX A" in pdb.read_text()
+        assert '<Residue name="ALX">' in xml.read_text()
+        sigma = result.parameters.to_dict()["metal_lj_sigma"]
+        assert f'sigma="{sigma / 10:.12g}"' in xml.read_text()
+
+    def test_molecule_target_must_be_a_charged_ion(self):
+        import pytest
+        from veloxchem import Molecule, OutputStream
+        from veloxchem.errorhandler import VeloxChemError
+
+        cdamfit = AutoCDAM(ostream=OutputStream(None))
+        cdamfit.properties = {"IOD": {"value": 1.9, "tolerance": 0.05}}
+        cdamfit.target = Molecule.read_smiles("[Al]")
+        with pytest.raises(VeloxChemError, match="set the ion charge"):
+            cdamfit.fit()
+        cdamfit.target = Molecule.read_smiles("O")
+        with pytest.raises(VeloxChemError, match="single metal ion"):
+            cdamfit.fit()
+        cdamfit.target = None
+        with pytest.raises(VeloxChemError, match="both target and properties"):
+            cdamfit.fit()

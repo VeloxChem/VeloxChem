@@ -52,6 +52,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
 import sys
@@ -61,6 +62,7 @@ from mpi4py import MPI
 from . import reporting
 from ..errorhandler import assert_msg_critical
 from ..inputparser import parse_input, print_keywords, print_attributes
+from ..molecule import Molecule
 from ..outputstream import OutputStream
 from ..profiler import Profiler
 from ..veloxchemlib import mpi_master
@@ -134,6 +136,18 @@ class AutoCDAM:
         # output stream
         self.ostream = ostream
 
+        # study: the ion (a one-atom Molecule with its charge, or a
+        # CDAMCandidate), the target properties and the fitted parameters
+        self.target = None
+        self.properties = None
+        self.parameters = None
+
+        # ion model of a Molecule target (None: the CDAMCandidate default)
+        self.water_model = None
+        self.geometry = None
+        self.potential_form = None
+        self.fit_result = None
+
         # search
         self.search_method = 'staged'
         self.geometries = []
@@ -175,6 +189,12 @@ class AutoCDAM:
 
         self._input_keywords = {
             'autocdam': {
+                'target': ('raw', 'the ion: one-atom Molecule or CDAMCandidate'),
+                'properties': ('raw', 'target properties, name: settings'),
+                'parameters': ('raw', 'fitted parameters (default: LJ, UFF)'),
+                'water_model': ('str_lower', 'tip3p, spce or tip4pew'),
+                'geometry': ('str_lower', 'dummy geometry, e.g. octahedral'),
+                'potential_form': ('str_lower', 'lj12_6 or lj12_6_4'),
                 'search_method': ('str_lower', 'staged or bayesian search'),
                 'geometries': ('raw', 'dummy geometries searched one by one'),
                 'seed': ('int', 'random seed of the search'),
@@ -589,9 +609,13 @@ class AutoCDAM:
         """
         Runs the configured search and returns the finalized result.
 
+        Without arguments the study is set up from the ``target``,
+        ``properties`` and ``parameters`` attributes (or kept from an earlier
+        ``setup``).
+
         :param candidate:
-            The CDAM candidate; with ``fit_targets`` it sets up the study
-            (see ``setup``). Omit both after an explicit ``setup``.
+            The CDAM candidate, or a one-atom Molecule with the ion charge;
+            with ``fit_targets`` it sets up the study (see ``setup``).
         :param fit_targets:
             The fit targets.
         :param parameters:
@@ -606,11 +630,18 @@ class AutoCDAM:
         """
 
         if candidate is not None or fit_targets is not None:
-            self.setup(candidate, fit_targets, parameters, systems,
-                       fit_parameters)
+            self.setup(self._candidate(candidate), fit_targets, parameters,
+                       systems, fit_parameters)
+        elif self.target is not None or self.properties is not None:
+            assert_msg_critical(
+                self.target is not None and self.properties is not None,
+                'AutoCDAM: set both target and properties before fit()')
+            self.setup(self._candidate(self.target),
+                       self._properties(self.properties), self.parameters)
         assert_msg_critical(
             hasattr(self, 'candidate'),
-            'AutoCDAM: give candidate and fit_targets to fit() or setup()')
+            'AutoCDAM: set target and properties (or give candidate and '
+            'fit_targets) before fit()')
         resume = bool(self.restart)
         self.print_references()
 
@@ -651,7 +682,96 @@ class AutoCDAM:
             result.save(self.filename)
 
         profiler.end(self.ostream)
+        self.fit_result = result
         return result
+
+    def _candidate(self, target) -> CDAMCandidate:
+        """
+        Gets the CDAM candidate of a target.
+
+        :param target:
+            A CDAMCandidate, or a one-atom Molecule whose charge is the formal
+            charge of the ion (water_model, geometry and potential_form
+            settings apply).
+
+        :return:
+            The CDAM candidate.
+        """
+
+        if isinstance(target, CDAMCandidate):
+            return target
+        assert_msg_critical(
+            isinstance(target, Molecule),
+            'AutoCDAM: target must be a Molecule or a CDAMCandidate')
+        assert_msg_critical(
+            target.number_of_atoms() == 1,
+            'AutoCDAM: the target Molecule must be a single metal ion, '
+            f'got {target.number_of_atoms()} atoms')
+        charge = target.get_charge()
+        assert_msg_critical(
+            charge == round(charge) and charge > 0,
+            'AutoCDAM: set the ion charge on the target Molecule, '
+            'e.g. mol.set_charge(3)')
+        options = {
+            name: getattr(self, name)
+            for name in ('water_model', 'geometry', 'potential_form')
+            if getattr(self, name) is not None
+        }
+        return CDAMCandidate(target.get_labels()[0], int(round(charge)),
+                             **options)
+
+    @staticmethod
+    def _properties(properties):
+        """
+        Gets the target properties as a mapping of name to settings.
+
+        :param properties:
+            The properties; a mapping wrapped in a one-element tuple (a
+            trailing comma after the dict) is unwrapped.
+
+        :return:
+            The properties.
+        """
+
+        if (isinstance(properties, (tuple, list)) and len(properties) == 1 and
+                isinstance(properties[0], Mapping)):
+            return properties[0]
+        return properties
+
+    def write_openmm_files(self, filename=None, mol_name=None):
+        """
+        Writes the fitted ion as OpenMM PDB and XML files.
+
+        :param filename:
+            The base filename of <filename>.pdb and <filename>.xml (default:
+            the run filename, or the candidate identifier).
+        :param mol_name:
+            The residue name written to the files (default: CDM; at most
+            three characters are kept, as in the PDB format).
+
+        :return:
+            The paths of the PDB and XML files (empty on non-master ranks).
+        """
+
+        assert_msg_critical(
+            getattr(self, 'fitting_driver', None) is not None,
+            'AutoCDAM: fit() before write_openmm_files()')
+        point = self.candidate.with_parameters(self._best_parameters())
+        if self.rank != mpi_master():
+            return []
+        stem = Path(filename or self.filename or point.candidate_id)
+        residue = (mol_name or 'CDM')[:3]
+        pdb_path = stem.with_name(stem.name + '.pdb')
+        xml_path = stem.with_name(stem.name + '.xml')
+        pdb_path.parent.mkdir(parents=True, exist_ok=True)
+        pdb_path.write_text(point.to_pdb().replace(' CDM A',
+                                                   f' {residue:>3s} A'))
+        xml_path.write_text(point.to_openmm_xml().replace(
+            '<Residue name="CDM">', f'<Residue name="{residue}">'))
+        self.ostream.print_info(f'Fitted ion written to {pdb_path} and '
+                                f'{xml_path}')
+        self.ostream.flush()
+        return [pdb_path, xml_path]
 
     def _study_metadata(self) -> dict[str, Any]:
         """What defines this study; checkpoints only resume when it matches."""
