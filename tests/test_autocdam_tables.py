@@ -66,9 +66,10 @@ def fit(tmp_path):
         "seed": 1,
         "filename": str(tmp_path / "run"),
     })
-    return driver, driver.fit(CDAMCandidate("Al", 3),
-                              targets,
-                              parameters={"sigma": (1.4, 2.6)})
+    driver.fit(CDAMCandidate("Al", 3),
+               targets,
+               parameters={"sigma": (1.4, 2.6)})
+    return driver, driver.fit_result()
 
 
 class TestAutoCdamTables:

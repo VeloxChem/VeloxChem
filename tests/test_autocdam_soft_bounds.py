@@ -60,9 +60,10 @@ def fit(parameters, iod, search=None, **settings):
         **(search or {}),
         **settings
     })
-    return driver, driver.fit(CDAMCandidate("Al", 3),
-                              targets,
-                              parameters=parameters)
+    driver.fit(CDAMCandidate("Al", 3),
+               targets,
+               parameters=parameters)
+    return driver, driver.fit_result()
 
 
 class TestAutoCdamSoftBounds:

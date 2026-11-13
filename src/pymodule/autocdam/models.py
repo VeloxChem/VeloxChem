@@ -1110,6 +1110,53 @@ class FitResult:
                    checkpoint=data.get("checkpoint"),
                    checkpoint_group=data.get("checkpoint_group"))
 
+    def __repr__(self) -> str:
+        """
+        Creates the formatted result shown in notebooks and by ``print``.
+
+        :return:
+            The formatted result.
+        """
+
+        d = self.diagnostics
+        title = "AutoCDAM Fit Result"
+        lines = [title, "=" * len(title)]
+        cost = d.get("cost", {})
+        rows = [
+            ("Status", f"{self.status} (converged: {self.converged}, "
+             f"stop: {d.get('stop_reason')})"),
+            ("Objective", f"{self.objective:.6g} (feasible: "
+             f"{d.get('feasible')})"),
+            ("Candidates", cost.get("n_candidates",
+                                    d.get("n_calculations"))),
+            ("Physical validation", d.get("physical_validation",
+                                          "not performed")),
+        ]
+        lines += [f"{label:<20s}: {value}" for label, value in rows
+                  if value is not None]
+        lines += ["", f"{'Parameter':<22s}{'Value':>14s}"]
+        lines += [f"{name:<22s}{value:>14.6g}"
+                  for name, value in self.parameters.items()]
+        results = d.get("target_results", {})
+        if results:
+            lines += [
+                "", f"{'Target':<16s}{'Calculated':>14s}{'Reference':>14s}"
+                f"{'Error/Tol':>11s}  Met"
+            ]
+            for name, row in results.items():
+                lines.append(
+                    f"{name:<16s}{_short(row['prediction']):>14s}"
+                    f"{_short(row['reference']):>14s}"
+                    f"{row['normalized_error']:>11.3g}  "
+                    f"{'yes' if row.get('within_tolerance') else 'no'}")
+        for name, row in d.get("monitor", {}).items():
+            lines.append(f"{name:<16s}{_short(row['value']):>14s}"
+                         f"{_short(row['reference']):>14s}{'':>11s}  monitor")
+        warnings = list(dict.fromkeys(self.warnings))
+        if warnings:
+            lines += [""] + [f"Warning: {warning}" for warning in warnings]
+        return "\n".join(lines)
+
     def summary(self) -> str:
         """
         Creates a plain-text report.
@@ -1422,3 +1469,11 @@ def convert_units(values: dict, metadata: dict,
         for name in ("spread", "uncertainty"):
             if name in metadata[target.name]:
                 metadata[target.name][name] *= factor
+
+
+def _short(value) -> str:
+    """A value for the formatted result (vectors by their length)."""
+    try:
+        return f"{float(value):.6g}"
+    except (TypeError, ValueError):
+        return f"[{len(value)} values]"

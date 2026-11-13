@@ -90,9 +90,10 @@ def fit(targets=None, search=None, parameters=None):
     driver = AutoCDAM()
     driver.calculator = Surface()
     driver.update_settings({"search_method": "bayesian", **search})
-    return driver, driver.fit(CDAMCandidate("Al", 3),
-                              targets,
-                              parameters=parameters)
+    driver.fit(CDAMCandidate("Al", 3),
+               targets,
+               parameters=parameters)
+    return driver, driver.fit_result()
 
 
 def result_parameters():
@@ -251,10 +252,11 @@ class TestAutoCdamResultsDiagnostics:
         search = {"max_evaluations": 6, "initial_samples": 5, "seed": 5}
         driver = AutoCDAM()
         driver.update_settings({"search_method": "bayesian", **search})
-        result = driver.fit(CDAMCandidate("Al", 3),
+        driver.fit(CDAMCandidate("Al", 3),
                             targets,
                             parameters=parameters,
                             systems={"mof": mof})
+        result = driver.fit_result()
         report = result.diagnostics["systems"]["mof"]
         assert report["non_target_preserved"] and "VeloxChem" in report[
             "baseline_source"]

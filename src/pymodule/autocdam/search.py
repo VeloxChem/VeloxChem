@@ -59,6 +59,7 @@ import math
 import sys
 import threading
 import time
+import warnings
 from pathlib import Path
 
 import importlib.util
@@ -250,6 +251,7 @@ class SklearnGaussianProcessSurrogate:
             The properties to fit.
         """
 
+        from sklearn.exceptions import ConvergenceWarning
         from sklearn.gaussian_process import GaussianProcessRegressor
         from sklearn.gaussian_process.kernels import Matern, WhiteKernel
         from sklearn.preprocessing import StandardScaler
@@ -299,8 +301,12 @@ class SklearnGaussianProcessSurrogate:
                 n_restarts_optimizer=2 if self.noise else 0,
                 random_state=0,
             )
-            model.fit(scaled_inputs,
-                      scaled_outputs if is_vector else scaled_outputs[:, 0])
+            # MD properties are fitted almost noise-free, so the learned noise
+            # level often settles at its lower bound; that warning is expected.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", ConvergenceWarning)
+                model.fit(scaled_inputs,
+                          scaled_outputs if is_vector else scaled_outputs[:, 0])
             self.models[name] = (model, input_scaler, output_scaler, is_vector)
 
     def predict(

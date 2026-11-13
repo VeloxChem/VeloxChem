@@ -214,7 +214,8 @@ class TestAutoCdamStagedFitting:
             "max_iterations": 1,
             "samples_per_stage": 12
         })
-        result = cdam.fit(candidate(), targets, fit_parameters=parameters)
+        cdam.fit(candidate(), targets, fit_parameters=parameters)
+        result = cdam.fit_result()
         assert result.converged
         assert result.diagnostics["quality_counts"]["rejected"] > 0
         assert result.diagnostics["quality_counts"]["usable"] > 0

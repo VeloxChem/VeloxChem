@@ -98,9 +98,10 @@ def fit(search,
         **settings):
     calculator = calculator or Surface()
     driver = bayesian_driver(search, calculator, **settings)
-    result = driver.fit(CDAMCandidate("Al", 3),
+    driver.fit(CDAMCandidate("Al", 3),
                         targets,
                         parameters=parameters)
+    result = driver.fit_result()
     return driver, result, calculator
 
 
@@ -158,9 +159,10 @@ def run(strategy, seed, budget):
     driver = AutoCDAM()
     driver.calculator = calculator
     driver.update_settings(search)
-    result = driver.fit(CDAMCandidate("Al", 3),
+    driver.fit(CDAMCandidate("Al", 3),
                         targets,
                         parameters=parameters)
+    result = driver.fit_result()
     return {"solved": bool(result.converged), "evaluations": calculator.calls}
 
 
@@ -308,9 +310,10 @@ class TestAutoCdamBayesianSearch:
                                  filename=filename,
                                  cache=False,
                                  restart=True)
-        result = driver.fit(CDAMCandidate("Al", 3),
+        driver.fit(CDAMCandidate("Al", 3),
                             targets,
                             parameters=PARAMETERS)
+        result = driver.fit_result()
         assert resumed_calc.points == [] and result.diagnostics[
             "n_evaluations"] == 9
 

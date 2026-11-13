@@ -517,6 +517,7 @@ class BayesianFittingDriver(SearchDriver):
 
     def _cost_factor(self, pool: np.ndarray) -> np.ndarray | None:
         """Predicted wall time of pool candidates from earlier runtimes, or None."""
+        from sklearn.exceptions import ConvergenceWarning
         from sklearn.gaussian_process import GaussianProcessRegressor
         from sklearn.gaussian_process.kernels import Matern, WhiteKernel
 
@@ -533,7 +534,10 @@ class BayesianFittingDriver(SearchDriver):
         model = GaussianProcessRegressor(Matern(length_scale=0.3, nu=2.5) +
                                          WhiteKernel(1e-2),
                                          normalize_y=True,
-                                         random_state=0).fit(x, y)
+                                         random_state=0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ConvergenceWarning)
+            model.fit(x, y)
         return np.exp(model.predict(pool))
 
     def _propose_batch(self, step: int, count: int | None = None):

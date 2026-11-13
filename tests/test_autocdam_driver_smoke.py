@@ -54,7 +54,7 @@ class TestAutoCdamDriverSmoke:
                 "work_dir": str(tmp_path),
                 "filename": str(tmp_path / "run"),
             })
-            result = cdam.fit(CDAMCandidate("Zn", 2), {
+            cdam.fit(CDAMCandidate("Zn", 2), {
                 "IOD": {
                     "value": 2.09,
                     "tolerance": 0.03
@@ -64,6 +64,7 @@ class TestAutoCdamDriverSmoke:
                     "tolerance": 0.25
                 }
             })
+            result = cdam.fit_result()
             assert result.iterations == 1
             assert result.diagnostics["n_calculations"] == 2
             assert math.isfinite(result.objective)
@@ -117,7 +118,7 @@ class TestAutoCdamDriverSmoke:
         cdam = AutoCDAM()
         cdam.calculator = SuppliedCalculator()
         cdam.evaluator = SuppliedEvaluator()
-        result = cdam.fit(
+        cdam.fit(
             CDAMCandidate("Zn", 2, metal_lj_sigma=2.0, metal_lj_epsilon=0.2),
             {"IOD": {
                 "reference": 2.0,
@@ -129,6 +130,7 @@ class TestAutoCdamDriverSmoke:
                     "bounds": [0.0, 1.0]
                 }
             })
+        result = cdam.fit_result()
         assert result.objective == 7.0
         assert result.metrics == {"custom_loss": 7.0}
 
@@ -171,7 +173,8 @@ class TestAutoCdamAttributeInterface:
             "IOD": {"value": 1.90, "tolerance": 0.05, "unit": "angstrom",
                     "weight": 1.0},
             "CN": {"value": 6.0, "tolerance": 0.3, "weight": 1.0}},
-        result = cdamfit.fit()
+        cdamfit.fit()
+        result = cdamfit.fit_result()
 
         assert cdamfit.candidate.metal == "Al"
         assert cdamfit.candidate.formal_charge == 3

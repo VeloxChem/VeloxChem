@@ -724,9 +724,10 @@ class AutoCDAM:
             fit_targets=None,
             parameters=None,
             systems=None,
-            fit_parameters=None) -> FitResult:
+            fit_parameters=None) -> None:
         """
-        Runs the configured search and returns the finalized result.
+        Runs the configured search; ``fit_result`` gets the result,
+        ``fit_report`` prints a short report.
 
         Without arguments the study is set up from the ``target``,
         ``properties`` and ``parameters`` attributes (or kept from an earlier
@@ -743,9 +744,6 @@ class AutoCDAM:
             The named systems the targets refer to.
         :param fit_parameters:
             Explicit parameter specifications instead of ``parameters``.
-
-        :return:
-            The fit result.
         """
 
         if candidate is not None or fit_targets is not None:
@@ -813,7 +811,21 @@ class AutoCDAM:
 
         profiler.end(self.ostream)
         self._fit_result = result
-        return result
+
+    def fit_result(self) -> FitResult:
+        """
+        Gets the result of the last fit.
+
+        Notebooks and ``print`` show it formatted; its attributes
+        (``parameters``, ``diagnostics``, ...) hold the full result.
+
+        :return:
+            The fit result.
+        """
+
+        assert_msg_critical(self._fit_result is not None,
+                            'AutoCDAM: fit() before fit_result()')
+        return self._fit_result
 
     def _print_fast_mode(self):
         """
