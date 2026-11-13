@@ -514,13 +514,14 @@ class AutoCDAM:
                 'Metal-dummy distance fixed at '
                 f'{candidate.metal_dummy_distance:.2f} angstrom')
         if candidate.potential_form == 'lj12_6_4':
-            # soft bounds, widened up to 3000 if the search reaches 200
+            # soft bounds: the Bayesian search widens them up to 3000
             parameters['c4_metal_water'] = ParameterSpec(
                 'c4_metal_water', candidate.c4_metal_water, (0.0, 200.0),
                 expandable=True, hard_bounds=(0.0, 3000.0))
             self.ostream.print_info(
-                'C4 (12-6-4) fitted in [0, 200] kcal/mol*angstrom^4, '
-                'widened up to 3000 if needed')
+                'C4 (12-6-4) fitted in [0, 200] kcal/mol*angstrom^4' +
+                (', widened up to 3000 if needed'
+                 if self.search_method == 'bayesian' else ''))
         if self.dummy_atom_charge is not None:
             self.ostream.print_info(
                 f'Dummy atom charge fixed at {candidate.dummy_charge:.2f} e')
