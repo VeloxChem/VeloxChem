@@ -245,6 +245,28 @@ class TestAutoCdamAttributeInterface:
             cdamfit.setup(CDAMCandidate("Al", 3), iod,
                           parameters={"dummy_charge": (0.4, 1.0)})
 
+    def test_lj12_6_4_fits_c4_by_default(self):
+        import pytest
+        from veloxchem import OutputStream
+
+        iod = {"IOD": {"value": 1.9, "tolerance": 0.05}}
+        cdamfit = AutoCDAM(ostream=OutputStream(None))
+        cdamfit.setup(CDAMCandidate("Al", 3), iod)
+        assert "c4_metal_water" not in _fitted(cdamfit)
+
+        cdamfit.setup(CDAMCandidate("Al", 3, potential_form="lj12_6_4"), iod)
+        spec = next(s for s in cdamfit.parameter_specs
+                    if s.name == "c4_metal_water")
+        assert spec.optimizable and spec.expandable
+        assert tuple(spec.bounds) == pytest.approx((0.0, 200.0))
+        assert tuple(spec.hard_bounds) == pytest.approx((0.0, 3000.0))
+
+        cdamfit.setup(CDAMCandidate("Al", 3, potential_form="lj12_6_4"), iod,
+                      parameters={"sigma": (1.5, 2.5), "c4": 50.0})
+        spec = next(s for s in cdamfit.parameter_specs
+                    if s.name == "c4_metal_water")
+        assert not spec.optimizable and spec.initial == 50.0
+
     def test_metal_dummy_distance_is_fixed_or_fitted(self):
         import pytest
         from veloxchem import OutputStream

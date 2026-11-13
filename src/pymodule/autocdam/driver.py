@@ -484,7 +484,8 @@ class AutoCDAM:
     def _default_parameters(self, systems) -> dict[str, Any]:
         """
         Gets the default fitted parameters: the metal LJ sigma and epsilon,
-        and the dummy charge when a target can determine it.
+        C4 for the 12-6-4 form, and the dummy charge when a target can
+        determine it.
 
         IOD and CN hardly depend on the dummy charge, so it is fitted only
         with an HFE target or a framework system, in 0.8-2.0 times the
@@ -512,6 +513,14 @@ class AutoCDAM:
             self.ostream.print_info(
                 'Metal-dummy distance fixed at '
                 f'{candidate.metal_dummy_distance:.2f} angstrom')
+        if candidate.potential_form == 'lj12_6_4':
+            # soft bounds, widened up to 3000 if the search reaches 200
+            parameters['c4_metal_water'] = ParameterSpec(
+                'c4_metal_water', candidate.c4_metal_water, (0.0, 200.0),
+                expandable=True, hard_bounds=(0.0, 3000.0))
+            self.ostream.print_info(
+                'C4 (12-6-4) fitted in [0, 200] kcal/mol*angstrom^4, '
+                'widened up to 3000 if needed')
         if self.dummy_atom_charge is not None:
             self.ostream.print_info(
                 f'Dummy atom charge fixed at {candidate.dummy_charge:.2f} e')
