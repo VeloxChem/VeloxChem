@@ -271,6 +271,35 @@ class TestAutoCdamAttributeInterface:
         with pytest.raises(VeloxChemError, match="lower, upper"):
             cdamfit.setup(CDAMCandidate("Al", 3), iod)
 
+    def test_study_id_is_reproducible_and_kept_in_the_run_file(self, tmp_path):
+        from veloxchem import Molecule, OutputStream
+        from veloxchem.autocdam.models import read_h5_group
+
+        def run(filename, dummy_charge=0.9):
+            cdamfit = AutoCDAM(ostream=OutputStream(None))
+            cdamfit.target = Molecule.read_smiles("[Al+3]")
+            cdamfit.calculator = _ToyCalculator()
+            cdamfit.dummy_atom_charge = dummy_charge
+            cdamfit.samples_per_stage = 2
+            cdamfit.max_iterations = 1
+            cdamfit.filename = str(filename)
+            cdamfit.properties = {"IOD": {"value": 1.9, "tolerance": 0.05}}
+            cdamfit.fit()
+            return cdamfit
+
+        first = run(tmp_path / "Al0.9d0.9e")
+        assert (tmp_path / "Al0.9d0.9e.h5").is_file()
+        assert first.study_id.startswith("Al3_octahedral_tip3p_lj12_6_")
+        assert first.fit_result().diagnostics["study_id"] == first.study_id
+        saved = read_h5_group(tmp_path / "Al0.9d0.9e.h5", "autocdam/checkpoint")
+        assert first.study_id.endswith(saved["study_hash"])
+        assert run(tmp_path / "again").study_id == first.study_id
+        assert run(tmp_path / "other", 0.8).study_id != first.study_id
+
+        text = repr(first.fit_result())
+        assert "metal_lj_sigma" in text and "angstrom" in text
+        assert "kcal/mol" in text and first.study_id in text
+
     def test_pilot_and_fast_mode_md_protocols(self):
         import pytest
         from veloxchem import OutputStream

@@ -114,7 +114,7 @@ class TestAutoCdamResultsDiagnostics:
             "adjustable": False,
             "bounds": None,
             "fixed_value": 0.9,
-            "unit": None
+            "unit": "angstrom"
         }
         roles = {o["name"]: o["role"] for o in d["objectives"]}
         assert roles == {

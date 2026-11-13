@@ -1134,24 +1134,35 @@ class FitResult:
         ]
         lines += [f"{label:<20s}: {value}" for label, value in rows
                   if value is not None]
-        lines += ["", f"{'Parameter':<22s}{'Value':>14s}"]
-        lines += [f"{name:<22s}{value:>14.6g}"
+        if d.get("study_id"):
+            lines.insert(2, f"{'Study ID':<20s}: {d['study_id']}")
+        units = {
+            row["name"]: row.get("unit") or ""
+            for row in d.get("parameter_definitions", [])
+        }
+        lines += ["", f"{'Parameter':<22s}{'Value':>14s}  Unit"]
+        lines += [f"{name:<22s}{value:>14.6g}  {units.get(name, '')}"
                   for name, value in self.parameters.items()]
+        units = {
+            row["name"]: row.get("unit") or ""
+            for row in d.get("objectives", [])
+        }
         results = d.get("target_results", {})
-        if results:
+        if results or d.get("monitor"):
             lines += [
                 "", f"{'Target':<16s}{'Calculated':>14s}{'Reference':>14s}"
-                f"{'Error/Tol':>11s}  Met"
+                f"{'Error/Tol':>11s}  {'Met':<9s}Unit"
             ]
-            for name, row in results.items():
-                lines.append(
-                    f"{name:<16s}{_short(row['prediction']):>14s}"
-                    f"{_short(row['reference']):>14s}"
-                    f"{row['normalized_error']:>11.3g}  "
-                    f"{'yes' if row.get('within_tolerance') else 'no'}")
+        for name, row in results.items():
+            met = 'yes' if row.get('within_tolerance') else 'no'
+            lines.append(f"{name:<16s}{_short(row['prediction']):>14s}"
+                         f"{_short(row['reference']):>14s}"
+                         f"{row['normalized_error']:>11.3g}  {met:<9s}"
+                         f"{units.get(name, '')}")
         for name, row in d.get("monitor", {}).items():
             lines.append(f"{name:<16s}{_short(row['value']):>14s}"
-                         f"{_short(row['reference']):>14s}{'':>11s}  monitor")
+                         f"{_short(row['reference']):>14s}{'':>11s}  "
+                         f"{'monitor':<9s}{units.get(name, '')}")
         warnings = list(dict.fromkeys(self.warnings))
         if warnings:
             lines += [""] + [f"Warning: {warning}" for warning in warnings]

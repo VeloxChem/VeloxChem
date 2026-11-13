@@ -54,6 +54,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict, replace
 from typing import Any, Iterable, Literal, Sequence, Callable
+import hashlib
 import json
 import math
 import sys
@@ -382,6 +383,28 @@ def _json_value(value):
         return str(value)
     raise TypeError(
         f"checkpoint contains unsupported value {type(value).__name__}")
+
+
+def study_hash(signature: dict[str, Any]) -> str:
+    """
+    Gets a short, reproducible hash of a study signature.
+
+    The same settings always give the same hash; the working directory is
+    left out, so moving a study does not change it.
+
+    :param signature:
+        The study signature (``SearchDriver._signature``).
+
+    :return:
+        The first 12 hexadecimal digits of the SHA-256 hash.
+    """
+
+    data = json.loads(json.dumps(signature, default=_json_value))
+    options = data.get("study_metadata", {}).get("calculator_options")
+    if isinstance(options, dict):
+        options.pop("work_dir", None)
+    text = json.dumps(data, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
 
 
 def _clock(seconds: float) -> str:
@@ -740,6 +763,7 @@ class SearchDriver:
             return
         data = {
             "version": CHECKPOINT_VERSION,
+            "study_hash": study_hash(self._signature()),
             "signature": self._signature(),
             **self._checkpoint_state(), "history": self.history,
             "samples": [asdict(r) for r in self.table.samples]
@@ -759,7 +783,9 @@ class SearchDriver:
             json.dumps(self._signature(), default=_json_value))
         if (data.get("version") != CHECKPOINT_VERSION or
                 data["signature"] != signature):
-            raise ValueError(differ_message)
+            raise ValueError(
+                f"{differ_message} (run file study {study_hash(data['signature'])}"
+                f", this study {study_hash(signature)})")
         self.history = data["history"]
         self.table.samples = []
         for item in data["samples"]:

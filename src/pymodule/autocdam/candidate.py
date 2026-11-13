@@ -267,6 +267,16 @@ PARAMETER_NAMES = frozenset({
     "bond_force_constant",
     "angle_force_constant",
 })
+# Units of the CDAM parameters as given to and reported by AutoCDAM.
+PARAMETER_UNITS = {
+    "dummy_charge": "e",
+    "metal_dummy_distance": "angstrom",
+    "metal_lj_sigma": "angstrom",
+    "metal_lj_epsilon": "kcal/mol",
+    "c4_metal_water": "kcal/mol*angstrom^4",
+    "bond_force_constant": "kcal/mol/angstrom^2",
+    "angle_force_constant": "kcal/mol/rad^2",
+}
 # Short user-facing names accepted by AutoCDAM(parameters=...).
 PARAMETER_ALIASES = {
     "sigma": "metal_lj_sigma",

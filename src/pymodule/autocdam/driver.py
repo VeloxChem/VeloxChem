@@ -72,16 +72,17 @@ from .calculator import Calculator
 from .evaluator import Evaluator
 from .reporting import export_cdam_model
 from .framework import FrameworkSystem
-from .candidate import CDAMCandidate
+from .candidate import PARAMETER_UNITS, CDAMCandidate
 from .generator import CoordinateGenerator
 from .md import md_settings
 from .models import (print_settings, CalculationResult, EvaluationResult, FitResult, FitTarget,
                      GeneratedBatch, ParameterSet, ParameterSpec,
-                     coerce_parameter_specs, coerce_targets, parse_parameters,
+                     coerce_parameter_specs, coerce_targets, h5_filename,
+                     parse_parameters,
                      read_h5_group, reference_bounds)
 from .multisystem import MultiSystemCalculator, build_systems
 from .search import (CHECKPOINT_GROUP, CalculationInput, FittingDriver,
-                     default_quality_check)
+                     default_quality_check, study_hash)
 
 # Default parameters: metal LJ sigma/epsilon with wide UFF-scaled soft bounds.
 DEFAULT_PARAMETERS = {"metal_lj_sigma": "uff", "metal_lj_epsilon": "uff"}
@@ -155,6 +156,7 @@ class AutoCDAM:
         # it, a (lower, upper) pair fits it within these bounds
         self.metal_dummy_distance = None
         self._fit_result = None
+        self.study_id = None
 
         # search
         self.search_method = 'staged'
@@ -786,6 +788,7 @@ class AutoCDAM:
             result = self._fit_geometries(study_metadata, resume)
         else:
             self.fitting_driver = self._make_fitting_driver(study_metadata)
+            self._print_study(self.fitting_driver)
             result = self.fitting_driver.fit(resume=resume)
             progress = getattr(self.fitting_driver, '_progress', None)
             if progress is not None:
@@ -796,6 +799,7 @@ class AutoCDAM:
         profiler.stop_timer('Search')
 
         result.warnings.extend(self.parameter_warnings)
+        result.diagnostics['study_id'] = self.study_id
         if self.systems is not None:
             result.diagnostics["systems"] = reporting.system_report(
                 self.systems, self._samples(), self.candidate.water_model)
@@ -826,6 +830,45 @@ class AutoCDAM:
         assert_msg_critical(self._fit_result is not None,
                             'AutoCDAM: fit() before fit_result()')
         return self._fit_result
+
+    def _study_id(self, driver) -> str:
+        """
+        Gets the study identifier: the ion model and a reproducible hash of
+        every setting (candidate, parameters and bounds, targets, systems,
+        MD/FEP protocol and search).
+
+        :param driver:
+            The search driver of the study.
+
+        :return:
+            The study identifier.
+        """
+
+        c = self.candidate
+        water = str(c.water_model).replace('/', '').replace('-', '')
+        return (f'{c.metal}{c.formal_charge}_{c.geometry}_{water}_'
+                f'{c.potential_form}_{study_hash(driver._signature())}')
+
+    def _print_study(self, driver):
+        """
+        Prints the study identifier and the run file.
+
+        :param driver:
+            The search driver of the study.
+        """
+
+        self.study_id = self._study_id(driver)
+        self.ostream.print_info(f'Study ID: {self.study_id}')
+        if self.filename is None:
+            self.ostream.print_info(
+                'Run file: none (set filename to keep a checkpoint and '
+                'restart)')
+        else:
+            self.ostream.print_info(
+                f'Run file: {h5_filename(self.filename)} (checkpoint, '
+                'calculated properties and result)')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def _print_fast_mode(self):
         """
@@ -880,6 +923,9 @@ class AutoCDAM:
         wall = sum(sample.runtime_seconds or 0.0 for sample in samples)
 
         print_settings(self.ostream, 'AutoCDAM Fitting Report', [
+            ('Study ID', self.study_id),
+            ('Run File', str(h5_filename(self.filename))
+             if self.filename is not None else None),
             ('Ion', f'{candidate.metal}{candidate.formal_charge}+ CDAM, '
              f'{candidate.geometry}, {candidate.water_model} water, '
              f'{candidate.potential_form}'),
@@ -894,26 +940,32 @@ class AutoCDAM:
             row['name']: row
             for row in diagnostics.get('parameter_definitions', [])
         }
-        lines = [f"{'Parameter':<22s}{'Value':>12s}   {'Range':<26s}"]
+        lines = [
+            f"{'Parameter':<22s}{'Value':>12s}   {'Range':<18s}{'Unit':<20s}"
+        ]
         for name, value in result.parameters.items():
             row = definitions.get(name, {})
             bounds = row.get('bounds') if row.get('adjustable') else None
             span = (f'[{bounds[0]:.4g}, {bounds[1]:.4g}]'
                     if bounds is not None else 'fixed')
-            lines.append(f'{name:<22s}{value:>12.5g}   {span:<26s}')
+            lines.append(f'{name:<22s}{value:>12.5g}   {span:<18s}'
+                         f"{PARAMETER_UNITS.get(name, ''):<20s}")
         fixed = ['dummy_charge', 'metal_dummy_distance']
         if candidate.potential_form == 'lj12_6_4':
             fixed.append('c4_metal_water')
         for name in fixed:
             if name not in result.parameters.to_dict():
                 lines.append(f"{name:<22s}{getattr(candidate, name):>12.5g}   "
-                             f"{'fixed':<26s}")
+                             f"{'fixed':<18s}{PARAMETER_UNITS[name]:<20s}")
         self._print_table(lines)
 
-        units = {target.name: target.unit or '' for target in self.targets}
+        units = {
+            target.name: reporting.target_unit(target) or ''
+            for target in self.targets
+        }
         lines = [
             f"{'Target':<14s}{'Calculated':>12s}{'Reference':>12s}"
-            f"{'Tolerance':>12s}  {'Unit':<10s}{'Met':<4s}"
+            f"{'Tolerance':>12s}  {'Unit':<15s}{'Met':<4s}"
         ]
         for name, row in diagnostics.get('target_results', {}).items():
             target = next(t for t in self.targets if t.name == name)
@@ -921,11 +973,11 @@ class AutoCDAM:
             lines.append(
                 f"{name:<14s}{_number(row['prediction']):>12s}"
                 f"{_number(row['reference']):>12s}"
-                f"{_number(target.tolerance):>12s}  {units[name]:<10s}{met:<4s}")
+                f"{_number(target.tolerance):>12s}  {units[name]:<15s}{met:<4s}")
         for name, row in diagnostics.get('monitor', {}).items():
             lines.append(f"{name:<14s}{_number(row['value']):>12s}"
                          f"{_number(row['reference']):>12s}{'':>12s}  "
-                         f"{units.get(name, ''):<10s}{'-':<4s}")
+                         f"{units.get(name, ''):<15s}{'-':<4s}")
         self._print_table(lines)
 
         for warning in dict.fromkeys(result.warnings):
@@ -1129,6 +1181,7 @@ class AutoCDAM:
             metadata.update(self.candidate.metadata())
             group = f"{CHECKPOINT_GROUP}_{geometry}"
             driver = self._make_fitting_driver(metadata, group)
+            self._print_study(driver)
             saved = (self.filename is not None and
                      read_h5_group(self.filename, group) is not None)
             results[geometry] = driver.fit(resume=resume and saved)
@@ -1138,6 +1191,7 @@ class AutoCDAM:
                        "feasible", False), results[g].objective))
         self.candidate = base_candidate.with_geometry(best)
         self.fitting_driver = drivers[best]
+        self.study_id = self._study_id(drivers[best])
         result = results[best]
         result.diagnostics["geometry"] = best
         result.diagnostics["geometry_results"] = {

@@ -62,8 +62,11 @@ try:
 except ImportError:
     pass
 
-from .models import (BOUND_MARGIN, RESULT_GROUP, FitResult, FitTarget,
-                     ParameterSpec, h5_filename, read_h5_group)
+from .candidate import PARAMETER_UNITS
+from .framework import FRAMEWORK_PROPERTIES
+from .models import (AQUEOUS_PROPERTIES, BOUND_MARGIN, RESULT_GROUP,
+                     FitResult, FitTarget, ParameterSpec, h5_filename,
+                     read_h5_group)
 
 # ==========================================================================
 # reporting
@@ -85,7 +88,7 @@ def parameter_definitions(specs: Sequence[ParameterSpec],
             "bounds": (list(final_bounds.get(spec.name, spec.bounds))
                        if spec.bounds else None),
             "initial" if spec.optimizable else "fixed_value": spec.initial,
-            "unit": spec.unit
+            "unit": spec.unit or PARAMETER_UNITS.get(spec.name)
         }
         if spec.expandable:
             definition.update({
@@ -109,8 +112,17 @@ def objective_definitions(targets: Sequence[FitTarget]) -> list[dict[str, Any]]:
         "scale": t.normalization_scale,
         "weight": t.weight,
         "role": t.kind,
-        "unit": t.unit
+        "unit": target_unit(t)
     } for t in targets]
+
+
+def target_unit(target: FitTarget) -> str | None:
+    """The unit of a target: as given, else that of its calculated property."""
+    if target.unit:
+        return target.unit
+    if target.property_name in AQUEOUS_PROPERTIES:
+        return AQUEOUS_PROPERTIES[target.property_name].unit
+    return FRAMEWORK_PROPERTIES.get(target.property_name)
 
 
 def bound_warnings(specs: Sequence[ParameterSpec], parameters: dict[str, float],
