@@ -69,6 +69,7 @@ from ..veloxchemlib import hartree_in_kcalpermol, hartree_in_kjpermol, mpi_maste
 # ==========================================================================
 
 SETTINGS_WIDTH = 84
+OUTPUT_WIDTH = 122  # the default width of a VeloxChem OutputStream
 LABEL_WIDTH = 32
 
 
@@ -108,6 +109,32 @@ def format_value(value) -> str:
     return str(value)
 
 
+def settings_lines(rows) -> list[str]:
+    """``Label : value`` lines of equal width; rows with value ``None`` are skipped.
+
+    Long values (paths, lists) wrap under the value column, so every line keeps
+    the block's centered alignment.
+    """
+    lines = []
+    indent = " " * (LABEL_WIDTH + 2)
+    for label, value in rows:
+        if value is None:
+            continue
+        wrapped = textwrap.wrap(f"{label:<{LABEL_WIDTH}s}: {format_value(value)}",
+                                SETTINGS_WIDTH,
+                                subsequent_indent=indent,
+                                break_on_hyphens=False) or [label]
+        lines += [line.ljust(SETTINGS_WIDTH) for line in wrapped]
+    return lines
+
+
+def table_lines(lines) -> list[str]:
+    """A table of equal-width lines: header, ``-`` separator, rows."""
+    width = max(len(line) for line in lines)
+    return [lines[0].ljust(width), "-" * width,
+            *(line.ljust(width) for line in lines[1:])]
+
+
 def print_settings(ostream: OutputStream | None, title: str, rows) -> None:
     """Print a titled ``Label : value`` block; ``rows`` holds (label, value) pairs.
 
@@ -119,18 +146,8 @@ def print_settings(ostream: OutputStream | None, title: str, rows) -> None:
     ostream.print_header(title)
     ostream.print_header("=" * (len(title) + 2))
     ostream.print_blank()
-    for label, value in rows:
-        if value is None:
-            continue
-        # Wrap long values (paths, lists) under the value column so every
-        # line keeps the block's centered alignment.
-        indent = " " * (LABEL_WIDTH + 2)
-        lines = textwrap.wrap(f"{label:<{LABEL_WIDTH}s}: {format_value(value)}",
-                              SETTINGS_WIDTH,
-                              subsequent_indent=indent,
-                              break_on_hyphens=False) or [label]
-        for line in lines:
-            ostream.print_header(line.ljust(SETTINGS_WIDTH))
+    for line in settings_lines(rows):
+        ostream.print_header(line)
     ostream.print_blank()
     ostream.flush()
 
@@ -1112,60 +1129,69 @@ class FitResult:
 
     def __repr__(self) -> str:
         """
-        Creates the formatted result shown in notebooks and by ``print``.
+        Creates the formatted result shown in notebooks and by ``print``, in
+        the VeloxChem output format.
 
         :return:
             The formatted result.
         """
 
         d = self.diagnostics
-        title = "AutoCDAM Fit Result"
-        lines = [title, "=" * len(title)]
         cost = d.get("cost", {})
-        rows = [
+        settings = settings_lines([
+            ("Study ID", d.get("study_id")),
             ("Status", f"{self.status} (converged: {self.converged}, "
              f"stop: {d.get('stop_reason')})"),
             ("Objective", f"{self.objective:.6g} (feasible: "
              f"{d.get('feasible')})"),
             ("Candidates", cost.get("n_candidates",
                                     d.get("n_calculations"))),
-            ("Physical validation", d.get("physical_validation",
+            ("Physical Validation", d.get("physical_validation",
                                           "not performed")),
-        ]
-        lines += [f"{label:<20s}: {value}" for label, value in rows
-                  if value is not None]
-        if d.get("study_id"):
-            lines.insert(2, f"{'Study ID':<20s}: {d['study_id']}")
+        ])
+
         units = {
             row["name"]: row.get("unit") or ""
             for row in d.get("parameter_definitions", [])
         }
-        lines += ["", f"{'Parameter':<22s}{'Value':>14s}  Unit"]
-        lines += [f"{name:<22s}{value:>14.6g}  {units.get(name, '')}"
-                  for name, value in self.parameters.items()]
+        parameters = table_lines(
+            [f"{'Parameter':<22s}{'Value':>14s}   {'Unit':<20s}"] +
+            [f"{name:<22s}{value:>14.6g}   {units.get(name, ''):<20s}"
+             for name, value in self.parameters.items()])
+
         units = {
             row["name"]: row.get("unit") or ""
             for row in d.get("objectives", [])
         }
-        results = d.get("target_results", {})
-        if results or d.get("monitor"):
-            lines += [
-                "", f"{'Target':<16s}{'Calculated':>14s}{'Reference':>14s}"
-                f"{'Error/Tol':>11s}  {'Met':<9s}Unit"
-            ]
-        for name, row in results.items():
-            met = 'yes' if row.get('within_tolerance') else 'no'
-            lines.append(f"{name:<16s}{_short(row['prediction']):>14s}"
-                         f"{_short(row['reference']):>14s}"
-                         f"{row['normalized_error']:>11.3g}  {met:<9s}"
-                         f"{units.get(name, '')}")
+        rows = [
+            f"{'Target':<16s}{'Calculated':>12s}{'Reference':>12s}"
+            f"{'Error/Tol':>11s}   {'Met':<9s}{'Unit':<15s}"
+        ]
+        for name, row in d.get("target_results", {}).items():
+            met = "yes" if row.get("within_tolerance") else "no"
+            rows.append(f"{name:<16s}{_short(row['prediction']):>12s}"
+                        f"{_short(row['reference']):>12s}"
+                        f"{row['normalized_error']:>11.3g}   {met:<9s}"
+                        f"{units.get(name, ''):<15s}")
         for name, row in d.get("monitor", {}).items():
-            lines.append(f"{name:<16s}{_short(row['value']):>14s}"
-                         f"{_short(row['reference']):>14s}{'':>11s}  "
-                         f"{'monitor':<9s}{units.get(name, '')}")
-        warnings = list(dict.fromkeys(self.warnings))
-        if warnings:
-            lines += [""] + [f"Warning: {warning}" for warning in warnings]
+            rows.append(f"{name:<16s}{_short(row['value']):>12s}"
+                        f"{_short(row['reference']):>12s}{'':>11s}   "
+                        f"{'monitor':<9s}{units.get(name, ''):<15s}")
+        targets = table_lines(rows) if len(rows) > 1 else []
+
+        title = "AutoCDAM Fitting Result"
+        width = OUTPUT_WIDTH
+        blocks = [[title, "=" * (len(title) + 2)], settings, parameters,
+                  targets]
+        lines = [""]
+        for block in blocks:
+            if block:
+                lines += [OutputStream.header(line, width).rstrip()
+                          for line in block] + [""]
+        lines += [
+            OutputStream.warning(warning, width).rstrip()
+            for warning in dict.fromkeys(self.warnings)
+        ]
         return "\n".join(lines)
 
     def summary(self) -> str:
@@ -1484,7 +1510,9 @@ def convert_units(values: dict, metadata: dict,
 
 def _short(value) -> str:
     """A value for the formatted result (vectors by their length)."""
+    if value is None:
+        return "n/a"
     try:
-        return f"{float(value):.6g}"
+        return f"{float(value):.5g}"
     except (TypeError, ValueError):
         return f"[{len(value)} values]"

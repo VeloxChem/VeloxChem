@@ -75,7 +75,7 @@ from .framework import FrameworkSystem
 from .candidate import PARAMETER_UNITS, CDAMCandidate
 from .generator import CoordinateGenerator
 from .md import md_settings
-from .models import (print_settings, CalculationResult, EvaluationResult, FitResult, FitTarget,
+from .models import (print_settings, table_lines, CalculationResult, EvaluationResult, FitResult, FitTarget,
                      GeneratedBatch, ParameterSet, ParameterSpec,
                      coerce_parameter_specs, coerce_targets, h5_filename,
                      parse_parameters,
@@ -1015,14 +1015,11 @@ class AutoCDAM:
         Prints a centered table: header, separator, rows.
 
         :param lines:
-            The header line and the row lines (equal width).
+            The header line and the row lines.
         """
 
-        width = len(lines[0])
-        self.ostream.print_header(lines[0])
-        self.ostream.print_header('-' * width)
-        for line in lines[1:]:
-            self.ostream.print_header(line.ljust(width))
+        for line in table_lines(lines):
+            self.ostream.print_header(line)
         self.ostream.print_blank()
 
     def _candidate(self, target) -> CDAMCandidate:
@@ -1287,6 +1284,8 @@ class AutoCDAM:
 
 def _number(value) -> str:
     """A target value for the report (vectors by their length)."""
+    if value is None:
+        return "n/a"
     try:
         return f'{float(value):.4g}'
     except (TypeError, ValueError):
