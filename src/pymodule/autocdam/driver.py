@@ -72,7 +72,7 @@ from .reporting import export_cdam_model
 from .framework import FrameworkSystem
 from .candidate import PARAMETER_UNITS, CDAMCandidate
 from .generator import CoordinateGenerator
-from .md import md_settings
+from .md import fep_settings, md_settings
 from .models import (print_settings, table_lines, CalculationResult, EvaluationResult, FitResult, FitTarget,
                      GeneratedBatch, ParameterSet, ParameterSpec,
                      coerce_parameter_specs, coerce_targets, h5_filename,
@@ -1127,7 +1127,14 @@ class AutoCDAM:
         template = self.candidate.to_generated_batch()
         metadata = dict(template.metadata)
         metadata["candidate_template"] = asdict(template.system)
-        metadata["calculator_options"] = self.calculator_options
+        # the applied settings, defaults included, so a default and the same
+        # value set explicitly give the same study
+        options = deepcopy(self.calculator_options)
+        options['md_options'] = md_settings(options.get('md_options'))
+        if any(t.property_name == 'HFE' for t in self.targets):
+            options['fep_options'] = fep_settings(options.get('fep_options'))
+        metadata["calculator_options"] = options
+        metadata["search_method"] = self.search_method
         if self.systems is not None:
             # Baselines are prepared once here; fingerprints guard resume.
             metadata["systems"] = {

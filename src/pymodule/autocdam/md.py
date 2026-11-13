@@ -46,6 +46,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+from copy import deepcopy
 from typing import Any
 import collections
 import math
@@ -363,6 +364,24 @@ STAGE1_LAMBDAS = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9,
 STAGE2_LAMBDAS = [1.0, 0.8, 0.6, 0.4, 0.2, 0.0]  # LJ
 DRIVER_OPTIONS = ("num_steps", "num_snapshots", "num_equil_steps",
                   "num_em_steps", "platform")
+# The applied FEP protocol (SolvationFepDriver equilibration defaults included).
+FEP_DEFAULTS = {
+    "num_steps": NUM_STEPS,
+    "num_snapshots": NUM_SNAPSHOTS,
+    "num_equil_steps": 5000,
+    "num_em_steps": 0,
+    "timestep_fs": TIMESTEP_FS,
+    "lambdas_stage1": STAGE1_LAMBDAS,
+    "lambdas_stage2": STAGE2_LAMBDAS,
+    "equilibrate_first": True,
+}
+
+
+def fep_settings(options: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The production FEP protocol, then explicit overrides."""
+    settings = deepcopy(FEP_DEFAULTS)
+    settings.update(options or {})
+    return settings
 
 # Finite-size correction constants (OpenMM units: nm, e, kJ/mol).
 # 1/(4 pi eps0) in kJ/mol nm/e^2, from VeloxChem atomic-unit conversions.
@@ -422,17 +441,14 @@ def _make_driver(fep_options: dict[str, Any], ostream) -> SolvationFepDriver:
 
     Only ``DRIVER_OPTIONS`` and ``timestep_fs`` are applied; other keys are ignored here.
     """
+    settings = fep_settings(fep_options)
     driver = SolvationFepDriver(ostream=ostream)
-    driver.num_steps = NUM_STEPS
-    driver.num_snapshots = NUM_SNAPSHOTS
+    for name in DRIVER_OPTIONS:
+        if name in settings:
+            setattr(driver, name, settings[name])
     driver.lambdas_stage1 = list(STAGE1_LAMBDAS)
     driver.lambdas_stage2 = list(STAGE2_LAMBDAS)
-    driver.timestep = TIMESTEP_FS * unit.femtoseconds
-    for name in DRIVER_OPTIONS:
-        if name in fep_options:
-            setattr(driver, name, fep_options[name])
-    if "timestep_fs" in fep_options:
-        driver.timestep = float(fep_options["timestep_fs"]) * unit.femtoseconds
+    driver.timestep = float(settings["timestep_fs"]) * unit.femtoseconds
     return driver
 
 

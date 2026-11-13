@@ -298,13 +298,17 @@ class TestAutoCdamAttributeInterface:
         from veloxchem import Molecule, OutputStream
         from veloxchem.autocdam.models import read_h5_group
 
-        def run(filename, dummy_charge=0.9):
+        def run(filename, dummy_charge=0.9, **settings):
             cdamfit = AutoCDAM(ostream=OutputStream(None))
             cdamfit.target = Molecule.read_smiles("[Al+3]")
             cdamfit.calculator = _ToyCalculator()
             cdamfit.dummy_atom_charge = dummy_charge
+            cdamfit.max_evaluations = 3
+            cdamfit.initial_samples = 2
             cdamfit.samples_per_stage = 2
             cdamfit.max_iterations = 1
+            for name, value in settings.items():
+                setattr(cdamfit, name, value)
             cdamfit.filename = str(filename)
             cdamfit.properties = {"IOD": {"value": 1.9, "tolerance": 0.05}}
             cdamfit.fit()
@@ -318,6 +322,17 @@ class TestAutoCdamAttributeInterface:
         assert first.study_id.endswith(saved["study_hash"])
         assert run(tmp_path / "again").study_id == first.study_id
         assert run(tmp_path / "other", 0.8).study_id != first.study_id
+
+        # defaults are part of the ID: setting them explicitly changes nothing
+        explicit = run(tmp_path / "explicit", search_method="bayesian",
+                       water_model="tip3p", coordination_type="octahedral",
+                       potential_form="lj12_6", metal_dummy_distance=0.9,
+                       md_options={"production_steps": 250000})
+        assert explicit.study_id == first.study_id
+        for name, value in (("search_method", "staged"), ("fast_mode", True),
+                            ("md_options", {"production_steps": 1000})):
+            other = run(tmp_path / name, **{name: value})
+            assert other.study_id != first.study_id
 
         text = repr(first.fitting_result())
         assert "metal_lj_sigma" in text and "angstrom" in text
@@ -333,6 +348,10 @@ class TestAutoCdamAttributeInterface:
         assert pilot["production_steps"] * pilot["timestep_fs"] / 1000 == 0.05
         with pytest.raises(ValueError, match="not both"):
             md_settings({"pilot": True, "fast_mode": True})
+
+        from veloxchem.autocdam.md import fep_settings
+        assert fep_settings({"num_steps": 50000}) == fep_settings()
+        assert fep_settings({"num_steps": 100})["num_steps"] == 100
 
         md = md_settings({"fast_mode": True})
         assert md["timestep_fs"] == 2.0
