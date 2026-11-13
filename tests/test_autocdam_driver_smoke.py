@@ -182,9 +182,8 @@ class TestAutoCdamAttributeInterface:
         assert cdamfit.fit_result is result
         assert result.diagnostics["n_calculations"] == 4
 
-        pdb, xml = cdamfit.write_openmm_files(str(tmp_path / "al"),
-                                              mol_name="ALX")
-        assert pdb.name == "al.pdb" and xml.name == "al.xml"
+        cdamfit.write_openmm_files(str(tmp_path / "al"), mol_name="ALX")
+        pdb, xml = tmp_path / "al.pdb", tmp_path / "al.xml"
         assert " ALX A" in pdb.read_text()
         assert '<Residue name="ALX">' in xml.read_text()
         sigma = result.parameters.to_dict()["metal_lj_sigma"]

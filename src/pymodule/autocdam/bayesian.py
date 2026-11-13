@@ -367,6 +367,10 @@ class BayesianFittingDriver(SearchDriver):
         """Number of acquisition steps that widened at least one soft bound."""
         return len({e["step"] for e in self.bound_expansions})
 
+    def _progress_total(self) -> int:
+        """The evaluation budget, including widenings so far."""
+        return self._budget()
+
     def _budget(self) -> int:
         """``max_evaluations`` plus the extra evaluations granted per widening."""
         return (int(self.search["max_evaluations"]) + self._n_widenings() *

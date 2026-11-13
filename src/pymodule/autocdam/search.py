@@ -56,6 +56,8 @@ from dataclasses import dataclass, field, asdict, replace
 from typing import Any, Iterable, Literal, Sequence, Callable
 import json
 import math
+import sys
+import threading
 import time
 from pathlib import Path
 
@@ -376,6 +378,142 @@ def _json_value(value):
         f"checkpoint contains unsupported value {type(value).__name__}")
 
 
+def _clock(seconds: float) -> str:
+    """Seconds as h:mm:ss."""
+    seconds = int(round(seconds))
+    return f"{seconds // 3600}:{seconds % 3600 // 60:02d}:{seconds % 60:02d}"
+
+
+SHORT_NAMES = {
+    "metal_lj_sigma": "sigma",
+    "metal_lj_epsilon": "epsilon",
+    "c4_metal_water": "c4",
+    "dummy_charge": "q_dummy",
+    "metal_dummy_distance": "r_dummy",
+}
+
+
+class FitProgress:
+    """
+    Prints one line per calculated candidate and, on a terminal or notebook,
+    a progress bar with the elapsed and the estimated remaining time that is
+    redrawn in place while a candidate runs.
+
+    :param ostream:
+        The output stream.
+    :param total:
+        The planned number of candidates (None if unknown).
+    :param done:
+        The number of candidates calculated before this run (restart).
+    """
+
+    WIDTH = 30
+    REFRESH_SECONDS = 2.0
+
+    def __init__(self, ostream, total: int | None, done: int = 0):
+        """
+        Initializes the progress report.
+        """
+
+        self.ostream = ostream
+        self.total = total
+        self.done = done
+        self.started = time.monotonic()
+        self.runtimes: list[float] = []
+        self._candidate_started = None
+        self._stop = threading.Event()
+        self._thread = None
+        self._live = (ostream is not None and ostream.get_state() and
+                      not ostream.is_muted and
+                      ostream.stream is sys.stdout)
+
+    def bar(self) -> str:
+        """The progress bar line."""
+        running = self.done + (1 if self._candidate_started is not None else 0)
+        total = max(self.total or running, running)
+        filled = int(self.WIDTH * self.done / total) if total else 0
+        line = (f"[{'#' * filled}{'-' * (self.WIDTH - filled)}] "
+                f"{self.done}/{total} candidates | elapsed "
+                f"{_clock(time.monotonic() - self.started)}")
+        if self._candidate_started is not None:
+            line += (f" | candidate {running}: "
+                     f"{_clock(time.monotonic() - self._candidate_started)}")
+        if self.runtimes and self.total:
+            mean = sum(self.runtimes) / len(self.runtimes)
+            left = max(self.total - self.done, 0) * mean
+            if self._candidate_started is not None:
+                left -= min(time.monotonic() - self._candidate_started, mean)
+            line += f" | remaining ~{_clock(max(left, 0.0))}"
+        return line
+
+    def _draw(self) -> None:
+        sys.stdout.write("\r" + self.bar().ljust(self.ostream.width)[:self.ostream.width])
+        sys.stdout.flush()
+
+    def _clear(self) -> None:
+        sys.stdout.write("\r" + " " * self.ostream.width + "\r")
+        sys.stdout.flush()
+
+    def _refresh(self) -> None:
+        while not self._stop.wait(self.REFRESH_SECONDS):
+            self._draw()
+
+    def start_candidate(self) -> None:
+        """Marks the start of a candidate calculation."""
+        self._candidate_started = time.monotonic()
+        if self._live:
+            self.ostream.flush()
+            self._draw()
+            self._stop.clear()
+            self._thread = threading.Thread(target=self._refresh, daemon=True)
+            self._thread.start()
+
+    def finish_candidate(self, parameters, calculation, runtime: float) -> None:
+        """
+        Prints the result line of a calculated candidate.
+
+        :param parameters:
+            The parameter set.
+        :param calculation:
+            The calculation result.
+        :param runtime:
+            The wall time of the candidate in seconds.
+        """
+
+        if self._thread is not None:
+            self._stop.set()
+            self._thread.join()
+            self._thread = None
+        self._candidate_started = None
+        self.done += 1
+        self.runtimes.append(runtime)
+        if self.ostream is None:
+            return
+        if self._live:
+            self._clear()
+        total = f"/{self.total}" if self.total else ""
+        values = ", ".join(
+            f"{SHORT_NAMES.get(name, name)}={value:.4g}"
+            for name, value in parameters.to_dict().items())
+        if calculation.failed:
+            result = f"failed: {calculation.failure_reason}"
+        else:
+            result = ", ".join(
+                f"{name}={float(value):.4g}"
+                for name, value in calculation.values.items()
+                if np.ndim(value) == 0)
+        self.ostream.print_info(f"Candidate {self.done}{total} "
+                                f"({_clock(runtime)}): {values} -> {result}")
+        self.ostream.flush()
+        if self._live:
+            self._draw()
+
+    def close(self) -> None:
+        """Removes the progress bar line."""
+        if self._live and self.done:
+            self._clear()
+
+
 class SearchDriver:
     """Shared state and bookkeeping of a parameter search (not used directly).
 
@@ -451,8 +589,23 @@ class SearchDriver:
     def _info(self, message: str) -> None:
         """Print an information line to ``ostream``, if one was given."""
         if self.ostream is not None:
+            progress = getattr(self, "_progress", None)
+            if progress is not None:
+                progress.close()
             self.ostream.print_info(message)
             self.ostream.flush()
+
+    def _progress_total(self) -> int | None:
+        """The planned number of candidates (None if unknown)."""
+        return None
+
+    def _get_progress(self) -> FitProgress:
+        """The progress report of this fit, created at the first candidate."""
+        if getattr(self, "_progress", None) is None:
+            self._progress = FitProgress(self.ostream, self._progress_total(),
+                                         len(self.table.samples))
+        self._progress.total = self._progress_total()
+        return self._progress
 
     # ------------------------------------------------------------- evaluation
 
@@ -519,10 +672,14 @@ class SearchDriver:
             for index in range(len(proposals))
         ]
         inputs = iter(self.make_inputs(proposals, sample_ids))
+        progress = self._get_progress()
         for parameters, sample_id in zip(proposals, sample_ids):
             started = time.monotonic()
+            progress.start_candidate()
             item = next(inputs)
             calculation = self._calculate(item, parameters)
+            progress.finish_candidate(parameters, calculation,
+                                      time.monotonic() - started)
             quality = self.quality_check(calculation)
             if quality not in ("usable", "unreviewed", "rejected"):
                 raise ValueError(
@@ -724,6 +881,10 @@ class FittingDriver(SearchDriver):
         self.samples_per_stage = samples_per_stage
         self.shrink_fraction = shrink_fraction
         self.region = {s.name: s.bounds for s in self.specs if s.optimizable}
+
+    def _progress_total(self) -> int:
+        """At most ``max_iterations`` stages of ``samples_per_stage``."""
+        return self.max_iterations * self.samples_per_stage
 
     # ------------------------------------------------------------------ fit
 

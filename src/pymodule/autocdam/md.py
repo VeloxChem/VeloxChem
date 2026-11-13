@@ -49,6 +49,7 @@ from functools import lru_cache
 from typing import Any
 import collections
 import math
+import os
 import tempfile
 from pathlib import Path
 
@@ -158,16 +159,37 @@ def check_md_settings(settings: dict[str, Any]) -> None:
             "production_steps must record at least two trajectory frames")
 
 
+# OpenMM's CPU platform uses every core by default. For a CDAM water box
+# (~1300 atoms) PME scales only to ~8 threads, and 128 threads run 2x slower
+# than 8. OPENMM_CPU_THREADS overrides this default.
+DEFAULT_CPU_THREADS = 8
+
+
+def cpu_threads() -> str:
+    """Number of OpenMM CPU threads: OPENMM_CPU_THREADS, else up to 8."""
+    return os.environ.get("OPENMM_CPU_THREADS") or str(
+        min(DEFAULT_CPU_THREADS, os.cpu_count() or 1))
+
+
 @lru_cache(maxsize=None)
 def default_platform() -> tuple[mm.Platform, tuple]:
-    """Fastest available OpenMM platform and its default properties (as items)."""
+    """Fastest available OpenMM platform and its default properties (as items).
+
+    Also sets the default thread count of the CPU platform, so that contexts
+    created elsewhere (the solvation FEP driver) do not use every core.
+    """
+    mm.Platform.getPlatformByName("CPU").setPropertyDefaultValue(
+        "Threads", cpu_threads())
     for name in ("HIP", "CUDA", "OpenCL", "CPU"):
         try:
             platform = mm.Platform.getPlatformByName(name)
         except Exception:
             continue
-        return platform, ((("Precision", "mixed"),) if name in ("CUDA",
-                                                                "HIP") else ())
+        if name in ("CUDA", "HIP"):
+            return platform, (("Precision", "mixed"),)
+        if name == "CPU":
+            return platform, (("Threads", cpu_threads()),)
+        return platform, ()
     raise RuntimeError("no OpenMM platform is available")
 
 
@@ -175,8 +197,10 @@ def platform_for(
         settings: dict[str, Any]) -> tuple[mm.Platform, dict[str, str]]:
     """The platform named in ``settings``, else the default one."""
     if "platform" in settings:
-        return (mm.Platform.getPlatformByName(settings["platform"]),
-                dict(settings.get("platform_properties", {})))
+        properties = dict(settings.get("platform_properties", {}))
+        if settings["platform"] == "CPU":
+            properties.setdefault("Threads", cpu_threads())
+        return mm.Platform.getPlatformByName(settings["platform"]), properties
     platform, properties = default_platform()
     return platform, dict(settings.get("platform_properties", dict(properties)))
 
@@ -422,6 +446,7 @@ def run_fep(systems, final_state: mm.State | None, work_dir: Path,
     ``RuntimeError`` unless the CDAM cluster is rigid (purely 1-2/1-3 bonded),
     because only then are the vacuum legs zero and skipped.
     """
+    default_platform()  # CPU thread default for the FEP contexts
     ostream.print_info("Handing CDAM system to SolvationFepDriver...")
     ostream.flush()
     system = systems.solvated_system

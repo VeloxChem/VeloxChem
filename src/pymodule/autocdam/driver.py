@@ -70,12 +70,12 @@ from .bayesian import SEARCH_DEFAULTS, BayesianFittingDriver
 from .cache import CachedCalculator
 from .calculator import Calculator
 from .evaluator import Evaluator
-from .reporting import export_cdam_model, format_table, samples_table
+from .reporting import export_cdam_model
 from .framework import FrameworkSystem
 from .candidate import CDAMCandidate
 from .generator import CoordinateGenerator
 from .md import md_settings
-from .models import (CalculationResult, EvaluationResult, FitResult, FitTarget,
+from .models import (print_settings, CalculationResult, EvaluationResult, FitResult, FitTarget,
                      GeneratedBatch, ParameterSet, ParameterSpec,
                      coerce_parameter_specs, coerce_targets, parse_parameters,
                      read_h5_group, reference_bounds)
@@ -176,6 +176,10 @@ class AutoCDAM:
         self.fep_options = None
         self.qm_options = None
 
+        # output: 1 prints one line per candidate and a progress bar,
+        # 2 also every calculation, MD and FEP setup
+        self.print_level = 1
+
         # timing and profiling
         self.timing = False
         self.profiling = False
@@ -242,6 +246,8 @@ class AutoCDAM:
                 'md_options': ('raw', 'MD protocol settings'),
                 'fep_options': ('raw', 'solvation FEP settings'),
                 'qm_options': ('raw', 'QM single-point settings'),
+                'print_level':
+                    ('int', '1: progress per candidate, 2: every calculation'),
                 'timing': ('bool', 'print timing of the fit stages'),
                 'profiling': ('bool', 'print profiling information'),
                 'filename':
@@ -383,7 +389,8 @@ class AutoCDAM:
             Explicit parameter specifications instead of ``parameters``.
         """
 
-        ostream = self.ostream
+        # Calculation details (plans, MD and FEP setups) only at print level 2
+        ostream = (self.ostream if self.print_level > 1 else OutputStream(None))
         if self.dummy_atom_charge is not None:
             candidate = candidate.with_parameters(
                 {'dummy_charge': float(self.dummy_atom_charge)})
@@ -736,6 +743,9 @@ class AutoCDAM:
         else:
             self.fitting_driver = self._make_fitting_driver(study_metadata)
             result = self.fitting_driver.fit(resume=resume)
+            progress = getattr(self.fitting_driver, '_progress', None)
+            if progress is not None:
+                progress.close()
             if self.fitting_driver.table.samples:
                 self.last_calculation = self.fitting_driver.table.samples[
                     -1].calculation
@@ -780,36 +790,106 @@ class AutoCDAM:
 
     def check_fitting(self, filename=None):
         """
-        Prints the fit summary and every calculated candidate, and plots the
-        fitting procedure.
+        Prints a short report of the fit and saves the plot of the fitting
+        procedure as <filename>_fitting.png.
 
         :param filename:
-            The base filename of the plot, <filename>_fitting.png (default:
-            the run filename, or the candidate identifier).
-
-        :return:
-            The Matplotlib figure (None on non-master ranks).
+            The base filename of the plot (default: the run filename, or the
+            candidate identifier).
         """
 
         assert_msg_critical(self.fit_result is not None,
                             'AutoCDAM: fit() before check_fitting()')
         if self.rank != mpi_master():
-            return None
+            return
         result = self.fit_result
-        for line in result.summary().splitlines():
-            self.ostream.print_line(line)
-        self.ostream.print_blank()
-        for line in format_table(samples_table(result),
-                                 digits=3).splitlines():
-            self.ostream.print_line(line)
-        stem = Path(filename or self.filename or self.candidate.candidate_id)
+        diagnostics = result.diagnostics
+        candidate = self.candidate
+        samples = self._samples()
+        failed = sum(sample.calculation.failed for sample in samples)
+        md = self.calculator_options.get('md_options', {})
+        if md.get('pilot'):
+            protocol = 'pilot (workflow test only)'
+        elif md.get('fast_mode'):
+            protocol = 'fast mode (short MD)'
+        else:
+            protocol = 'production'
+        if md:
+            step_ps = float(md['timestep_fs']) / 1000.0
+            protocol += f", {md['production_steps'] * step_ps:g} ps production"
+        if result.converged:
+            status = 'converged: all targets within tolerance'
+        else:
+            status = ('not converged '
+                      f"(stopped: {diagnostics.get('stop_reason')})")
+        wall = sum(sample.runtime_seconds or 0.0 for sample in samples)
+
+        print_settings(self.ostream, 'AutoCDAM Fitting Report', [
+            ('Ion', f'{candidate.metal}{candidate.formal_charge}+ CDAM, '
+             f'{candidate.geometry}, {candidate.water_model} water, '
+             f'{candidate.potential_form}'),
+            ('Search', f'{self.search_method}, {len(samples)} candidates'
+             f' ({failed} failed)'),
+            ('MD Protocol', protocol),
+            ('Candidate Wall Time', f'{wall / 60.0:.1f} min'),
+            ('Status', status),
+        ])
+
+        definitions = {
+            row['name']: row
+            for row in diagnostics.get('parameter_definitions', [])
+        }
+        lines = [f"{'Parameter':<22s}{'Value':>12s}   {'Range':<26s}"]
+        for name, value in result.parameters.items():
+            row = definitions.get(name, {})
+            bounds = row.get('bounds') if row.get('adjustable') else None
+            span = (f'[{bounds[0]:.4g}, {bounds[1]:.4g}]'
+                    if bounds is not None else 'fixed')
+            lines.append(f'{name:<22s}{value:>12.5g}   {span:<26s}')
+        self._print_table(lines)
+
+        units = {target.name: target.unit or '' for target in self.targets}
+        lines = [
+            f"{'Target':<14s}{'Calculated':>12s}{'Reference':>12s}"
+            f"{'Tolerance':>12s}  {'Unit':<10s}{'Met':<4s}"
+        ]
+        for name, row in diagnostics.get('target_results', {}).items():
+            target = next(t for t in self.targets if t.name == name)
+            met = 'yes' if row.get('within_tolerance') else 'no'
+            lines.append(
+                f"{name:<14s}{_number(row['prediction']):>12s}"
+                f"{_number(row['reference']):>12s}"
+                f"{_number(target.tolerance):>12s}  {units[name]:<10s}{met:<4s}")
+        for name, row in diagnostics.get('monitor', {}).items():
+            lines.append(f"{name:<14s}{_number(row['value']):>12s}"
+                         f"{_number(row['reference']):>12s}{'':>12s}  "
+                         f"{units.get(name, ''):<10s}{'-':<4s}")
+        self._print_table(lines)
+
+        for warning in dict.fromkeys(result.warnings):
+            self.ostream.print_warning(warning)
+        stem = Path(filename or self.filename or candidate.candidate_id)
         plot_path = stem.with_name(stem.name + '_fitting.png')
         plot_path.parent.mkdir(parents=True, exist_ok=True)
-        figure = result.plot(output_path=str(plot_path))
-        self.ostream.print_blank()
+        result.plot(output_path=str(plot_path))
         self.ostream.print_info(f'Fitting plot written to {plot_path}')
+        self.ostream.print_blank()
         self.ostream.flush()
-        return figure
+
+    def _print_table(self, lines):
+        """
+        Prints a centered table: header, separator, rows.
+
+        :param lines:
+            The header line and the row lines (equal width).
+        """
+
+        width = len(lines[0])
+        self.ostream.print_header(lines[0])
+        self.ostream.print_header('-' * width)
+        for line in lines[1:]:
+            self.ostream.print_header(line.ljust(width))
+        self.ostream.print_blank()
 
     def _candidate(self, target) -> CDAMCandidate:
         """
@@ -881,8 +961,6 @@ class AutoCDAM:
             The residue name written to the files (default: CDM; at most
             three characters are kept, as in the PDB format).
 
-        :return:
-            The paths of the PDB and XML files (empty on non-master ranks).
         """
 
         assert_msg_critical(
@@ -890,7 +968,7 @@ class AutoCDAM:
             'AutoCDAM: fit() before write_openmm_files()')
         point = self.candidate.with_parameters(self._best_parameters())
         if self.rank != mpi_master():
-            return []
+            return
         stem = Path(filename or self.filename or point.candidate_id)
         residue = (mol_name or 'CDM')[:3]
         pdb_path = stem.with_name(stem.name + '.pdb')
@@ -900,10 +978,10 @@ class AutoCDAM:
                                                    f' {residue:>3s} A'))
         xml_path.write_text(point.to_openmm_xml().replace(
             '<Residue name="CDM">', f'<Residue name="{residue}">'))
-        self.ostream.print_info(f'Fitted ion written to {pdb_path} and '
-                                f'{xml_path}')
+        self.ostream.print_info(f'PDB file written to {pdb_path}')
+        self.ostream.print_info(f'XML file written to {xml_path}')
+        self.ostream.print_blank()
         self.ostream.flush()
-        return [pdb_path, xml_path]
 
     def _study_metadata(self) -> dict[str, Any]:
         """What defines this study; checkpoints only resume when it matches."""
@@ -1069,3 +1147,11 @@ class AutoCDAM:
             if best is not None:
                 return best.parameters.to_dict()
         raise ValueError("no usable fitted candidate to export")
+
+
+def _number(value) -> str:
+    """A target value for the report (vectors by their length)."""
+    try:
+        return f'{float(value):.4g}'
+    except (TypeError, ValueError):
+        return f'[{len(value)} values]'
