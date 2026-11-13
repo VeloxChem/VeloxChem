@@ -496,15 +496,15 @@ class Calculator:
         for name in results.plan.jobs["md"]:
             entry = results.metadata[name]
             entry["md_options"] = md_options
-            entry["pilot"] = bool(md_options.get("pilot", False))
+            entry["fast_mode"] = bool(md_options.get("fast_mode", False))
             if analysis:
                 entry["analysis_method"] = analysis["method"]
                 if name == "CN":
                     entry["cutoff_angstrom"] = analysis["cn_cutoff_angstrom"]
-        if md_options.get("pilot"):
+        if md_options.get("fast_mode"):
             results.warnings.append(
-                "Pilot MD is intentionally too short for scientific "
-                "sampling/convergence assessment.")
+                "Fast-mode MD (50 ps production); check the final parameters "
+                "with the production protocol (fast_mode = False).")
         for key, value in md_results.items():
             if key.endswith("_std"):
                 name = key[:-len("_std")]

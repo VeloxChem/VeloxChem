@@ -70,7 +70,7 @@ from .bayesian import SEARCH_DEFAULTS, BayesianFittingDriver
 from .cache import CachedCalculator
 from .calculator import Calculator
 from .evaluator import Evaluator
-from .reporting import export_cdam_model
+from .reporting import export_cdam_model, format_table, samples_table
 from .framework import FrameworkSystem
 from .candidate import CDAMCandidate
 from .generator import CoordinateGenerator
@@ -144,8 +144,12 @@ class AutoCDAM:
 
         # ion model of a Molecule target (None: the CDAMCandidate default)
         self.water_model = None
-        self.geometry = None
+        self.coordination_type = None
         self.potential_form = None
+
+        # dummy atom charge: a number keeps it fixed; None fits it when an
+        # HFE or framework target can determine it
+        self.dummy_atom_charge = None
         self.fit_result = None
 
         # search
@@ -165,7 +169,7 @@ class AutoCDAM:
                 setattr(self, key, deepcopy(value))
 
         # calculations
-        self.pilot = False
+        self.fast_mode = False
         self.work_dir = None
         self.md_options = None
         self.fep_options = None
@@ -193,7 +197,10 @@ class AutoCDAM:
                 'properties': ('raw', 'target properties, name: settings'),
                 'parameters': ('raw', 'fitted parameters (default: LJ, UFF)'),
                 'water_model': ('str_lower', 'tip3p, spce or tip4pew'),
-                'geometry': ('str_lower', 'dummy geometry, e.g. octahedral'),
+                'coordination_type':
+                    ('str_lower', 'dummy geometry, e.g. octahedral'),
+                'dummy_atom_charge':
+                    ('raw', 'fixed dummy charge in e, or None to fit it'),
                 'potential_form': ('str_lower', 'lj12_6 or lj12_6_4'),
                 'search_method': ('str_lower', 'staged or bayesian search'),
                 'geometries': ('raw', 'dummy geometries searched one by one'),
@@ -228,7 +235,7 @@ class AutoCDAM:
                     ('float', 'Bayesian: widening fraction of the width'),
                 'bound_expansion_evaluations':
                     ('int', 'Bayesian: extra budget per widening'),
-                'pilot': ('bool', 'short MD workflow test'),
+                'fast_mode': ('bool', 'short MD (50 ps production)'),
                 'work_dir': ('str', 'working directory of the calculations'),
                 'md_options': ('raw', 'MD protocol settings'),
                 'fep_options': ('raw', 'solvation FEP settings'),
@@ -339,9 +346,9 @@ class AutoCDAM:
             for name in ('work_dir', 'md_options', 'fep_options', 'qm_options')
             if getattr(self, name) is not None
         }
-        if self.pilot:
+        if self.fast_mode:
             options['md_options'] = {
-                'pilot': True,
+                'fast_mode': True,
                 **options.get('md_options', {})
             }
         return options
@@ -372,6 +379,9 @@ class AutoCDAM:
         """
 
         ostream = self.ostream
+        if self.dummy_atom_charge is not None:
+            candidate = candidate.with_parameters(
+                {'dummy_charge': float(self.dummy_atom_charge)})
         self.candidate = candidate
         self.calculator_options = self._calculator_options()
         self.fitting_options = {
@@ -402,8 +412,16 @@ class AutoCDAM:
                 geometry in CDAMCandidate.geometries,
                 f"unsupported geometry {geometry!r} in geometries")
 
+        if parameters is None and fit_parameters is None:
+            parameters = self._default_parameters(systems)
         self.parameter_specs = self._resolve_parameters(parameters,
                                                         fit_parameters)
+        assert_msg_critical(
+            self.dummy_atom_charge is None or
+            all(spec.name != 'dummy_charge' or not spec.optimizable
+                for spec in self.parameter_specs),
+            'AutoCDAM: dummy_atom_charge fixes the dummy charge, but the '
+            'parameters also fit it')
 
         # Collaborators: generator -> (system router) -> (cache) calculator -> evaluator.
         if self.generator is None:
@@ -432,6 +450,49 @@ class AutoCDAM:
         self.last_calculation: CalculationResult | None = None
 
     # ----------------------------------------------------------------- setup
+
+    def _default_parameters(self, systems) -> dict[str, Any]:
+        """
+        Gets the default fitted parameters: the metal LJ sigma and epsilon,
+        and the dummy charge when a target can determine it.
+
+        IOD and CN hardly depend on the dummy charge, so it is fitted only
+        with an HFE target or a framework system, in 0.8-2.0 times the
+        formal charge per dummy (0.4-1.0 e for octahedral Al3+).
+
+        :param systems:
+            The named systems of the study.
+
+        :return:
+            The parameters in compact form.
+        """
+
+        parameters = dict(DEFAULT_PARAMETERS)
+        candidate = self.candidate
+        if self.dummy_atom_charge is not None:
+            self.ostream.print_info(
+                f'Dummy atom charge fixed at {candidate.dummy_charge:.2f} e')
+            self.ostream.flush()
+            return parameters
+        framework = any(
+            isinstance(spec, FrameworkSystem) or
+            (isinstance(spec, Mapping) and spec.get('type') == 'framework')
+            for spec in (systems or {}).values())
+        if framework or any(t.property_name == 'HFE' for t in self.targets):
+            per_dummy = candidate.formal_charge / candidate.coordination_number
+            lower, upper = 0.8 * per_dummy, 2.0 * per_dummy
+            initial = min(max(candidate.dummy_charge, lower), upper)
+            parameters['dummy_charge'] = ParameterSpec('dummy_charge', initial,
+                                                       (lower, upper))
+            self.ostream.print_info(
+                f'Dummy atom charge fitted in [{lower:.2f}, {upper:.2f}] e')
+        else:
+            self.ostream.print_info(
+                f'Dummy atom charge fixed at {candidate.dummy_charge:.2f} e: '
+                'IOD and CN do not determine it; add an HFE or framework '
+                'target to fit it')
+        self.ostream.flush()
+        return parameters
 
     def _resolve_parameters(self, parameters,
                             fit_parameters) -> list[ParameterSpec]:
@@ -644,6 +705,8 @@ class AutoCDAM:
             'fit_targets) before fit()')
         resume = bool(self.restart)
         self.print_references()
+        if self.fast_mode:
+            self._print_fast_mode()
 
         profiler = Profiler({
             'timing': self.timing,
@@ -685,14 +748,66 @@ class AutoCDAM:
         self.fit_result = result
         return result
 
+    def _print_fast_mode(self):
+        """
+        Prints the short MD protocol of fast mode.
+        """
+
+        md = md_settings({'fast_mode': True, **(self.md_options or {})})
+        step_ps = float(md['timestep_fs']) / 1000.0
+        self.ostream.print_info(
+            'Fast mode: each candidate runs '
+            f"{md['nvt_steps'] * step_ps:g} ps NVT, "
+            f"{md['npt_steps'] * step_ps:g} ps NPT and "
+            f"{md['production_steps'] * step_ps:g} ps production MD "
+            f"({md['timestep_fs']:g} fs time step)")
+        self.ostream.print_info(
+            'Check the final parameters with production MD '
+            '(fast_mode = False)')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def check_fitting(self, filename=None):
+        """
+        Prints the fit summary and every calculated candidate, and plots the
+        fitting procedure.
+
+        :param filename:
+            The base filename of the plot, <filename>_fitting.png (default:
+            the run filename, or the candidate identifier).
+
+        :return:
+            The Matplotlib figure (None on non-master ranks).
+        """
+
+        assert_msg_critical(self.fit_result is not None,
+                            'AutoCDAM: fit() before check_fitting()')
+        if self.rank != mpi_master():
+            return None
+        result = self.fit_result
+        for line in result.summary().splitlines():
+            self.ostream.print_line(line)
+        self.ostream.print_blank()
+        for line in format_table(samples_table(result),
+                                 digits=3).splitlines():
+            self.ostream.print_line(line)
+        stem = Path(filename or self.filename or self.candidate.candidate_id)
+        plot_path = stem.with_name(stem.name + '_fitting.png')
+        plot_path.parent.mkdir(parents=True, exist_ok=True)
+        figure = result.plot(output_path=str(plot_path))
+        self.ostream.print_blank()
+        self.ostream.print_info(f'Fitting plot written to {plot_path}')
+        self.ostream.flush()
+        return figure
+
     def _candidate(self, target) -> CDAMCandidate:
         """
         Gets the CDAM candidate of a target.
 
         :param target:
             A CDAMCandidate, or a one-atom Molecule whose charge is the formal
-            charge of the ion (water_model, geometry and potential_form
-            settings apply).
+            charge of the ion (water_model, coordination_type and
+            potential_form settings apply).
 
         :return:
             The CDAM candidate.
@@ -714,9 +829,15 @@ class AutoCDAM:
             'e.g. mol.set_charge(3)')
         options = {
             name: getattr(self, name)
-            for name in ('water_model', 'geometry', 'potential_form')
+            for name in ('water_model', 'potential_form')
             if getattr(self, name) is not None
         }
+        if self.coordination_type:
+            assert_msg_critical(
+                self.coordination_type in CDAMCandidate.geometries,
+                f'AutoCDAM: coordination_type must be one of '
+                f'{sorted(CDAMCandidate.geometries)}')
+            options['geometry'] = self.coordination_type
         return CDAMCandidate(target.get_labels()[0], int(round(charge)),
                              **options)
 

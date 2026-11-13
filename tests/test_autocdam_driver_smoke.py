@@ -32,6 +32,10 @@
 
 from veloxchem.autocdam import AutoCDAM, CDAMCandidate
 
+TINY_MD = {"timestep_fs": 0.25, "nvt_steps": 100, "npt_steps": 100,
+           "production_steps": 200, "report_interval": 20, "random_seed": 42,
+           "platform": "CPU", "platform_properties": {"Threads": "2"}}
+
 
 class TestAutoCdamDriverSmoke:
 
@@ -50,7 +54,8 @@ class TestAutoCdamDriverSmoke:
                 "search_method": "staged",
                 "max_iterations": 1,
                 "samples_per_stage": 2,
-                "pilot": True,
+                # a 0.05 ps workflow check, far shorter than fast_mode
+                "md_options": TINY_MD,
                 "work_dir": str(tmp_path),
                 "filename": str(tmp_path / "run"),
             })
@@ -79,7 +84,7 @@ class TestAutoCdamDriverSmoke:
                 "method"] == "OpenMM MD trajectory analysis"
             assert best.calculation.metadata["IOD"]["md_options"][
                 "timestep_fs"] == 0.25
-            assert best.calculation.metadata["IOD"]["pilot"] is True
+            assert best.calculation.metadata["IOD"]["fast_mode"] is False
             assert read_h5_group(tmp_path / "run.h5",
                                  "autocdam/checkpoint") is not None
             assert FitResult.load(tmp_path / "run").parameters.to_dict(
@@ -159,6 +164,8 @@ class TestAutoCdamAttributeInterface:
             cdamfit.write_openmm_files("x")
         cdamfit.target = mol
         cdamfit.water_model = "spce"
+        cdamfit.coordination_type = "octahedral"
+        cdamfit.dummy_atom_charge = 0.9
         cdamfit.calculator = _ToyCalculator()
         cdamfit.cache = False
         cdamfit.samples_per_stage = 4
@@ -173,6 +180,9 @@ class TestAutoCdamAttributeInterface:
         assert cdamfit.candidate.metal == "Al"
         assert cdamfit.candidate.formal_charge == 3
         assert cdamfit.candidate.water_model == "spce"
+        assert cdamfit.candidate.geometry == "octahedral"
+        assert cdamfit.candidate.dummy_charge == 0.9
+        assert "dummy_charge" not in _fitted(cdamfit)
         assert cdamfit.fit_result is result
         assert result.diagnostics["n_calculations"] == 4
 
@@ -183,6 +193,9 @@ class TestAutoCdamAttributeInterface:
         assert '<Residue name="ALX">' in xml.read_text()
         sigma = result.parameters.to_dict()["metal_lj_sigma"]
         assert f'sigma="{sigma / 10:.12g}"' in xml.read_text()
+
+        cdamfit.check_fitting(str(tmp_path / "al"))
+        assert (tmp_path / "al_fitting.png").is_file()
 
     def test_molecule_target_must_be_a_charged_ion(self):
         import pytest
@@ -200,3 +213,55 @@ class TestAutoCdamAttributeInterface:
         cdamfit.target = None
         with pytest.raises(VeloxChemError, match="both target and properties"):
             cdamfit.fit()
+        cdamfit.target = Molecule.read_smiles("[Al+3]")
+        cdamfit.coordination_type = "hexagonal"
+        with pytest.raises(VeloxChemError, match="coordination_type must be"):
+            cdamfit.fit()
+
+    def test_dummy_charge_is_fitted_only_when_a_target_determines_it(self):
+        import pytest
+        from veloxchem import OutputStream
+        from veloxchem.errorhandler import VeloxChemError
+
+        iod = {"IOD": {"value": 1.9, "tolerance": 0.05}}
+        hfe = {"HFE": {"value": -4525.0, "tolerance": 50.0, "unit": "kJ/mol"}}
+        cdamfit = AutoCDAM(ostream=OutputStream(None))
+
+        cdamfit.setup(CDAMCandidate("Al", 3), iod)
+        assert set(_fitted(cdamfit)) == {"metal_lj_sigma", "metal_lj_epsilon"}
+        assert cdamfit.candidate.dummy_charge == 0.5
+
+        cdamfit.setup(CDAMCandidate("Al", 3), {**iod, **hfe})
+        assert _fitted(cdamfit)["dummy_charge"] == pytest.approx((0.4, 1.0))
+
+        cdamfit.setup(CDAMCandidate("Zn", 2, geometry="tetrahedral"), hfe)
+        assert _fitted(cdamfit)["dummy_charge"] == pytest.approx((0.4, 1.0))
+
+        cdamfit.dummy_atom_charge = 0.7
+        cdamfit.setup(CDAMCandidate("Al", 3), {**iod, **hfe})
+        assert "dummy_charge" not in _fitted(cdamfit)
+        assert cdamfit.candidate.dummy_charge == 0.7
+        with pytest.raises(VeloxChemError, match="also fit it"):
+            cdamfit.setup(CDAMCandidate("Al", 3), iod,
+                          parameters={"dummy_charge": (0.4, 1.0)})
+
+    def test_fast_mode_runs_50_ps_production(self):
+        from veloxchem import OutputStream
+        from veloxchem.autocdam.md import md_settings
+
+        md = md_settings({"fast_mode": True})
+        assert md["timestep_fs"] == 2.0
+        assert md["production_steps"] * md["timestep_fs"] / 1000 == 50.0
+        assert md["nvt_steps"] == md_settings(None)["nvt_steps"]
+
+        cdamfit = AutoCDAM(ostream=OutputStream(None))
+        cdamfit.fast_mode = True
+        cdamfit.setup(CDAMCandidate("Al", 3),
+                      {"IOD": {"value": 1.9, "tolerance": 0.05}})
+        assert cdamfit.calculator_options["md_options"] == md
+
+
+def _fitted(cdamfit):
+    """Bounds of the fitted parameters by name."""
+    return {spec.name: tuple(spec.bounds) for spec in cdamfit.parameter_specs
+            if spec.optimizable}

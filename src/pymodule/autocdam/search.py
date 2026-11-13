@@ -650,7 +650,7 @@ class SearchDriver:
                     quality: sum(s.quality_status == quality for s in samples)
                     for quality in ("usable", "unreviewed", "rejected")
                 },
-                "pilot": any(item.get("pilot") for item in metadata),
+                "fast_mode": any(item.get("fast_mode") for item in metadata),
                 "scientifically_validated": False,
             },
             checkpoint=(str(self.checkpoint_file)
