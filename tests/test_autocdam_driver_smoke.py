@@ -166,6 +166,7 @@ class TestAutoCdamAttributeInterface:
         cdamfit.dummy_atom_charge = 0.9
         cdamfit.calculator = _ToyCalculator()
         cdamfit.cache = False
+        cdamfit.search_method = "staged"
         cdamfit.samples_per_stage = 4
         cdamfit.max_iterations = 1
         # the trailing comma makes a one-element tuple; it is unwrapped

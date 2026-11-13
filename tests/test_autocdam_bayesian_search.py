@@ -150,6 +150,7 @@ def run(strategy, seed, budget):
         }
     else:
         search = {
+            "search_method": "staged",
             "max_iterations": budget // 5,
             "samples_per_stage": 5,
             "seed": seed

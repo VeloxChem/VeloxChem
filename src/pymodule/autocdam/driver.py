@@ -32,12 +32,10 @@
 """User-facing entry point: ``AutoCDAM`` sets up a study, fits it, and reports.
 
 A ``CDAMCandidate`` defines the ion model and the targets say what to match.
-``fit()`` then runs one of the searches selected by ``search``:
+``fit()`` then runs the search selected by ``search_method``:
 
-* ``search=None`` or ``{"method": "staged", ...}``: the staged GP search
-  (``search.py``);
-* ``search={...}`` (``"method": "bayesian"`` implied): the Bayesian search
-  (``bayesian.py``).
+* ``"bayesian"`` (default): the Bayesian search (``bayesian.py``);
+* ``"staged"``: the staged coarse-to-fine GP search (``search.py``).
 
 The real-atom metal-complex LJ fit is separate: ``MetalComplexLJDriver``
 (``metal_complex.py``).
@@ -102,8 +100,8 @@ class AutoCDAM:
 
     Settings are attributes (see ``_input_keywords`` and ``update_settings``);
     the study itself (candidate, targets, parameters, systems) is given to
-    ``setup`` or directly to ``fit``. ``search_method`` selects the staged
-    (default) or the Bayesian search; ``geometries`` repeats the search per
+    ``setup`` or directly to ``fit``. ``search_method`` selects the Bayesian
+    (default) or the staged search; ``geometries`` repeats the search per
     dummy geometry and keeps the best.
 
     Collaborators (``generator``, ``calculator``, ``evaluator``) can be replaced
@@ -159,7 +157,7 @@ class AutoCDAM:
         self.study_id = None
 
         # search
-        self.search_method = 'staged'
+        self.search_method = 'bayesian'
         self.geometries = []
         self.seed = 42
         self.objective_threshold = None
