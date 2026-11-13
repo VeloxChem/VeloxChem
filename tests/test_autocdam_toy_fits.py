@@ -108,7 +108,7 @@ def toy_fit(search, output):
         "filename": str(output / "run"),
     })
     fit.fit(CDAMCandidate("Al", 3), targets, parameters=parameters)
-    return fit.fit_result()
+    return fit.fitting_result()
 
 
 def zn_complex_and_baseline():

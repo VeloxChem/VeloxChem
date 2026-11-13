@@ -64,7 +64,7 @@ class TestAutoCdamDriverSmoke:
                     "tolerance": 0.25
                 }
             })
-            result = cdam.fit_result()
+            result = cdam.fitting_result()
             assert result.iterations == 1
             assert result.diagnostics["n_calculations"] == 2
             assert math.isfinite(result.objective)
@@ -130,7 +130,7 @@ class TestAutoCdamDriverSmoke:
                     "bounds": [0.0, 1.0]
                 }
             })
-        result = cdam.fit_result()
+        result = cdam.fitting_result()
         assert result.objective == 7.0
         assert result.metrics == {"custom_loss": 7.0}
 
@@ -174,7 +174,7 @@ class TestAutoCdamAttributeInterface:
                     "weight": 1.0},
             "CN": {"value": 6.0, "tolerance": 0.3, "weight": 1.0}},
         cdamfit.fit()
-        result = cdamfit.fit_result()
+        result = cdamfit.fitting_result()
 
         assert cdamfit.candidate.metal == "Al"
         assert cdamfit.candidate.formal_charge == 3
@@ -192,7 +192,7 @@ class TestAutoCdamAttributeInterface:
         sigma = result.parameters.to_dict()["metal_lj_sigma"]
         assert f'sigma="{sigma / 10:.12g}"' in xml.read_text()
 
-        cdamfit.fit_report()
+        cdamfit.fitting_report()
         assert not list(tmp_path.glob("*.png"))
         cdamfit.plot_optimization(str(tmp_path / "al"))
         assert (tmp_path / "al_optimization.png").is_file()
@@ -290,13 +290,13 @@ class TestAutoCdamAttributeInterface:
         first = run(tmp_path / "Al0.9d0.9e")
         assert (tmp_path / "Al0.9d0.9e.h5").is_file()
         assert first.study_id.startswith("Al3_octahedral_tip3p_lj12_6_")
-        assert first.fit_result().diagnostics["study_id"] == first.study_id
+        assert first.fitting_result().diagnostics["study_id"] == first.study_id
         saved = read_h5_group(tmp_path / "Al0.9d0.9e.h5", "autocdam/checkpoint")
         assert first.study_id.endswith(saved["study_hash"])
         assert run(tmp_path / "again").study_id == first.study_id
         assert run(tmp_path / "other", 0.8).study_id != first.study_id
 
-        text = repr(first.fit_result())
+        text = repr(first.fitting_result())
         assert "metal_lj_sigma" in text and "angstrom" in text
         assert "kcal/mol" in text and first.study_id in text
 

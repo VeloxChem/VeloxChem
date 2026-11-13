@@ -230,7 +230,7 @@ class TestAutoCdamWeightedObjectives:
             },
         })
         fit.fit()
-        result = fit.fit_result()
+        result = fit.fitting_result()
         search_calls = calculator.calls[:-1]
         assert all(
             call[0]["metal_dummy_distance"] == 0.9 for call in calculator.calls)
@@ -282,7 +282,7 @@ class TestAutoCdamWeightedObjectives:
             },
         })
         fit.fit()
-        result = fit.fit_result()
+        result = fit.fitting_result()
         assert not result.converged and result.status != "success"
         assert result.diagnostics["feasible"] is False
         assert "IOD" in result.diagnostics["constraint_violations"]

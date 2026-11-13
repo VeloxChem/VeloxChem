@@ -728,8 +728,8 @@ class AutoCDAM:
             systems=None,
             fit_parameters=None) -> None:
         """
-        Runs the configured search; ``fit_result`` gets the result,
-        ``fit_report`` prints a short report.
+        Runs the configured search; ``fitting_result`` gets the result,
+        ``fitting_report`` prints a short report.
 
         Without arguments the study is set up from the ``target``,
         ``properties`` and ``parameters`` attributes (or kept from an earlier
@@ -816,7 +816,7 @@ class AutoCDAM:
         profiler.end(self.ostream)
         self._fit_result = result
 
-    def fit_result(self) -> FitResult:
+    def fitting_result(self) -> FitResult:
         """
         Gets the result of the last fit.
 
@@ -828,7 +828,7 @@ class AutoCDAM:
         """
 
         assert_msg_critical(self._fit_result is not None,
-                            'AutoCDAM: fit() before fit_result()')
+                            'AutoCDAM: fit() before fitting_result()')
         return self._fit_result
 
     def _study_id(self, driver) -> str:
@@ -889,7 +889,7 @@ class AutoCDAM:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def fit_report(self):
+    def fitting_report(self):
         """
         Prints a short report of the fit: settings, fitted parameters and
         targets. ``plot_optimization`` plots the fitting procedure; ``fit()``
@@ -897,7 +897,7 @@ class AutoCDAM:
         """
 
         assert_msg_critical(self._fit_result is not None,
-                            'AutoCDAM: fit() before fit_report()')
+                            'AutoCDAM: fit() before fitting_report()')
         if self.rank != mpi_master():
             return
         result = self._fit_result

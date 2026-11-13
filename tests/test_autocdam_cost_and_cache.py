@@ -103,7 +103,7 @@ def run(search, calculator, targets=None, **settings):
     fit.fit(CDAMCandidate("Al", 3),
             targets,
             parameters=PARAMETERS)
-    return fit, fit.fit_result()
+    return fit, fit.fitting_result()
 
 
 class TestAutoCdamCostAndCache:
@@ -276,7 +276,7 @@ class TestAutoCdamCostAndCache:
             "restart": True,
         })
         fit.fit(CDAMCandidate("Al", 3), targets, parameters=PARAMETERS)
-        result = fit.fit_result()
+        result = fit.fitting_result()
         assert result.diagnostics["n_evaluations"] == 10
         assert result.parameters.to_dict() == reference.parameters.to_dict()
         assert len(resumed.calls) <= 3  # only the unfinished steps

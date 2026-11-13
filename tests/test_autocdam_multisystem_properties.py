@@ -399,7 +399,7 @@ class TestAutoCdamMultisystemProperties:
                   systems=systems)
         baseline_xml = mof.prepare_baseline().system_xml
         fit.fit()
-        result = fit.fit_result()
+        result = fit.fitting_result()
         samples = fit.fitting_driver.table.samples
         assert len(samples) == 4 and all(
             not s.calculation.failed for s in samples)

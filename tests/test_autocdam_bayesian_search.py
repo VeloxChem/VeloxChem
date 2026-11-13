@@ -101,7 +101,7 @@ def fit(search,
     driver.fit(CDAMCandidate("Al", 3),
                         targets,
                         parameters=parameters)
-    result = driver.fit_result()
+    result = driver.fitting_result()
     return driver, result, calculator
 
 
@@ -162,7 +162,7 @@ def run(strategy, seed, budget):
     driver.fit(CDAMCandidate("Al", 3),
                         targets,
                         parameters=parameters)
-    result = driver.fit_result()
+    result = driver.fitting_result()
     return {"solved": bool(result.converged), "evaluations": calculator.calls}
 
 
@@ -313,7 +313,7 @@ class TestAutoCdamBayesianSearch:
         driver.fit(CDAMCandidate("Al", 3),
                             targets,
                             parameters=PARAMETERS)
-        result = driver.fit_result()
+        result = driver.fitting_result()
         assert resumed_calc.points == [] and result.diagnostics[
             "n_evaluations"] == 9
 
