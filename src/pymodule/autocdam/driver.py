@@ -834,7 +834,7 @@ class AutoCDAM:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def fit_result(self):
+    def fit_report(self):
         """
         Prints a short report of the fit: settings, fitted parameters and
         targets. ``plot_optimization`` plots the fitting procedure; ``fit()``
@@ -842,7 +842,7 @@ class AutoCDAM:
         """
 
         assert_msg_critical(self._fit_result is not None,
-                            'AutoCDAM: fit() before fit_result()')
+                            'AutoCDAM: fit() before fit_report()')
         if self.rank != mpi_master():
             return
         result = self._fit_result

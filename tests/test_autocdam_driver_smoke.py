@@ -189,7 +189,7 @@ class TestAutoCdamAttributeInterface:
         sigma = result.parameters.to_dict()["metal_lj_sigma"]
         assert f'sigma="{sigma / 10:.12g}"' in xml.read_text()
 
-        cdamfit.fit_result()
+        cdamfit.fit_report()
         assert not list(tmp_path.glob("*.png"))
         cdamfit.plot_optimization(str(tmp_path / "al"))
         assert (tmp_path / "al_optimization.png").is_file()
