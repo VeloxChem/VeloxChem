@@ -154,7 +154,7 @@ class AutoCDAM:
         # metal-dummy distance in angstrom: None keeps 0.90, a number fixes
         # it, a (lower, upper) pair fits it within these bounds
         self.metal_dummy_distance = None
-        self.fit_result = None
+        self._fit_result = None
 
         # search
         self.search_method = 'staged'
@@ -812,7 +812,7 @@ class AutoCDAM:
             result.save(self.filename)
 
         profiler.end(self.ostream)
-        self.fit_result = result
+        self._fit_result = result
         return result
 
     def _print_fast_mode(self):
@@ -834,17 +834,18 @@ class AutoCDAM:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def check_fitting(self):
+    def fit_result(self):
         """
         Prints a short report of the fit: settings, fitted parameters and
-        targets. ``plot_optimization`` plots the fitting procedure.
+        targets. ``plot_optimization`` plots the fitting procedure; ``fit()``
+        returns the full result.
         """
 
-        assert_msg_critical(self.fit_result is not None,
-                            'AutoCDAM: fit() before check_fitting()')
+        assert_msg_critical(self._fit_result is not None,
+                            'AutoCDAM: fit() before fit_result()')
         if self.rank != mpi_master():
             return
-        result = self.fit_result
+        result = self._fit_result
         diagnostics = result.diagnostics
         candidate = self.candidate
         samples = self._samples()
@@ -930,7 +931,7 @@ class AutoCDAM:
             candidate identifier).
         """
 
-        assert_msg_critical(self.fit_result is not None,
+        assert_msg_critical(self._fit_result is not None,
                             'AutoCDAM: fit() before plot_optimization()')
         if self.rank != mpi_master():
             return
@@ -939,7 +940,7 @@ class AutoCDAM:
         stem = Path(filename or self.filename or self.candidate.candidate_id)
         plot_path = stem.with_name(stem.name + '_optimization.png')
         plot_path.parent.mkdir(parents=True, exist_ok=True)
-        self.fit_result.plot(output_path=str(plot_path))
+        self._fit_result.plot(output_path=str(plot_path))
         self.ostream.print_info(f'Optimization plot written to {plot_path}')
         self.ostream.print_blank()
         self.ostream.flush()

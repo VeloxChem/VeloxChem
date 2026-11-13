@@ -179,7 +179,7 @@ class TestAutoCdamAttributeInterface:
         assert cdamfit.candidate.geometry == "octahedral"
         assert cdamfit.candidate.dummy_charge == 0.9
         assert "dummy_charge" not in _fitted(cdamfit)
-        assert cdamfit.fit_result is result
+        assert cdamfit._fit_result is result
         assert result.diagnostics["n_calculations"] == 4
 
         cdamfit.write_openmm_files(str(tmp_path / "al"), mol_name="ALX")
@@ -189,7 +189,7 @@ class TestAutoCdamAttributeInterface:
         sigma = result.parameters.to_dict()["metal_lj_sigma"]
         assert f'sigma="{sigma / 10:.12g}"' in xml.read_text()
 
-        cdamfit.check_fitting()
+        cdamfit.fit_result()
         assert not list(tmp_path.glob("*.png"))
         cdamfit.plot_optimization(str(tmp_path / "al"))
         assert (tmp_path / "al_optimization.png").is_file()
