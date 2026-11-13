@@ -169,6 +169,7 @@ class AutoCDAM:
                 setattr(self, key, deepcopy(value))
 
         # calculations
+        self.pilot = False
         self.fast_mode = False
         self.work_dir = None
         self.md_options = None
@@ -235,6 +236,7 @@ class AutoCDAM:
                     ('float', 'Bayesian: widening fraction of the width'),
                 'bound_expansion_evaluations':
                     ('int', 'Bayesian: extra budget per widening'),
+                'pilot': ('bool', 'workflow test: 0.05 ps MD, minutes'),
                 'fast_mode': ('bool', 'short MD (50 ps production)'),
                 'work_dir': ('str', 'working directory of the calculations'),
                 'md_options': ('raw', 'MD protocol settings'),
@@ -346,11 +348,14 @@ class AutoCDAM:
             for name in ('work_dir', 'md_options', 'fep_options', 'qm_options')
             if getattr(self, name) is not None
         }
-        if self.fast_mode:
-            options['md_options'] = {
-                'fast_mode': True,
-                **options.get('md_options', {})
-            }
+        assert_msg_critical(not (self.pilot and self.fast_mode),
+                            'AutoCDAM: choose pilot or fast_mode, not both')
+        for mode in ('pilot', 'fast_mode'):
+            if getattr(self, mode):
+                options['md_options'] = {
+                    mode: True,
+                    **options.get('md_options', {})
+                }
         return options
 
     def setup(self,
@@ -705,6 +710,12 @@ class AutoCDAM:
             'fit_targets) before fit()')
         resume = bool(self.restart)
         self.print_references()
+        if self.pilot:
+            self.ostream.print_info(
+                'Pilot mode: 0.05 ps MD per candidate tests the workflow only; '
+                'the fitted values are not meaningful')
+            self.ostream.print_blank()
+            self.ostream.flush()
         if self.fast_mode:
             self._print_fast_mode()
 

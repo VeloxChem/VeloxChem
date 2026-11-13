@@ -440,13 +440,7 @@ class TestAutoCdamMultisystemProperties:
             }
         }
         fit = AutoCDAM()
-        fit.update_settings({
-            "md_options": {"timestep_fs": 0.25, "nvt_steps": 100,
-                           "npt_steps": 100, "production_steps": 200,
-                           "report_interval": 20, "random_seed": 42,
-                           "platform": "CPU",
-                           "platform_properties": {"Threads": "2"}},
-            "work_dir": str(tmp_path)})
+        fit.update_settings({"pilot": True, "work_dir": str(tmp_path)})
         fit.setup(CDAMCandidate("Al", 3),
                   targets,
                   parameters={"sigma": (1.5, 2.5)},

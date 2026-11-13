@@ -32,10 +32,6 @@
 
 from veloxchem.autocdam import AutoCDAM, CDAMCandidate
 
-TINY_MD = {"timestep_fs": 0.25, "nvt_steps": 100, "npt_steps": 100,
-           "production_steps": 200, "report_interval": 20, "random_seed": 42,
-           "platform": "CPU", "platform_properties": {"Threads": "2"}}
-
 
 class TestAutoCdamDriverSmoke:
 
@@ -54,8 +50,7 @@ class TestAutoCdamDriverSmoke:
                 "search_method": "staged",
                 "max_iterations": 1,
                 "samples_per_stage": 2,
-                # a 0.05 ps workflow check, far shorter than fast_mode
-                "md_options": TINY_MD,
+                "pilot": True,
                 "work_dir": str(tmp_path),
                 "filename": str(tmp_path / "run"),
             })
@@ -84,6 +79,7 @@ class TestAutoCdamDriverSmoke:
                 "method"] == "OpenMM MD trajectory analysis"
             assert best.calculation.metadata["IOD"]["md_options"][
                 "timestep_fs"] == 0.25
+            assert best.calculation.metadata["IOD"]["pilot"] is True
             assert best.calculation.metadata["IOD"]["fast_mode"] is False
             assert read_h5_group(tmp_path / "run.h5",
                                  "autocdam/checkpoint") is not None
@@ -245,9 +241,16 @@ class TestAutoCdamAttributeInterface:
             cdamfit.setup(CDAMCandidate("Al", 3), iod,
                           parameters={"dummy_charge": (0.4, 1.0)})
 
-    def test_fast_mode_runs_50_ps_production(self):
+    def test_pilot_and_fast_mode_md_protocols(self):
+        import pytest
         from veloxchem import OutputStream
         from veloxchem.autocdam.md import md_settings
+        from veloxchem.errorhandler import VeloxChemError
+
+        pilot = md_settings({"pilot": True})
+        assert pilot["production_steps"] * pilot["timestep_fs"] / 1000 == 0.05
+        with pytest.raises(ValueError, match="not both"):
+            md_settings({"pilot": True, "fast_mode": True})
 
         md = md_settings({"fast_mode": True})
         assert md["timestep_fs"] == 2.0
@@ -259,6 +262,11 @@ class TestAutoCdamAttributeInterface:
         cdamfit.setup(CDAMCandidate("Al", 3),
                       {"IOD": {"value": 1.9, "tolerance": 0.05}})
         assert cdamfit.calculator_options["md_options"] == md
+
+        cdamfit.pilot = True
+        with pytest.raises(VeloxChemError, match="not both"):
+            cdamfit.setup(CDAMCandidate("Al", 3),
+                          {"IOD": {"value": 1.9, "tolerance": 0.05}})
 
 
 def _fitted(cdamfit):

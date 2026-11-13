@@ -496,11 +496,16 @@ class Calculator:
         for name in results.plan.jobs["md"]:
             entry = results.metadata[name]
             entry["md_options"] = md_options
+            entry["pilot"] = bool(md_options.get("pilot", False))
             entry["fast_mode"] = bool(md_options.get("fast_mode", False))
             if analysis:
                 entry["analysis_method"] = analysis["method"]
                 if name == "CN":
                     entry["cutoff_angstrom"] = analysis["cn_cutoff_angstrom"]
+        if md_options.get("pilot"):
+            results.warnings.append(
+                "Pilot MD (0.05 ps) only tests the workflow; its values are "
+                "not meaningful.")
         if md_options.get("fast_mode"):
             results.warnings.append(
                 "Fast-mode MD (50 ps production); check the final parameters "

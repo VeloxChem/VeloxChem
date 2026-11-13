@@ -32,7 +32,7 @@
 """OpenMM MD and solvation FEP for aqueous CDAM systems.
 
 ``md_settings`` resolves the MD protocol (production default, or the
-``fast_mode`` preset) and ``run_md`` minimizes, heats (NVT),
+``pilot`` and ``fast_mode`` presets) and ``run_md`` minimizes, heats (NVT),
 equilibrates the density (NPT) and records production frames in memory.
 
 ``run_fep`` decouples the ion from water in two stages (charge, then LJ) with
@@ -86,6 +86,19 @@ DEFAULT_MD_OPTIONS = {
     "report_interval": 250,
     "random_seed": 0,
 }
+# pilot=True: 0.05 ps production, a workflow test only; values are not meaningful.
+PILOT_MD_OPTIONS = {
+    "platform": "CPU",
+    "platform_properties": {
+        "Threads": "2"
+    },
+    "timestep_fs": 0.25,
+    "nvt_steps": 100,
+    "npt_steps": 100,
+    "production_steps": 200,
+    "report_interval": 20,
+    "random_seed": 42,
+}
 # fast_mode=True: short but usable MD (10 ps NVT, 10 ps NPT, 50 ps production)
 # for screening; check the final parameters with the production protocol.
 FAST_MD_OPTIONS = {
@@ -102,6 +115,7 @@ MD_OPTION_NAMES = frozenset({
     "random_seed",
     "platform",
     "platform_properties",
+    "pilot",
     "fast_mode",
 })
 
@@ -110,6 +124,10 @@ def md_settings(options: dict[str, Any] | None = None) -> dict[str, Any]:
     """Production defaults, then the requested preset, then explicit overrides."""
     options = dict(options or {})
     settings = dict(DEFAULT_MD_OPTIONS)
+    if options.get("pilot") and options.get("fast_mode"):
+        raise ValueError("choose pilot or fast_mode, not both")
+    if options.get("pilot"):
+        settings.update(PILOT_MD_OPTIONS)
     if options.get("fast_mode"):
         settings.update(FAST_MD_OPTIONS)
     settings.update(options)
@@ -233,8 +251,9 @@ def run_md(system: mm.System,
     npt_production = bool(npt)
 
     print_settings(ostream, "OpenMM MD Setup", [
-        ("Protocol", "fast mode (short MD)"
-         if settings.get("fast_mode") else "production"),
+        ("Protocol", "pilot (workflow test only)" if settings.get("pilot")
+         else "fast mode (short MD)" if settings.get("fast_mode") else
+         "production"),
         ("Platform", f"{platform.getName()} {properties}"
          if properties else platform.getName()),
         ("Number of Atoms", topology.getNumAtoms()),
