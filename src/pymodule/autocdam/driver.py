@@ -150,6 +150,10 @@ class AutoCDAM:
         # dummy atom charge: a number keeps it fixed; None fits it when an
         # HFE or framework target can determine it
         self.dummy_atom_charge = None
+
+        # metal-dummy distance in angstrom: None keeps 0.90, a number fixes
+        # it, a (lower, upper) pair fits it within these bounds
+        self.metal_dummy_distance = None
         self.fit_result = None
 
         # search
@@ -206,6 +210,8 @@ class AutoCDAM:
                     ('str_lower', 'dummy geometry, e.g. octahedral'),
                 'dummy_atom_charge':
                     ('raw', 'fixed dummy charge in e, or None to fit it'),
+                'metal_dummy_distance':
+                    ('raw', 'angstrom: fixed value, or (lower, upper) to fit'),
                 'potential_form': ('str_lower', 'lj12_6 or lj12_6_4'),
                 'search_method': ('str_lower', 'staged or bayesian search'),
                 'geometries': ('raw', 'dummy geometries searched one by one'),
@@ -394,6 +400,9 @@ class AutoCDAM:
         if self.dummy_atom_charge is not None:
             candidate = candidate.with_parameters(
                 {'dummy_charge': float(self.dummy_atom_charge)})
+        if self._distance_bounds() is None and self.metal_dummy_distance is not None:
+            candidate = candidate.with_parameters(
+                {'metal_dummy_distance': float(self.metal_dummy_distance)})
         self.candidate = candidate
         self.calculator_options = self._calculator_options()
         self.fitting_options = {
@@ -434,6 +443,13 @@ class AutoCDAM:
                 for spec in self.parameter_specs),
             'AutoCDAM: dummy_atom_charge fixes the dummy charge, but the '
             'parameters also fit it')
+        fitted = {spec.name for spec in self.parameter_specs if spec.optimizable}
+        if self.metal_dummy_distance is not None:
+            assert_msg_critical(
+                (self._distance_bounds() is not None) ==
+                ('metal_dummy_distance' in fitted),
+                'AutoCDAM: metal_dummy_distance and parameters disagree on '
+                'whether the metal-dummy distance is fitted')
 
         # Collaborators: generator -> (system router) -> (cache) calculator -> evaluator.
         if self.generator is None:
@@ -481,6 +497,19 @@ class AutoCDAM:
 
         parameters = dict(DEFAULT_PARAMETERS)
         candidate = self.candidate
+        bounds = self._distance_bounds()
+        if bounds is not None:
+            parameters['metal_dummy_distance'] = ParameterSpec(
+                'metal_dummy_distance',
+                min(max(candidate.metal_dummy_distance, bounds[0]), bounds[1]),
+                bounds)
+            self.ostream.print_info(
+                f'Metal-dummy distance fitted in [{bounds[0]:.2f}, '
+                f'{bounds[1]:.2f}] angstrom')
+        else:
+            self.ostream.print_info(
+                'Metal-dummy distance fixed at '
+                f'{candidate.metal_dummy_distance:.2f} angstrom')
         if self.dummy_atom_charge is not None:
             self.ostream.print_info(
                 f'Dummy atom charge fixed at {candidate.dummy_charge:.2f} e')
@@ -505,6 +534,23 @@ class AutoCDAM:
                 'target to fit it')
         self.ostream.flush()
         return parameters
+
+    def _distance_bounds(self):
+        """
+        Gets the fitting bounds of the metal-dummy distance.
+
+        :return:
+            The (lower, upper) pair in angstrom, or None if it is fixed.
+        """
+
+        value = self.metal_dummy_distance
+        if value is None or isinstance(value, (int, float)):
+            return None
+        assert_msg_critical(
+            len(value) == 2 and 0 < float(value[0]) < float(value[1]),
+            'AutoCDAM: metal_dummy_distance must be a number or a '
+            '(lower, upper) pair in angstrom')
+        return float(value[0]), float(value[1])
 
     def _resolve_parameters(self, parameters,
                             fit_parameters) -> list[ParameterSpec]:
@@ -788,14 +834,10 @@ class AutoCDAM:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def check_fitting(self, filename=None):
+    def check_fitting(self):
         """
-        Prints a short report of the fit and saves the plot of the fitting
-        procedure as <filename>_fitting.png.
-
-        :param filename:
-            The base filename of the plot (default: the run filename, or the
-            candidate identifier).
+        Prints a short report of the fit: settings, fitted parameters and
+        targets. ``plot_optimization`` plots the fitting procedure.
         """
 
         assert_msg_critical(self.fit_result is not None,
@@ -846,6 +888,13 @@ class AutoCDAM:
             span = (f'[{bounds[0]:.4g}, {bounds[1]:.4g}]'
                     if bounds is not None else 'fixed')
             lines.append(f'{name:<22s}{value:>12.5g}   {span:<26s}')
+        fixed = ['dummy_charge', 'metal_dummy_distance']
+        if candidate.potential_form == 'lj12_6_4':
+            fixed.append('c4_metal_water')
+        for name in fixed:
+            if name not in result.parameters.to_dict():
+                lines.append(f"{name:<22s}{getattr(candidate, name):>12.5g}   "
+                             f"{'fixed':<26s}")
         self._print_table(lines)
 
         units = {target.name: target.unit or '' for target in self.targets}
@@ -868,13 +917,33 @@ class AutoCDAM:
 
         for warning in dict.fromkeys(result.warnings):
             self.ostream.print_warning(warning)
-        stem = Path(filename or self.filename or candidate.candidate_id)
-        plot_path = stem.with_name(stem.name + '_fitting.png')
-        plot_path.parent.mkdir(parents=True, exist_ok=True)
-        result.plot(output_path=str(plot_path))
-        self.ostream.print_info(f'Fitting plot written to {plot_path}')
         self.ostream.print_blank()
         self.ostream.flush()
+
+    def plot_optimization(self, filename=None):
+        """
+        Plots the fitting procedure and saves it as
+        <filename>_optimization.png.
+
+        :param filename:
+            The base filename of the plot (default: the run filename, or the
+            candidate identifier).
+        """
+
+        assert_msg_critical(self.fit_result is not None,
+                            'AutoCDAM: fit() before plot_optimization()')
+        if self.rank != mpi_master():
+            return
+        import matplotlib.pyplot as plt
+
+        stem = Path(filename or self.filename or self.candidate.candidate_id)
+        plot_path = stem.with_name(stem.name + '_optimization.png')
+        plot_path.parent.mkdir(parents=True, exist_ok=True)
+        self.fit_result.plot(output_path=str(plot_path))
+        self.ostream.print_info(f'Optimization plot written to {plot_path}')
+        self.ostream.print_blank()
+        self.ostream.flush()
+        plt.show()
 
     def _print_table(self, lines):
         """
