@@ -135,38 +135,38 @@ class TestCTNumbers:
     @pytest.mark.parametrize('ri', [False, True])
     def test_rpa(self, ri):
         ct_matrix = {
-            False: np.array([[0.37055813, 0.19016109], [0.13581409,
-                                                        0.32858347]]),
-            True: np.array([[0.37054215, 0.19015108], [0.13582063, 0.32860462]])
+            False: np.array([[0.37056039, 0.19015103], [0.13582151,
+                                                        0.32858343]]),
+            True: np.array([[0.37054440, 0.19014104], [0.13582803, 0.32860459]])
         }[ri]
 
         hole_participation_ratio = {
-            False: 1.982496948226768,
-            True: 1.982516338995640
+            False: 1.9825024049758715,
+            True: 1.982521782347638
         }[ri]
         particle_participation_ratio = {
-            False: 1.9997087109644545,
-            True: 1.9997077427444081
+            False: 1.999709641839421,
+            True: 1.9997086720193422
         }[ri]
         avg_participation_ratio = {
-            False: 1.9911028295956112,
-            True: 1.9911120408700242
+            False: 1.9911060234076463,
+            True: 1.99111522718349
         }[ri]
 
         avg_hole_position = {
-            False: np.array([0.10244102, 0.04395257, -0.00010709]),
-            True: np.array([0.10234146, 0.04395201, -0.00010709])
+            False: np.array([0.10241872, 0.04394061, -0.00010709]),
+            True: np.array([0.10231925, 0.04394004, -0.00010709])
         }[ri]
         avg_particle_position = {
-            False: np.array([1.55512189e-02, 1.76200117e-02, -2.91052404e-05]),
-            True: np.array([0.01552509, 0.01761981, -0.00002911])
+            False: np.array([1.55890593e-02, 1.76138246e-02, -2.91052376e-05]),
+            True: np.array([1.55627175e-02, 1.76135895e-02, -2.91094523e-05])
         }[ri]
         avg_difference_vec = {
-            False: np.array([-8.68898023e-02, -2.63325597e-02, 7.79813570e-05]),
-            True: np.array([-0.08681637, -0.02633220, 0.00007798])
+            False: np.array([-8.68296657e-02, -2.63267806e-02, 7.79811196e-05]),
+            True: np.array([-8.67565340e-02, -2.63264516e-02, 7.79763523e-05])
         }[ri]
 
-        ct_length = {False: 0.09079233183655822, True: 0.09072195686301675}[ri]
+        ct_length = {False: 0.0907331047537393, True: 0.09066302626924796}[ri]
 
         thienyl_thiazole_str = """
         S   1.5860   -1.4206    0.0001
@@ -209,6 +209,9 @@ class TestCTNumbers:
         lreig_drv = LinearResponseEigenSolver()
         lreig_drv.ostream.mute()
         lreig_drv.nstates = 2
+        # conv_thresh below the default, so that the reference values do not
+        # depend on the path of the Davidson iterations
+        lreig_drv.conv_thresh = 1.0e-7
         lreig_drv.initial_guess_multiplier = 1
         lreig_drv.max_subspace_dim = 1000
         lreig_results = lreig_drv.compute(molecule, basis, scf_results)
@@ -262,12 +265,12 @@ class TestCTNumbers:
         # reference hole and particle positions
         avg_hole_position = np.array([-2.06430183, 0.17889688, 2.35290839])
         avg_particle_position = {
-            False: np.array([-1.45474337, 0.02338098, 1.75900387]),
-            True: np.array([-1.45474161, 0.02338293, 1.75900451])
+            False: np.array([-1.45474403, 0.02337997, 1.75900405]),
+            True: np.array([-1.45474227, 0.02338192, 1.75900469])
         }[ri]
         avg_difference_vec = {
-            False: np.array([0.60955845, -0.1555159, -0.59390452]),
-            True: np.array([0.60956037, -0.15551398, -0.59390402])
+            False: np.array([0.60955779, -0.15551691, -0.59390434]),
+            True: np.array([0.60955971, -0.15551499, -0.59390384])
         }[ri]
 
         # Molecule and basis
@@ -296,6 +299,9 @@ class TestCTNumbers:
         # Core-excited states, O 1s
         lreig_drv.num_core_orbitals = 2
         lreig_drv.nstates = 2
+        # conv_thresh below the default, so that the reference values do not
+        # depend on the path of the Davidson iterations
+        lreig_drv.conv_thresh = 1.0e-7
         lreig_results = lreig_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()

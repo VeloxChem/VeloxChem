@@ -84,6 +84,11 @@ class LinearResponseEigenSolverBase(LinearSolver):
 
         self.nstates = 3
 
+        # roots refined above nstates (see LinearSolver._get_num_refined_roots)
+        self.num_extra_roots = 2
+        self.extra_root_cluster_thresh = 1.0e-3
+        self.max_extra_cluster_roots = 2
+
         self.initial_guess_multiplier = 3
         self.guess_scaling_threshold = 10
         self.max_subspace_dim = None
@@ -212,15 +217,41 @@ class LinearResponseEigenSolverBase(LinearSolver):
 
         return 20 * self.nstates * 2
 
+    def _get_max_num_refined_roots(self):
+        """
+        Gets the largest number of Ritz roots that can receive new trial
+        vectors in one iteration.
+        """
+
+        return (self.nstates + self.num_extra_roots +
+                self.max_extra_cluster_roots)
+
+    def _get_num_refined_roots_for(self, ritz_values):
+        """
+        Gets the number of refined Ritz roots for the given Ritz values.
+
+        :param ritz_values:
+            The Ritz values in ascending order.
+
+        :return:
+            The number of refined roots.
+        """
+
+        return self._get_num_refined_roots(ritz_values, self.nstates,
+                                           self.num_extra_roots,
+                                           self.extra_root_cluster_thresh,
+                                           self.max_extra_cluster_roots)
+
     def _get_collapse_nvec(self):
         """
-        Gets the number of Ritz states retained during collapse.
+        Gets the number of Ritz states retained during collapse. The collapsed
+        space keeps at least every root that can be refined.
         """
 
         if self.collapse_nvec is not None:
-            return max(self.nstates, self.collapse_nvec)
+            return max(self._get_max_num_refined_roots(), self.collapse_nvec)
 
-        return 2 * self.nstates
+        return max(self._get_max_num_refined_roots(), 2 * self.nstates)
 
     def _should_collapse_subspace(self):
         """

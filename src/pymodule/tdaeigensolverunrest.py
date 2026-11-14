@@ -222,9 +222,13 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
 
         # block Davidson algorithm setup
 
-        self.solver = BlockDavidsonSolver(self.max_subspace_dim,
-                                          self.collapse_nvec,
-                                          self.lindep_thresh)
+        self.solver = BlockDavidsonSolver(
+            self.max_subspace_dim,
+            self.collapse_nvec,
+            self.lindep_thresh,
+            num_extra_roots=self.num_extra_roots,
+            extra_root_cluster_thresh=self.extra_root_cluster_thresh,
+            max_extra_cluster_roots=self.max_extra_cluster_roots)
 
         # read initial guess from restart file
 

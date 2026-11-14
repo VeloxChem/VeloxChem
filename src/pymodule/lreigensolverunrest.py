@@ -335,11 +335,15 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
             nroots = max(self.nstates, self._get_collapse_nvec())
             wn_all, c_ger_all, c_ung_all = self._solve_reduced_space(nroots)
-            wn = wn_all[:self.nstates].copy()
-            c_ger = c_ger_all[:, :self.nstates].copy()
-            c_ung = c_ung_all[:, :self.nstates].copy()
 
-            for k in range(self.nstates):
+            # roots above nstates are refined as well, see
+            # LinearSolver._get_num_refined_roots
+            nrefine = self._get_num_refined_roots_for(wn_all)
+            wn = wn_all[:nrefine].copy()
+            c_ger = c_ger_all[:, :nrefine].copy()
+            c_ung = c_ung_all[:, :nrefine].copy()
+
+            for k in range(nrefine):
                 w = wn[k]
 
                 x_ger = self._dist_bger.matmul_AB_no_gather(c_ger[:, k])
@@ -379,9 +383,19 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
                 xn = np.sqrt(np.sum(x_norms_2))
 
                 if xn != 0:
-                    relative_residual_norm[k] = 2.0 * rn / xn
+                    rel_res = 2.0 * rn / xn
                 else:
-                    relative_residual_norm[k] = 2.0 * rn
+                    rel_res = 2.0 * rn
+
+                # a root above nstates receives a trial vector when its
+                # residual norm is at or above conv_thresh; it is not reported
+                # and not part of the convergence check
+                if k >= self.nstates:
+                    if rel_res >= self.conv_thresh:
+                        exc_residuals[k] = r
+                    continue
+
+                relative_residual_norm[k] = rel_res
 
                 if relative_residual_norm[k] < self.conv_thresh:
                     exc_energies[k] = w
@@ -415,7 +429,7 @@ class LinearResponseUnrestrictedEigenSolver(LinearResponseEigenSolverBase):
 
                 profiler.print_memory_tracing(self.ostream)
 
-                self._print_iteration(relative_residual_norm, wn)
+                self._print_iteration(relative_residual_norm, wn[:self.nstates])
 
                 self._print_gostshyp_neg_amp_info()
 

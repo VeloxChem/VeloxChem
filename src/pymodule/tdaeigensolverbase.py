@@ -104,6 +104,11 @@ class TdaEigenSolverBase(LinearSolver):
         # excited states information
         self.nstates = 3
 
+        # roots refined above nstates (see LinearSolver._get_num_refined_roots)
+        self.num_extra_roots = 2
+        self.extra_root_cluster_thresh = 1.0e-3
+        self.max_extra_cluster_roots = 2
+
         self.initial_guess_multiplier = 3
         self.guess_scaling_threshold = 10
         self.max_subspace_dim = None

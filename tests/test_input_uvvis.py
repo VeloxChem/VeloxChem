@@ -43,7 +43,7 @@ class TestInputUVVis:
 
         MPI.COMM_WORLD.barrier()
 
-    def get_input_lines(self, xcfun, tamm_dancoff, ri):
+    def get_input_lines(self, xcfun, tamm_dancoff, ri, conv_thresh=None):
 
         input_lines = """
             @jobs
@@ -80,6 +80,11 @@ class TestInputUVVis:
         if ri:
             input_lines = input_lines.replace('ri: false', 'ri: yes')
 
+        if conv_thresh is not None:
+            input_lines = input_lines.replace(
+                'property: absorption',
+                f'property: absorption\nconv_thresh: {conv_thresh}')
+
         if xcfun is not None:
             input_lines = input_lines.replace(
                 '@method settings', f'@method settings\nxcfun:{xcfun}')
@@ -89,13 +94,19 @@ class TestInputUVVis:
         else:
             return input_lines.replace('tamm_dancoff: yes', 'tamm_dancoff: no')
 
-    def run_input_uvvis(self, capsys, xcfun, tamm_dancoff, ri, ref_data):
+    def run_input_uvvis(self,
+                        capsys,
+                        xcfun,
+                        tamm_dancoff,
+                        ri,
+                        ref_data,
+                        conv_thresh=None):
 
         here = Path(__file__).parent
         random_string = get_random_string_parallel()
         input_file = here / 'data' / f'vlx_uvvis_{random_string}.inp'
 
-        input_lines = self.get_input_lines(xcfun, tamm_dancoff, ri)
+        input_lines = self.get_input_lines(xcfun, tamm_dancoff, ri, conv_thresh)
         self.create_input_file(input_lines, input_file)
 
         with patch.object(sys, 'argv', ['vlx', str(input_file)]):
@@ -244,9 +255,9 @@ class TestInputUVVis:
                 'n_scf_iterations': 7,
                 'dipole': 0.731257,
                 'nstates': 5,
-                'n_uvvis_iterations': 4,
+                'n_uvvis_iterations': 7,
                 'exc_ene': np.array([
-                    0.25720123, 0.30977192, 0.33859452, 0.37854004, 0.39054751
+                    0.25720120, 0.30977189, 0.33859449, 0.37854001, 0.39054747
                 ]),
                 'osc_str': np.array([0.0537, 0.0000, 0.0906, 0.0000, 0.0127]),
             },
@@ -256,16 +267,22 @@ class TestInputUVVis:
                 'n_scf_iterations': 7,
                 'dipole': 0.73125400,
                 'nstates': 5,
-                'n_uvvis_iterations': 4,
+                'n_uvvis_iterations': 7,
                 'exc_ene': np.array([
                     0.25720088, 0.30981356, 0.33860211, 0.37846444, 0.39064615
                 ]),
-                'osc_str': np.array(
-                    [0.0537000, 0.0000000, 0.0906000, 0.0000000, 0.0127000])
+                'osc_str': np.array([0.0537, 0.0000, 0.0907, 0.0000, 0.0127])
             }
         }[ri]
 
-        self.run_input_uvvis(capsys, xcfun, tamm_dancoff, ri, ref_data)
+        # conv_thresh below the default, so that the reference values do not
+        # depend on the path of the Davidson iterations
+        self.run_input_uvvis(capsys,
+                             xcfun,
+                             tamm_dancoff,
+                             ri,
+                             ref_data,
+                             conv_thresh=1.0e-7)
 
     @pytest.mark.parametrize('ri', [False, True])
     def test_input_rks_tddft_uvvis(self, capsys, ri):

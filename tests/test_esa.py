@@ -43,7 +43,13 @@ class TestExcitedStateAbsorption:
 
         return mol, bas
 
-    def _get_esa_transition_dipoles(self, mol, bas, nstates, ri, esafrom=None):
+    def _get_esa_transition_dipoles(self,
+                                    mol,
+                                    bas,
+                                    nstates,
+                                    ri,
+                                    esafrom=None,
+                                    conv_thresh=None):
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ri = ri
@@ -61,6 +67,8 @@ class TestExcitedStateAbsorption:
         lr_drv.esa = True
         if esafrom is not None:
             lr_drv.esa_from_state = esafrom
+        if conv_thresh is not None:
+            lr_drv.conv_thresh = conv_thresh
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
@@ -84,7 +92,13 @@ class TestExcitedStateAbsorption:
 
         return mol, bas
 
-    def _get_unrest_esa_results(self, mol, bas, nstates, ri, esafrom=None):
+    def _get_unrest_esa_results(self,
+                                mol,
+                                bas,
+                                nstates,
+                                ri,
+                                esafrom=None,
+                                conv_thresh=None):
 
         scf_drv = ScfUnrestrictedDriver()
         scf_drv.ri = ri
@@ -102,6 +116,8 @@ class TestExcitedStateAbsorption:
         lr_drv.esa = True
         if esafrom is not None:
             lr_drv.esa_from_state = esafrom
+        if conv_thresh is not None:
+            lr_drv.conv_thresh = conv_thresh
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
@@ -200,18 +216,27 @@ class TestExcitedStateAbsorption:
 
         mol, bas = self._get_formaldehyde_and_basis()
 
-        dipoles = self._get_esa_transition_dipoles(mol, bas, 4, ri, esafrom=1)
+        # conv_thresh below the default, so that the reference values do not
+        # depend on the path of the Davidson iterations
+        dipoles = self._get_esa_transition_dipoles(mol,
+                                                   bas,
+                                                   4,
+                                                   ri,
+                                                   esafrom=1,
+                                                   conv_thresh=1.0e-7)
 
         if dipoles is not None:
             ref_dipoles = {
                 False: np.array([
-                    [0.0000000000, -0.0599013291, 0.0000000000],
+                    [0.0000000000, -0.0599001158, 0.0000000000],
                     [0.0000000000, 0.0000000000, 0.0000000000],
-                    [-0.0477763616, 0.0000000000, 0.0000000000],
+                    [-0.0477754618, 0.0000000000, 0.0000000000],
                 ]),
-                True: np.array([[-1.420978e-16, -0.0598711512, 9.908095e-15],
-                                [-6.816208e-15, 4.895671e-15, 6.292357e-15],
-                                [-0.0477826662, 3.479722e-16, 6.539451e-13]])
+                True: np.array([
+                    [0.0000000000, -0.0598699390, 0.0000000000],
+                    [0.0000000000, 0.0000000000, 0.0000000000],
+                    [-0.0477817886, 0.0000000000, 0.0000000000],
+                ])
             }[ri]
 
             dipoles = self._match_signs(dipoles, ref_dipoles)
@@ -226,7 +251,16 @@ class TestExcitedStateAbsorption:
 
         mol, bas = self._get_water_and_basis()
 
-        esa_results = self._get_unrest_esa_results(mol, bas, 6, ri)
+        # The three lowest singlets of test_esa_transition_dipoles_water are
+        # the unrestricted states S2, S5 and S7 (S1, S3, S4 and S6 are
+        # triplets), so seven states are needed. conv_thresh is below the
+        # default, so that the reference values do not depend on the path of
+        # the Davidson iterations.
+        esa_results = self._get_unrest_esa_results(mol,
+                                                   bas,
+                                                   7,
+                                                   ri,
+                                                   conv_thresh=1.0e-7)
 
         if esa_results is not None:
             ref_excitation_energies = {

@@ -1204,6 +1204,48 @@ class LinearSolver:
                 self.guess_scaling_threshold * self.initial_guess_multiplier +
                 (nstates - self.guess_scaling_threshold))
 
+    @staticmethod
+    def _get_num_refined_roots(ritz_values, nstates, num_extra_roots,
+                               cluster_thresh, max_cluster_roots):
+        """
+        Gets the number of lowest Ritz roots that receive new trial vectors in
+        a Davidson iteration of the excited-state eigensolvers.
+
+        The Ritz values of the first iterations can be ordered differently
+        from the converged excitation energies. A state whose Ritz value lies
+        above root nstates receives no new trial vectors when only nstates
+        roots are refined, and the solver can converge without it. The
+        num_extra_roots roots above nstates are therefore refined as well.
+        While the next root lies within cluster_thresh of the last refined
+        root, it is refined too, up to max_cluster_roots more roots, so that a
+        near-degenerate group is not split at that point. The callers judge
+        convergence on the nstates requested roots only.
+
+        :param ritz_values:
+            The Ritz values in ascending order.
+        :param nstates:
+            The number of requested states.
+        :param num_extra_roots:
+            The number of roots refined above nstates.
+        :param cluster_thresh:
+            The largest difference (in Hartree) between neighbouring Ritz
+            values that extends the refined roots.
+        :param max_cluster_roots:
+            The largest number of roots added by that extension.
+
+        :return:
+            The number of refined roots.
+        """
+
+        nroots = min(nstates + num_extra_roots, len(ritz_values))
+        nroots_max = min(nroots + max_cluster_roots, len(ritz_values))
+
+        while (nroots < nroots_max and
+               ritz_values[nroots] - ritz_values[nroots - 1] < cluster_thresh):
+            nroots += 1
+
+        return nroots
+
     def _get_excitation_space_dimension_restricted(self, nocc, norb):
         """
         Gets the excitation-space dimension for restricted methods.
