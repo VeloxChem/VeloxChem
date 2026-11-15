@@ -745,6 +745,15 @@ def _main_body():
         rsp_dict['filename'] = task.input_dict['filename']
         rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
+        # NOTE: of what a response task runs below, only the excited-state
+        # gradient, vibrational analysis and optimization are given the SCF
+        # driver, and the gradients read the RI driver it formed. Without
+        # those sections in the input, the RI driver is released before the
+        # response forms its own.
+        if not any(key in task.input_dict for key in
+                   ['gradient', 'vibrational', 'optimize_excited_state']):
+            scf_drv.release_ri()
+
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm,
                              task.ostream,

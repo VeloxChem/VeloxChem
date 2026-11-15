@@ -437,6 +437,14 @@ class CSimdRIJKFockDriver
     /// asking for more parts of the Coulomb pass has not added any here.
     auto number_of_sweep_parts() const -> size_t;
 
+    /// @brief Releases the storage a Fock build keeps for the next one: the W
+    /// matrices of both spins and the squares of the threads of the exchange half
+    /// transformation.
+    /// @note The next build forms them again, as the first build after prepare
+    /// does, so the driver stays prepared and gives the same Fock matrices. The B
+    /// vectors and the metrics are kept, as the gradients read them.
+    auto release_work_storage() -> void;
+
     /// @brief Checks that the driver has been prepared.
     /// @return True if the driver is ready to form a Fock matrix.
     auto is_prepared() const -> bool;

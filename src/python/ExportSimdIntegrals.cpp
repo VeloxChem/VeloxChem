@@ -468,6 +468,9 @@ export_simdintegrals(py::module &m) -> void
         .def("number_of_sweep_parts", &CSimdRIJKFockDriver::number_of_sweep_parts,
              "Gets the number of parts the exchange pass sweeps the auxiliary basis in. Every rank sweeps "
              "every one of them, so asking for more parts of the Coulomb pass must not add any here.")
+        .def("release_work_storage", &CSimdRIJKFockDriver::release_work_storage,
+             "Releases the W matrices and the squares of the threads a Fock build keeps for the next one. The "
+             "next build forms them again; the B vectors and the metrics are kept.")
         .def("is_prepared", &CSimdRIJKFockDriver::is_prepared, "Checks that the driver has been prepared.")
         .def("get_mode", &CSimdRIJKFockDriver::get_mode, "Gets the way the driver forms the Fock matrices.")
         .def("get_bq_vectors", &CSimdRIJKFockDriver::get_bq_vectors,

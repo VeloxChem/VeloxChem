@@ -64,6 +64,7 @@ from .fikapotfilesource import (potfile_source_description,
 from .veloxchemlib import SimdRIJFockDriver
 from .veloxchemlib import SimdRIJKFockDriver
 from .veloxchemlib import rimode
+from .veloxchemlib import release_free_memory
 from .packedmatrix import PackedMatrix
 from .fockdriver import FockDriver
 from .profiler import Profiler
@@ -276,6 +277,9 @@ class ScfDriver:
         self._ri_aux_atoms = []
         self.ri_mode = 'in_memory'
         self._ri_drv = None
+        # NOTE: True after release_ri, until the next SCF forms a driver; read
+        # by the gradients to say why they find none.
+        self._ri_released = False
         self._ri_fallback = False
         self._ri_rss_at_setup = 0
         self._ri_memory_check = None
@@ -1193,6 +1197,8 @@ class ScfDriver:
 
         self._print_ri_memory_check()
 
+        self._release_ri_work_storage()
+
         if not self.is_converged:
             self.ostream.print_header(
                 '*** Warning: SCF is not converged!'.ljust(92))
@@ -1902,6 +1908,8 @@ class ScfDriver:
         # two calls of one driver. One flag serves RI-J and RI-JK, as a calculation
         # takes one of them or neither.
         self._ri_fallback = False
+
+        self._ri_released = False
 
         # NOTE: what this rank holds before the setup, against which its peak is
         # held after the SCF when memory is profiled, and what was predicted for
@@ -3436,6 +3444,36 @@ class ScfDriver:
         nmatrices = (18 + 3 * self.max_err_vecs) * nspins
 
         return max(nmatrices * nao * nao * 8, 512 * 1024**2)
+
+    def _release_ri_work_storage(self):
+        """
+        Releases the storage the SIMD RI-JK driver keeps from one Fock build for
+        the next (the W matrices and the squares of the threads). The B vectors
+        and the metrics are kept, as the SCF and TDDFT gradients read them from
+        this driver. The SIMD RI-J driver keeps no such storage.
+        """
+
+        # NOTE: the next Fock build of this driver forms the storage again; a
+        # new calculation with this SCF driver forms a new RI driver.
+        if isinstance(self._ri_drv, SimdRIJKFockDriver):
+            self._ri_drv.release_work_storage()
+
+    def release_ri(self):
+        """
+        Releases the RI driver the SCF formed: the B vectors (the three-center
+        integrals of RI-J) and the metrics. After this, an analytical SCF or
+        TDDFT gradient from this SCF driver stops with an error before any
+        work, until the SCF is run again. Response solvers form their own RI
+        drivers and are not affected. Every rank must call this.
+        """
+
+        self._ri_drv = None
+        self._ri_aux_atoms = []
+        self._ri_released = True
+
+        # NOTE: the B vectors are freed in blocks the allocator may keep
+        # resident; they are returned here.
+        release_free_memory()
 
     def _print_ri_memory_check(self):
         """

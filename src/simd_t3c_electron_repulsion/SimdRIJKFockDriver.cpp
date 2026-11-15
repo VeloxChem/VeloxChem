@@ -967,6 +967,29 @@ CSimdRIJKFockDriver::compute(const CPackedMatrix &density,
 }
 
 auto
+CSimdRIJKFockDriver::release_work_storage() -> void
+{
+    _w_vectors.clear();
+
+    _w_vectors.shrink_to_fit();
+
+    _w_vectors_beta.clear();
+
+    _w_vectors_beta.shrink_to_fit();
+
+    _drv.release_squares();
+
+    // NOTE: a W matrix is the basis by the occupied orbitals, and glibc raises the
+    // size it maps a block at to that of a mapped block freed, up to 32 megabytes
+    // on a 64 bit machine. Blocks below that come from the heap, and freed there
+    // they stay resident until the heap is trimmed.
+
+#ifdef __GLIBC__
+    malloc_trim(0);
+#endif
+}
+
+auto
 CSimdRIJKFockDriver::is_prepared() const -> bool
 {
     return _prepared;

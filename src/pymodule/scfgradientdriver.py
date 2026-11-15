@@ -202,14 +202,17 @@ class ScfGradientDriver(GradientDriver):
         else:
             # NOTE: the RI gradient reads the RI driver the SCF formed. A deep
             # copy of an SCF driver holds none until it runs the SCF itself
-            # (__deepcopy__ of the SCF drivers).
+            # (__deepcopy__ of the SCF drivers), and an SCF driver holds none
+            # after release_ri until it runs the SCF again.
+            why = ('it was released after the SCF (release_ri)'
+                   if self.scf_driver._ri_released else
+                   'a copy of one which has not run the SCF')
             assert_msg_critical(
                 not (self.scf_driver._uses_ri_jk() or
                      self.scf_driver._uses_ri_coulomb()) or
                 self.scf_driver._ri_drv is not None,
                 f'{type(self).__name__}: the SCF driver holds no RI driver ' +
-                '(a copy of one which has not run the SCF); run the SCF ' +
-                'with this driver before the gradient')
+                f'({why}); run the SCF with this driver before the gradient')
 
             if self.rank == mpi_master():
                 scf_type = scf_results['scf_type']
