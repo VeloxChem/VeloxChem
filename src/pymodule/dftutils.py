@@ -209,13 +209,17 @@ def get_response_fock_xc_density_memory(molecule,
 # The kxc and kxclxc integrations hold the same as the fxc integration of the
 # closed shell (integratePartialKxcFock* and integratePartialLxcFock* form the
 # same G and partials), and have no open-shell form; nor does the fxc
-# integration with a meta-GGA.
+# integration with a meta-GGA. For the open-shell meta-GGA the closed-shell
+# counts are taken with the matrices of each spin doubled (2 ground-state
+# densities, 10 G and 10 partials), so that the batch sizes which read this
+# are given a number and the integration reports what it lacks.
 _RESPONSE_FOCK_XC_BOX_MATRICES = {
     (xcfun_enum.lda, False): (2, 2),
     (xcfun_enum.gga, False): (3, 6),
     (xcfun_enum.mgga, False): (6, 9),
     (xcfun_enum.lda, True): (4, 3),
     (xcfun_enum.gga, True): (6, 8),
+    (xcfun_enum.mgga, True): (12, 14),
 }
 
 
@@ -265,11 +269,6 @@ def get_response_fock_xc_call_memory(molecule,
         return 0
 
     xcfun_type = xcfun.get_func_type()
-
-    assert_msg_critical(
-        (xcfun_type, bool(open_shell)) in _RESPONSE_FOCK_XC_BOX_MATRICES,
-        'get_response_fock_xc_call_memory: the response Fock XC integration '
-        'is implemented for LDA, GGA and closed-shell meta-GGA')
 
     if 'response_fock_xc_largest_boxes' not in dft_dict:
         xc_drv = XCIntegrator()

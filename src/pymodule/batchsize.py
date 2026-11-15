@@ -42,7 +42,10 @@ from .errorhandler import assert_msg_critical
 
 def get_batch_size(input_batch_size, n_total, n_ao, comm):
     """
-    Gets batch size for Fock matrix computation.
+    Gets batch size for Fock matrix computation. The four-center Fock builds
+    of the linear, CPHF and nonlinear solvers take get_four_center_batch_size
+    and their RI builds get_ri_batch_size; this one is taken by the Hessian
+    orbital response (its exchange-correlation derivative batches) and MP2.
 
     :param input_batch_size:
         The batch size from input.
@@ -101,6 +104,103 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
     return batch_size
 
 
+def _get_smallest_room(comm):
+    """
+    Gets the smallest memory free to a rank, in bytes. Every rank must call
+    this.
+
+    :param comm:
+        The communicator.
+
+    :return:
+        The smallest room of any rank, the same on every rank.
+
+    .. note::
+        The ranks on one node share its free memory (the smaller of the
+        node's and what its control groups leave, see
+        environment.get_available_memory), and are counted by their host
+        name, as get_ri_free_memory counts them for the RI budgets. Each
+        rank's room is its node's free memory over the ranks on it.
+    """
+
+    import platform
+    hosts_and_memory = comm.allgather((platform.node(), get_available_memory()))
+    hosts = [host for host, _ in hosts_and_memory]
+
+    return min(available // hosts.count(host)
+               for host, available in hosts_and_memory)
+
+
+# NOTE: the memory the four-center response Fock build reserves for what the
+# ERI integration holds besides the Fock matrix, in densities of
+# 8 x n_ao^2 x threads bytes. The build forms one density at a time, so this
+# is held once, whatever the batch size. Measured peaks of one '2jkx' build (MN15,
+# def2-SVPD, 16 threads, one rank's share of the work), besides the Fock
+# matrix and its copy: a 43-atom molecule with 689 basis functions, share of
+# 16 ranks, block size factor 8: 19 n_ao^2 (1.2 for each thread); a 248-atom
+# molecule with 3860 basis functions, share of 64 ranks, block size factor
+# 16: 37 n_ao^2 (2.3 for each thread), and 19 n_ao^2 (2.4 for each thread)
+# with 8 threads.
+_FOUR_CENTER_ERI_RESERVE = 3
+
+
+def get_four_center_batch_size(input_batch_size,
+                               n_total,
+                               n_ao,
+                               comm,
+                               call_memory=0):
+    """
+    Gets the batch size of a response Fock build from the four-center
+    integrals (the linear, CPHF and nonlinear solvers), from the memory free
+    to each rank. Every rank must call this. Builds with the resolution of
+    the identity take get_ri_batch_size.
+
+    :param input_batch_size:
+        The batch size from input, or None.
+    :param n_total:
+        The total number of Fock matrices.
+    :param n_ao:
+        The number of atomic orbitals in one Fock matrix; read on the master
+        rank only.
+    :param comm:
+        The communicator.
+    :param call_memory:
+        The memory a build holds once, whatever the number of its densities,
+        in bytes (the exchange-correlation integration's, from
+        dftutils.get_response_fock_xc_call_memory); read on the master rank
+        only.
+
+    :return:
+        The batch size, the same on every rank: the input batch size where one
+        is given, and otherwise as many densities as the smallest room of a
+        rank holds after call_memory and the ERI reserve, at least one and at
+        most n_total (zero where n_total is zero).
+
+    .. note::
+        The memory of a density is 8 x n_ao^2 bytes for each thread, as
+        get_batch_size takes it, and _FOUR_CENTER_ERI_RESERVE such densities
+        are reserved for the ERI integration.
+    """
+
+    if input_batch_size is not None:
+        return comm.bcast(input_batch_size, root=mpi_master())
+
+    room = _get_smallest_room(comm)
+
+    batch_size = None
+
+    if comm.Get_rank() == mpi_master():
+        per_density = n_ao * n_ao * 8 * get_number_of_threads()
+        eri_reserve = _FOUR_CENTER_ERI_RESERVE * per_density
+
+        # NOTE: batch_size is zero where n_total is zero.
+        batch_size = min(
+            n_total,
+            max((room - call_memory - eri_reserve) // per_density, 1))
+
+    return comm.bcast(batch_size, root=mpi_master())
+
+
 def get_ri_batch_size(input_batch_size,
                       n_total,
                       n_ao,
@@ -111,8 +211,8 @@ def get_ri_batch_size(input_batch_size,
     Gets the batch size of a Fock build with the resolution of the identity,
     from the memory free to each rank (the smaller of the node's and what its
     control groups leave, see environment.get_available_memory). Every rank
-    must call this. Builds from the four-center integrals take
-    get_batch_size.
+    must call this. Response builds from the four-center integrals take
+    get_four_center_batch_size.
 
     :param input_batch_size:
         The batch size from input, or None.
@@ -147,15 +247,7 @@ def get_ri_batch_size(input_batch_size,
     if input_batch_size is not None:
         return comm.bcast(input_batch_size, root=mpi_master())
 
-    # NOTE: the ranks on one node share its free memory, and are counted by
-    # their host name, as get_ri_free_memory counts them for the RI budgets.
-    # Each rank's room is its node's free memory over the ranks on it, and the
-    # smallest room of any rank is taken.
-    import platform
-    hosts_and_memory = comm.allgather((platform.node(), get_available_memory()))
-    hosts = [host for host, _ in hosts_and_memory]
-    room = min(available // hosts.count(host)
-               for host, available in hosts_and_memory)
+    room = _get_smallest_room(comm)
 
     batch_size = None
 

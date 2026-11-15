@@ -49,7 +49,7 @@ from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .inputparser import parse_input
 from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
-from .batchsize import get_batch_size
+from .batchsize import get_four_center_batch_size
 from .batchsize import get_ri_batch_size
 from .batchsize import get_number_of_batches
 
@@ -1040,18 +1040,24 @@ class CphfSolver(LinearSolver):
 
         num_vecs = dist_trials.shape(1)
 
+        # NOTE: the exchange-correlation integration holds this once for
+        # each build, whatever the number of its densities; both kinds of
+        # build take it off the room.
+        call_memory = None
+
+        if self.rank == mpi_master():
+            call_memory = self._xc_call_memory(molecule, basis, dft_dict,
+                                               False)
+
         if self._uses_ri_jk() or self._uses_ri_coulomb():
             # NOTE: an RI-JK build also holds the right factor of each density
             # (ri_jk_factors below), nao by nocc.
             density_memory = None
-            call_memory = None
 
             if self.rank == mpi_master():
                 density_memory = self._ri_density_memory(
                     molecule, basis, dft_dict, nao, _RI_BATCH_MATRICES,
                     nocc if self._uses_ri_jk() else 0, 1)
-                call_memory = self._ri_call_memory(molecule, basis, dft_dict,
-                                                   False)
 
             batch_size = get_ri_batch_size(self.batch_size, num_vecs, nao,
                                            density_memory, self.comm,
@@ -1059,8 +1065,9 @@ class CphfSolver(LinearSolver):
             self._note_ri_batch_memory(density_memory,
                                        min(batch_size, num_vecs))
         else:
-            batch_size = get_batch_size(self.batch_size, num_vecs, nao,
-                                        self.comm)
+            batch_size = get_four_center_batch_size(self.batch_size, num_vecs,
+                                                    nao, self.comm,
+                                                    call_memory)
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
 
         if profiler is not None:
@@ -1226,19 +1233,25 @@ class CphfSolver(LinearSolver):
 
         num_vecs = dist_trials.shape(1)
 
+        # NOTE: the exchange-correlation integration holds this once for
+        # each build, whatever the number of its densities; both kinds of
+        # build take it off the room.
+        call_memory = None
+
+        if self.rank == mpi_master():
+            call_memory = self._xc_call_memory(molecule, basis, dft_dict,
+                                               True)
+
         if self._uses_ri_jk() or self._uses_ri_coulomb():
             # NOTE: an RI-JK build also holds the right factor of each spin's
             # density (ri_jk_factors below), nao by nocc_a and nao by nocc_b.
             density_memory = None
-            call_memory = None
 
             if self.rank == mpi_master():
                 density_memory = self._ri_density_memory(
                     molecule, basis, dft_dict, nao,
                     _RI_BATCH_MATRICES_UNRESTRICTED,
                     (nocc_a + nocc_b) if self._uses_ri_jk() else 0, 2)
-                call_memory = self._ri_call_memory(molecule, basis, dft_dict,
-                                                   True)
 
             batch_size = get_ri_batch_size(self.batch_size, num_vecs, nao,
                                            density_memory, self.comm,
@@ -1246,8 +1259,9 @@ class CphfSolver(LinearSolver):
             self._note_ri_batch_memory(density_memory,
                                        min(batch_size, num_vecs))
         else:
-            batch_size = get_batch_size(self.batch_size, num_vecs, nao,
-                                        self.comm)
+            batch_size = get_four_center_batch_size(self.batch_size, num_vecs,
+                                                    nao, self.comm,
+                                                    call_memory)
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
 
         if profiler is not None:

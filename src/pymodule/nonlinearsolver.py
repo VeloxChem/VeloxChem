@@ -54,7 +54,7 @@ from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level, get_optimal_grid_box_size
 from .dftutils import get_response_fock_xc_density_memory
 from .dftutils import get_response_fock_xc_call_memory
-from .batchsize import get_batch_size
+from .batchsize import get_four_center_batch_size
 from .batchsize import get_ri_batch_size
 from .batchsize import get_ri_density_memory
 from .batchsize import get_number_of_batches
@@ -869,9 +869,10 @@ class NonlinearSolver:
         density_memory = None
 
         # NOTE: without factors from the caller, use_ri_jk below is false and
-        # the build takes the four-center integrals, and get_batch_size as
-        # every four-center build. The factors are handed on the master rank
-        # alone, so the master decides.
+        # the build takes the four-center integrals, and
+        # get_four_center_batch_size as the four-center builds of the linear
+        # and CPHF solvers. The factors are handed on the master rank alone,
+        # so the master decides.
         ri_build = None
 
         if self.rank == mpi_master():
@@ -880,25 +881,31 @@ class NonlinearSolver:
 
         ri_build = self.comm.bcast(ri_build, root=mpi_master())
 
-        if ri_build:
-            call_memory = None
+        # NOTE: the exchange-correlation integration holds this once for each
+        # build, whatever the number of its densities; both kinds of build
+        # take it off the room. The nonlinear exchange-correlation
+        # integrations are closed-shell only (see
+        # XCIntegrator.integrateKxcFock).
+        call_memory = None
 
+        if self.rank == mpi_master():
+            call_memory = get_response_fock_xc_call_memory(
+                molecule, ao_basis, dft_dict,
+                self.xcfun if self._dft else None, False,
+                self.xc_screening_threshold)
+
+        if ri_build:
             if self.rank == mpi_master():
                 density_memory = self._ri_density_memory(
                     molecule, ao_basis, dft_dict, n_ao, mode, mode_is_cubic)
-                # NOTE: the nonlinear exchange-correlation integrations are
-                # closed-shell only (see XCIntegrator.integrateKxcFock).
-                call_memory = get_response_fock_xc_call_memory(
-                    molecule, ao_basis, dft_dict,
-                    self.xcfun if self._dft else None, False,
-                    self.xc_screening_threshold)
 
             batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
                                            density_memory, self.comm,
                                            call_memory)
         else:
-            batch_size = get_batch_size(self.batch_size, n_total, n_ao,
-                                        self.comm)
+            batch_size = get_four_center_batch_size(self.batch_size, n_total,
+                                                    n_ao, self.comm,
+                                                    call_memory)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         # double-check batch size for DFT

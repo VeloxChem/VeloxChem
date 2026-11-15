@@ -195,7 +195,7 @@ class TestXCBoxAOCounts:
     @pytest.mark.parametrize('xcfun_label, open_shell, n_square, n_points',
                              [('slater', False, 2, 2), ('blyp', False, 3, 6),
                               ('tpssh', False, 6, 9), ('slater', True, 4, 3),
-                              ('b3lyp', True, 6, 8)])
+                              ('b3lyp', True, 6, 8), ('tpssh', True, 12, 14)])
     def test_the_xc_memory_of_a_call(self, xcfun_label, open_shell, n_square,
                                      n_points):
 

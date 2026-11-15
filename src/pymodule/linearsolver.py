@@ -71,7 +71,7 @@ from .dftutils import (get_default_grid_level, get_optimal_grid_box_size,
                        print_xc_reference, get_response_fock_xc_density_memory,
                        get_response_fock_xc_call_memory)
 from .checkpoint import write_rsp_hdf5
-from .batchsize import get_batch_size
+from .batchsize import get_four_center_batch_size
 from .batchsize import get_ri_batch_size
 from .batchsize import get_ri_density_memory
 from .batchsize import get_number_of_batches
@@ -792,12 +792,12 @@ class LinearSolver:
         return get_ri_density_memory(n_ao, n_matrices, n_factor_columns,
                                      n_sliced, xc_density_memory)
 
-    def _ri_call_memory(self, molecule, basis, dft_dict, open_shell):
+    def _xc_call_memory(self, molecule, basis, dft_dict, open_shell):
         """
-        Gets the memory an RI Fock build holds on the master rank once,
-        whatever the number of its densities, as get_ri_batch_size takes it:
-        that of the exchange-correlation integration. Called on the master
-        only.
+        Gets the memory a Fock build holds on the master rank once, whatever
+        the number of its densities, as get_ri_batch_size and
+        get_four_center_batch_size take it: that of the exchange-correlation
+        integration. Called on the master only.
 
         :param molecule:
             The molecule.
@@ -2104,20 +2104,26 @@ class LinearSolver:
 
         n_total = n_general + n_extra_ger + n_extra_ung
 
+        # NOTE: the exchange-correlation integration holds this once for
+        # each build, whatever the number of its densities; both kinds of
+        # build take it off the room.
+        call_memory = None
+
+        if self.rank == mpi_master():
+            call_memory = self._xc_call_memory(molecule, basis, dft_dict,
+                                               False)
+
         if self._uses_ri_jk() or self._uses_ri_coulomb():
             # NOTE: an RI-JK build also holds the two right factors of each
             # density (ri_jk_factors below), n_ao by the occupied orbitals the
             # trial vectors excite from: nocc, or fewer for core excitation or
             # a restricted subspace, which nocc bounds.
             density_memory = None
-            call_memory = None
 
             if self.rank == mpi_master():
                 density_memory = self._ri_density_memory(
                     molecule, basis, dft_dict, n_ao, _RI_BATCH_MATRICES,
                     2 * nocc if self._uses_ri_jk() else 0, 1)
-                call_memory = self._ri_call_memory(molecule, basis, dft_dict,
-                                                   False)
 
             batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
                                            density_memory, self.comm,
@@ -2125,8 +2131,9 @@ class LinearSolver:
             self._note_ri_batch_memory(density_memory,
                                        min(batch_size, n_total))
         else:
-            batch_size = get_batch_size(self.batch_size, n_total, n_ao,
-                                        self.comm)
+            batch_size = get_four_center_batch_size(self.batch_size, n_total,
+                                                    n_ao, self.comm,
+                                                    call_memory)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         if profiler is not None:
@@ -3103,20 +3110,26 @@ class LinearSolver:
 
         n_total = n_general + n_extra_ger + n_extra_ung
 
+        # NOTE: the exchange-correlation integration holds this once for
+        # each build, whatever the number of its densities; both kinds of
+        # build take it off the room.
+        call_memory = None
+
+        if self.rank == mpi_master():
+            call_memory = self._xc_call_memory(molecule, basis, dft_dict,
+                                               True)
+
         if self._uses_ri_jk() or self._uses_ri_coulomb():
             # NOTE: as in _e2n_half_size_single_comm, for both spins: n_ao by
             # nocc_a and n_ao by nocc_b for each RI-JK right factor, which bound
             # the core excitation case.
             density_memory = None
-            call_memory = None
 
             if self.rank == mpi_master():
                 density_memory = self._ri_density_memory(
                     molecule, basis, dft_dict, n_ao,
                     _RI_BATCH_MATRICES_UNRESTRICTED,
                     2 * (nocc_a + nocc_b) if self._uses_ri_jk() else 0, 2)
-                call_memory = self._ri_call_memory(molecule, basis, dft_dict,
-                                                   True)
 
             batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
                                            density_memory, self.comm,
@@ -3124,8 +3137,9 @@ class LinearSolver:
             self._note_ri_batch_memory(density_memory,
                                        min(batch_size, n_total))
         else:
-            batch_size = get_batch_size(self.batch_size, n_total, n_ao,
-                                        self.comm)
+            batch_size = get_four_center_batch_size(self.batch_size, n_total,
+                                                    n_ao, self.comm,
+                                                    call_memory)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         if profiler is not None:
