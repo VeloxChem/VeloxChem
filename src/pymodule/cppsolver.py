@@ -510,11 +510,8 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
 
             profiler.stop_timer('Orthonorm.')
 
-            if self.rank == mpi_master():
-                n_new_trials = new_trials_ger.shape(1) + new_trials_ung.shape(1)
-            else:
-                n_new_trials = None
-            n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
+            n_new_trials = self._get_num_trial_vectors(new_trials_ger,
+                                                       new_trials_ung)
 
             if iter_per_trial_in_hours is not None:
                 next_iter_in_hours = iter_per_trial_in_hours * n_new_trials
