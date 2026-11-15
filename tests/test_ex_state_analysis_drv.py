@@ -22,39 +22,39 @@ class TestCTNumbers:
 
         ct_matrix = {
             False: np.array([
-                [0.34837228, 0.19662888],
-                [0.1367462, 0.31825265],
+                [0.34837229, 0.19662885],
+                [0.13674624, 0.31825263],
             ]),
             True: np.array([[0.34835735, 0.19661779], [0.13675409, 0.31827078]])
         }[ri]
 
         hole_participation_ratio = {
-            False: 1.9839293483578253,
+            False: 1.9839293631378832,
             True: 1.9839477783725588
         }[ri]
         particle_participation_ratio = {
-            False: 1.9982298906088756,
+            False: 1.9982299007986115,
             True: 1.9982282163446563
         }[ri]
         avg_participation_ratio = {
-            False: 1.9910796194833504,
+            False: 1.9910796319682473,
             True: 1.9910879973586075
         }[ri]
 
         avg_hole_position = {
-            False: np.array([9.48439790e-02, 4.63701220e-02, -9.30375228e-05]),
+            False: np.array([9.48438098e-02, 4.63701472e-02, -9.30375484e-05]),
             True: np.array([0.09474389, 0.04637279, -0.00009304])
         }[ri]
         avg_particle_position = {
-            False: np.array([-1.05663691e-02, 1.95196319e-02, -2.61361122e-05]),
+            False: np.array([-1.05661049e-02, 1.95196531e-02, -2.61360911e-05]),
             True: np.array([-0.01058115, 0.01951824, -0.00002614])
         }[ri]
         avg_difference_vec = {
-            False: np.array([-1.05410348e-01, -2.68504901e-02, 6.69014106e-05]),
+            False: np.array([-1.05409915e-01, -2.68504941e-02, 6.69014573e-05]),
             True: np.array([-0.10532504, -0.02685454, 0.00006690])
         }[ri]
 
-        ct_length = {False: 0.10877635215676436, True: 0.10869469104546430}[ri]
+        ct_length = {False: 0.10877593310370542, True: 0.10869469104546430}[ri]
 
         thienyl_thiazole_str = """S   1.5860   -1.4206    0.0001
         C   0.6775    0.0310   -0.0004
@@ -96,6 +96,10 @@ class TestCTNumbers:
         tda_drv = TdaEigenSolver()
         tda_drv.ostream.mute()
         tda_drv.nstates = 2
+        # conv_thresh below the default: the results depend on the path of
+        # the Davidson iterations by less than at the default threshold, and
+        # by much less than the tolerances of this test
+        tda_drv.conv_thresh = 1.0e-7
         tda_drv.initial_guess_multiplier = 1
         tda_results = tda_drv.compute(molecule, basis, scf_results)
 
@@ -209,8 +213,9 @@ class TestCTNumbers:
         lreig_drv = LinearResponseEigenSolver()
         lreig_drv.ostream.mute()
         lreig_drv.nstates = 2
-        # conv_thresh below the default, so that the reference values do not
-        # depend on the path of the Davidson iterations
+        # conv_thresh below the default: the results depend on the path of
+        # the Davidson iterations by less than at the default threshold, and
+        # by much less than the tolerances of this test
         lreig_drv.conv_thresh = 1.0e-7
         lreig_drv.initial_guess_multiplier = 1
         lreig_drv.max_subspace_dim = 1000
@@ -299,8 +304,9 @@ class TestCTNumbers:
         # Core-excited states, O 1s
         lreig_drv.num_core_orbitals = 2
         lreig_drv.nstates = 2
-        # conv_thresh below the default, so that the reference values do not
-        # depend on the path of the Davidson iterations
+        # conv_thresh below the default: the results depend on the path of
+        # the Davidson iterations by less than at the default threshold, and
+        # by much less than the tolerances of this test
         lreig_drv.conv_thresh = 1.0e-7
         lreig_results = lreig_drv.compute(molecule, basis, scf_results)
 
@@ -376,6 +382,10 @@ class TestCTNumbers:
         # Core-excited states, O 1s
         tda_drv.num_core_orbitals = 2
         tda_drv.nstates = 2
+        # conv_thresh below the default: the results depend on the path of
+        # the Davidson iterations by less than at the default threshold, and
+        # by much less than the tolerances of this test
+        tda_drv.conv_thresh = 1.0e-7
         tda_results = tda_drv.compute(molecule, basis, scf_results)
 
         exc_drv = ExcitedStateAnalysisDriver()

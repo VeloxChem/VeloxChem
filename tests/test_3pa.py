@@ -248,8 +248,9 @@ class Test3PA:
             }
         }[ri]
 
-        # conv_thresh below the default of run_3pa, so that the reference
-        # values do not depend on the path of the Davidson iterations
+        # conv_thresh below the default of run_3pa: the results depend on the
+        # path of the Davidson iterations by less than at that default, and by
+        # much less than the tolerances of this test
         self.run_3pa('hf', '6-31G', ref_result, ri=ri, conv_thresh=1.0e-8)
 
     @pytest.mark.parametrize('ri', [False, True])

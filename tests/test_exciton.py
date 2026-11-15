@@ -522,8 +522,9 @@ class TestExciton:
         exmod_drv.atoms_per_fragment = '6'
         exmod_drv.charges = '0'
         exmod_drv.nstates = 5
-        # conv_thresh below the default, so that the reference values do not
-        # depend on the path of the Davidson iterations
+        # conv_thresh below the default: the results depend on the path of
+        # the Davidson iterations by less than at the default threshold, and
+        # by much less than the tolerances of this test
         exmod_drv.tda_conv_thresh = 1.0e-7
         exmod_drv.ct_nocc = 1
         exmod_drv.ct_nvir = 1

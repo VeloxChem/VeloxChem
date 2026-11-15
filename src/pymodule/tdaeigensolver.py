@@ -228,7 +228,8 @@ class TdaEigenSolver(TdaEigenSolverBase):
             self.lindep_thresh,
             num_extra_roots=self.num_extra_roots,
             extra_root_cluster_thresh=self.extra_root_cluster_thresh,
-            max_extra_cluster_roots=self.max_extra_cluster_roots)
+            max_extra_cluster_roots=self.max_extra_cluster_roots,
+            conv_thresh=self.conv_thresh)
 
         # read initial guess from restart file
 

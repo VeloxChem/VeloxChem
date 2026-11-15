@@ -47,6 +47,8 @@ class BlockDavidsonSolver:
         - num_extra_roots, extra_root_cluster_thresh,
           max_extra_cluster_roots: The roots refined above neigenpairs (see
           LinearSolver._get_num_refined_roots).
+        - conv_thresh: The residual norm above which a refined root receives
+          a trial vector; with None, every refined root receives one.
         - sigma_matrices: The sigma vectors A * X in matrix format {A * X_0, A
           * X_1,...}.
         - trial_matrices: The trial vectors in matrix format {X_0, X_1,...}.
@@ -58,7 +60,8 @@ class BlockDavidsonSolver:
                  lindep_thresh=1.0e-6,
                  num_extra_roots=0,
                  extra_root_cluster_thresh=0.0,
-                 max_extra_cluster_roots=0):
+                 max_extra_cluster_roots=0,
+                 conv_thresh=None):
         """
         Initializes block Davidson sover to default setup.
         """
@@ -70,6 +73,10 @@ class BlockDavidsonSolver:
         self.num_extra_roots = num_extra_roots
         self.extra_root_cluster_thresh = extra_root_cluster_thresh
         self.max_extra_cluster_roots = max_extra_cluster_roots
+
+        # roots with residual norms at or below conv_thresh receive no trial
+        # vectors
+        self.conv_thresh = conv_thresh
 
         # solver storage setup
         self.sigma_matrices = None
@@ -303,9 +310,23 @@ class BlockDavidsonSolver:
             The trial vectors.
         """
 
-        tvecs = self.residual_matrices.copy()
+        residuals = self.residual_matrices
+        shifts = self.refined_eigs
+
+        # A root receives a trial vector only when its residual norm is above
+        # conv_thresh, which is when check_convergence counts it as not
+        # converged. The residual of a converged root can be as small as the
+        # rounding errors; the vector made from it is then rounding noise, and
+        # after the projection in project_trial_vectors it is not reliably
+        # orthogonal to the reduced space.
+        if self.conv_thresh is not None:
+            keep = np.linalg.norm(residuals, axis=0) > self.conv_thresh
+            residuals = residuals[:, keep]
+            shifts = shifts[keep]
+
+        tvecs = residuals.copy()
         for i in range(tvecs.shape[1]):
-            tvecs[:, i] /= (self.refined_eigs[i] - diag_mat)
+            tvecs[:, i] /= (shifts[i] - diag_mat)
 
         tvecs = LinearSolver.normalize(tvecs)
 

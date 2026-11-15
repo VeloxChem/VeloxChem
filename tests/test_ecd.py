@@ -139,8 +139,9 @@ class TestECD:
                 [-9.471445, 32.810070, -19.037454, 13.299826, -4.117262])
         }[ri]
 
-        # conv_thresh below the default, so that the reference values do not
-        # depend on the path of the Davidson iterations
+        # conv_thresh below the default: the results depend on the path of
+        # the Davidson iterations by less than at the default threshold, and
+        # by much less than the tolerances of this test
         self.run_ecd('hf',
                      'rpa',
                      ri,
@@ -213,8 +214,9 @@ class TestECD:
                 [-9.776558, 31.306340, -19.355404, 15.614216, -7.620553])
         }[ri]
 
-        # conv_thresh below the default, so that the reference values do not
-        # depend on the path of the Davidson iterations
+        # conv_thresh below the default: the results depend on the path of
+        # the Davidson iterations by less than at the default threshold, and
+        # by much less than the tolerances of this test
         self.run_ecd('hf',
                      'tda',
                      ri,

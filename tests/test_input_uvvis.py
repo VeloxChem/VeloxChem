@@ -275,8 +275,9 @@ class TestInputUVVis:
             }
         }[ri]
 
-        # conv_thresh below the default, so that the reference values do not
-        # depend on the path of the Davidson iterations
+        # conv_thresh below the default: the results depend on the path of
+        # the Davidson iterations by less than at the default threshold, and
+        # by much less than the tolerances of this test
         self.run_input_uvvis(capsys,
                              xcfun,
                              tamm_dancoff,

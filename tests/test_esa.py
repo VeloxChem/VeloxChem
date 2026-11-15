@@ -216,8 +216,9 @@ class TestExcitedStateAbsorption:
 
         mol, bas = self._get_formaldehyde_and_basis()
 
-        # conv_thresh below the default, so that the reference values do not
-        # depend on the path of the Davidson iterations
+        # conv_thresh below the default: the results depend on the path of
+        # the Davidson iterations by less than at the default threshold, and
+        # by much less than the tolerances of this test
         dipoles = self._get_esa_transition_dipoles(mol,
                                                    bas,
                                                    4,
