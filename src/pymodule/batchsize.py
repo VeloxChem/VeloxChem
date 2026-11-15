@@ -101,7 +101,12 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
     return batch_size
 
 
-def get_ri_batch_size(input_batch_size, n_total, n_ao, density_memory, comm):
+def get_ri_batch_size(input_batch_size,
+                      n_total,
+                      n_ao,
+                      density_memory,
+                      comm,
+                      call_memory=0):
     """
     Gets the batch size of a Fock build with the resolution of the identity,
     from the memory free to each rank (the smaller of the node's and what its
@@ -121,12 +126,17 @@ def get_ri_batch_size(input_batch_size, n_total, n_ao, density_memory, comm):
         batch, in bytes; read on the master rank only.
     :param comm:
         The communicator.
+    :param call_memory:
+        The memory a build holds once, whatever the number of its densities,
+        in bytes (the exchange-correlation integration's, from
+        dftutils.get_response_fock_xc_call_memory); read on the master rank
+        only.
 
     :return:
         The batch size, the same on every rank: the input batch size where one
         is given, and otherwise as many densities as the smallest room of a
-        rank holds, at least one and at most n_total (zero where n_total is
-        zero).
+        rank holds after call_memory, at least one and at most n_total (zero
+        where n_total is zero).
 
     .. note::
         The RI build's own matrices are not part of density_memory: the build
@@ -162,7 +172,8 @@ def get_ri_batch_size(input_batch_size, n_total, n_ao, density_memory, comm):
         per_density = max(estimate, density_memory)
 
         # NOTE: batch_size is zero where n_total is zero.
-        batch_size = min(n_total, max(room // per_density, 1))
+        batch_size = min(n_total,
+                         max((room - call_memory) // per_density, 1))
 
     return comm.bcast(batch_size, root=mpi_master())
 

@@ -50,6 +50,21 @@ class TestRIBatchSize:
         assert get_ri_batch_size(None, 10**9, self.nao, self.estimate() // 2,
                                  self.comm) == room // self.estimate()
 
+    def test_the_memory_of_a_call_is_taken_from_the_room(self, monkeypatch):
+
+        room = self.set_memory(monkeypatch, 8 * 1024**3)
+
+        density_memory = 3 * self.estimate()
+        call_memory = room // 4
+
+        assert get_ri_batch_size(None, 10**9, self.nao, density_memory,
+                                 self.comm, call_memory) == (
+                                     (room - call_memory) // density_memory)
+
+        # NOTE: a call that leaves no room for a density still gives one.
+        assert get_ri_batch_size(None, 10**9, self.nao, density_memory,
+                                 self.comm, 2 * room) == 1
+
     def test_the_input_batch_size_and_the_items_bound_the_count(
             self, monkeypatch):
 

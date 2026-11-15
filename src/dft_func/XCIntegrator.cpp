@@ -38,6 +38,7 @@
 #include <cmath>
 #include <cstring>
 #include <functional>
+#include <utility>
 #include <vector>
 
 #include "DenseMatrix.hpp"
@@ -372,6 +373,27 @@ CXCIntegrator::getLargestBoxAOCountsForResponseFockXC(const CMolecule&       mol
                                                       const CXCFunctional&   fvxc,
                                                       const int              count) const -> std::vector<int>
 {
+    const auto boxes = getLargestBoxesForResponseFockXC(molecule, basis, molecularGrid, fvxc, count);
+
+    std::vector<int> aocounts;
+
+    aocounts.reserve(boxes.size());
+
+    for (const auto& [aocount, npoints] : boxes)
+    {
+        aocounts.push_back(aocount);
+    }
+
+    return aocounts;
+}
+
+auto
+CXCIntegrator::getLargestBoxesForResponseFockXC(const CMolecule&       molecule,
+                                                const CMolecularBasis& basis,
+                                                const CMolecularGrid&  molecularGrid,
+                                                const CXCFunctional&   fvxc,
+                                                const int              count) const -> std::vector<std::pair<int, int>>
+{
     auto xcfuntype = fvxc.getFunctionalType();
 
     // NOTE: integrateFxcFock, integrateKxcFock and integrateKxcLxcFock call
@@ -396,7 +418,7 @@ CXCIntegrator::getLargestBoxAOCountsForResponseFockXC(const CMolecule&       mol
     }
     else
     {
-        errors::assertMsgCritical(false, std::string("XCIntegrator.getLargestBoxAOCountsForResponseFockXC: Only implemented for LDA/GGA/meta-GGA"));
+        errors::assertMsgCritical(false, std::string("XCIntegrator.getLargestBoxesForResponseFockXC: Only implemented for LDA/GGA/meta-GGA"));
     }
 
     const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
@@ -411,7 +433,7 @@ CXCIntegrator::getLargestBoxAOCountsForResponseFockXC(const CMolecule&       mol
 
     const auto n_boxes = static_cast<int>(counts.size());
 
-    std::vector<int> aocounts(n_boxes, 0);
+    std::vector<std::pair<int, int>> boxes(n_boxes, {0, 0});
 
 #pragma omp parallel for schedule(dynamic)
     for (int box_id = 0; box_id < n_boxes; box_id++)
@@ -427,16 +449,16 @@ CXCIntegrator::getLargestBoxAOCountsForResponseFockXC(const CMolecule&       mol
             aocount += static_cast<int>(pre_ao_inds.size());
         }
 
-        aocounts[box_id] = aocount;
+        boxes[box_id] = {aocount, counts[box_id]};
     }
 
     const auto n_largest = std::min(std::max(count, 0), n_boxes);
 
-    std::partial_sort(aocounts.begin(), aocounts.begin() + n_largest, aocounts.end(), std::greater<int>());
+    std::partial_sort(boxes.begin(), boxes.begin() + n_largest, boxes.end(), std::greater<std::pair<int, int>>());
 
-    aocounts.resize(n_largest);
+    boxes.resize(n_largest);
 
-    return aocounts;
+    return boxes;
 }
 
 auto

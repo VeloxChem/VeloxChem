@@ -53,6 +53,7 @@ from . import rijresponse
 from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level, get_optimal_grid_box_size
 from .dftutils import get_response_fock_xc_density_memory
+from .dftutils import get_response_fock_xc_call_memory
 from .batchsize import get_batch_size
 from .batchsize import get_ri_batch_size
 from .batchsize import get_ri_density_memory
@@ -880,12 +881,21 @@ class NonlinearSolver:
         ri_build = self.comm.bcast(ri_build, root=mpi_master())
 
         if ri_build:
+            call_memory = None
+
             if self.rank == mpi_master():
                 density_memory = self._ri_density_memory(
                     molecule, ao_basis, dft_dict, n_ao, mode, mode_is_cubic)
+                # NOTE: the nonlinear exchange-correlation integrations are
+                # closed-shell only (see XCIntegrator.integrateKxcFock).
+                call_memory = get_response_fock_xc_call_memory(
+                    molecule, ao_basis, dft_dict,
+                    self.xcfun if self._dft else None, False,
+                    self.xc_screening_threshold)
 
             batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
-                                           density_memory, self.comm)
+                                           density_memory, self.comm,
+                                           call_memory)
         else:
             batch_size = get_batch_size(self.batch_size, n_total, n_ao,
                                         self.comm)

@@ -5,6 +5,7 @@ from veloxchem.veloxchemlib import XCIntegrator
 from veloxchem.veloxchemlib import parse_xc_func
 from veloxchem.veloxchemlib import get_number_of_threads
 from veloxchem.dftutils import get_response_fock_xc_density_memory
+from veloxchem.dftutils import get_response_fock_xc_call_memory
 from veloxchem.griddriver import GridDriver
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -163,3 +164,68 @@ class TestXCBoxAOCounts:
         assert get_response_fock_xc_density_memory(molecule, basis, none_dict,
                                                  None) == 0
         assert 'response_fock_xc_density_memory' not in none_dict
+
+    def test_the_boxes_give_the_counts_and_their_points(self):
+
+        molecule = self.water_chain(4, 4.0)
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+        grid = self.grid(molecule, MPI.COMM_WORLD)
+        xcfun = parse_xc_func('blyp')
+
+        xc_drv = XCIntegrator()
+
+        boxes = xc_drv.get_largest_boxes_for_response_fock_xc(
+            molecule, basis, grid, xcfun, 10**9)
+        counts = xc_drv.get_largest_box_ao_counts_for_response_fock_xc(
+            molecule, basis, grid, xcfun, 10**9)
+
+        assert [aocount for aocount, _ in boxes] == counts
+        assert boxes == sorted(boxes, reverse=True)
+
+        # NOTE: every box of this rank is listed, so their points are the
+        # points of this rank's share, and the shares make up the grid.
+        mine = sum(npoints for _, npoints in boxes)
+        assert all(npoints > 0 for _, npoints in boxes)
+        assert MPI.COMM_WORLD.allreduce(mine) == grid.number_of_points()
+
+        for count in [0, 1, 5]:
+            assert xc_drv.get_largest_boxes_for_response_fock_xc(
+                molecule, basis, grid, xcfun, count) == boxes[:count]
+
+    @pytest.mark.parametrize('xcfun_label, open_shell, n_square, n_points',
+                             [('slater', False, 2, 2), ('blyp', False, 3, 6),
+                              ('tpssh', False, 6, 9), ('slater', True, 4, 3),
+                              ('b3lyp', True, 6, 8)])
+    def test_the_xc_memory_of_a_call(self, xcfun_label, open_shell, n_square,
+                                     n_points):
+
+        molecule = self.water_chain(4, 4.0)
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
+        grid = self.grid(molecule, MPI.COMM_WORLD)
+        xcfun = parse_xc_func(xcfun_label)
+
+        xc_drv = XCIntegrator()
+
+        boxes = xc_drv.get_largest_boxes_for_response_fock_xc(
+            molecule, basis, grid, xcfun, get_number_of_threads())
+
+        dft_dict = {'molgrid': grid}
+
+        memory = get_response_fock_xc_call_memory(molecule, basis, dft_dict,
+                                                  xcfun, open_shell)
+
+        assert memory == 8 * sum(n_square * a * a + n_points * a * p
+                                 for a, p in boxes)
+        assert dft_dict['response_fock_xc_largest_boxes'] == boxes
+
+        # NOTE: the boxes are kept in the dictionary, so a second call does
+        # not count again; boxes put there are what is used.
+        dft_dict['response_fock_xc_largest_boxes'] = [(1, 2)]
+        assert get_response_fock_xc_call_memory(
+            molecule, basis, dft_dict, xcfun,
+            open_shell) == 8 * (n_square + 2 * n_points)
+
+        none_dict = {'molgrid': grid}
+        assert get_response_fock_xc_call_memory(molecule, basis, none_dict,
+                                                None, open_shell) == 0
+        assert 'response_fock_xc_largest_boxes' not in none_dict

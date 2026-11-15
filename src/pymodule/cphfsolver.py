@@ -1044,14 +1044,18 @@ class CphfSolver(LinearSolver):
             # NOTE: an RI-JK build also holds the right factor of each density
             # (ri_jk_factors below), nao by nocc.
             density_memory = None
+            call_memory = None
 
             if self.rank == mpi_master():
                 density_memory = self._ri_density_memory(
                     molecule, basis, dft_dict, nao, _RI_BATCH_MATRICES,
                     nocc if self._uses_ri_jk() else 0, 1)
+                call_memory = self._ri_call_memory(molecule, basis, dft_dict,
+                                                   False)
 
             batch_size = get_ri_batch_size(self.batch_size, num_vecs, nao,
-                                           density_memory, self.comm)
+                                           density_memory, self.comm,
+                                           call_memory)
             self._note_ri_batch_memory(density_memory,
                                        min(batch_size, num_vecs))
         else:
@@ -1226,15 +1230,19 @@ class CphfSolver(LinearSolver):
             # NOTE: an RI-JK build also holds the right factor of each spin's
             # density (ri_jk_factors below), nao by nocc_a and nao by nocc_b.
             density_memory = None
+            call_memory = None
 
             if self.rank == mpi_master():
                 density_memory = self._ri_density_memory(
                     molecule, basis, dft_dict, nao,
                     _RI_BATCH_MATRICES_UNRESTRICTED,
                     (nocc_a + nocc_b) if self._uses_ri_jk() else 0, 2)
+                call_memory = self._ri_call_memory(molecule, basis, dft_dict,
+                                                   True)
 
             batch_size = get_ri_batch_size(self.batch_size, num_vecs, nao,
-                                           density_memory, self.comm)
+                                           density_memory, self.comm,
+                                           call_memory)
             self._note_ri_batch_memory(density_memory,
                                        min(batch_size, num_vecs))
         else:

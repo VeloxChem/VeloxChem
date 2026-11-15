@@ -171,7 +171,9 @@ def get_response_fock_xc_density_memory(molecule,
         most this takes for one density is the sum of aocount^2 over that many
         of the largest boxes. A caller multiplies this by the densities a build
         slices: two for each density of an open shell (alpha and beta), and
-        for the nonlinear builds the first-order densities as well.
+        for the nonlinear builds the first-order densities as well. What a
+        call holds besides its sliced densities is
+        get_response_fock_xc_call_memory.
     """
 
     if xcfun is None:
@@ -191,6 +193,101 @@ def get_response_fock_xc_density_memory(molecule,
             c * c for c in counts)
 
     return dft_dict['response_fock_xc_density_memory']
+
+
+# NOTE: the matrices a thread holds for one grid box in integrate_fxc_fock,
+# integrate_kxc_fock and integrate_kxclxc_fock besides the densities it
+# slices, as (matrices over the box's functions squared, matrices over its
+# functions times its points), by functional type and shell:
+# - the sliced ground-state density, one for each spin;
+# - the GTO values: 1 for LDA; 4 (values and gradient) for GGA and meta-GGA;
+# - the matrices one density's contribution is formed in, one density at a
+#   time: G, and the partial Fock matrices that G times the GTO values gives.
+#   LDA: 1 G and 1 partial for each spin. GGA: 2 G (G, G_gga) and 2 partials
+#   for each spin. Meta-GGA: 5 G (G, G_gga, G_gga_x, G_gga_y, G_gga_z) and 5
+#   partials.
+# The kxc and kxclxc integrations hold the same as the fxc integration of the
+# closed shell (integratePartialKxcFock* and integratePartialLxcFock* form the
+# same G and partials), and have no open-shell form; nor does the fxc
+# integration with a meta-GGA.
+_RESPONSE_FOCK_XC_BOX_MATRICES = {
+    (xcfun_enum.lda, False): (2, 2),
+    (xcfun_enum.gga, False): (3, 6),
+    (xcfun_enum.mgga, False): (6, 9),
+    (xcfun_enum.lda, True): (4, 3),
+    (xcfun_enum.gga, True): (6, 8),
+}
+
+
+def get_response_fock_xc_call_memory(molecule,
+                                     basis,
+                                     dft_dict,
+                                     xcfun,
+                                     open_shell=False,
+                                     xc_screening_threshold=None):
+    """
+    Gets the memory the exchange-correlation part of a response Fock build
+    (integrate_fxc_fock, integrate_kxc_fock, integrate_kxclxc_fock) holds on
+    this rank for each call, whatever the number of densities, in bytes. The
+    densities the call slices come on top, from
+    get_response_fock_xc_density_memory. The first call for a dft_dict keeps
+    the largest boxes in it as 'response_fock_xc_largest_boxes', and later
+    calls with the same dft_dict take them from there.
+
+    :param molecule:
+        The molecule.
+    :param basis:
+        The AO basis set.
+    :param dft_dict:
+        The dictionary of DFT information a solver's _init_dft returns, whose
+        'molgrid' the integration takes.
+    :param xcfun:
+        The exchange-correlation functional, or None without one.
+    :param open_shell:
+        True where the call integrates open-shell densities.
+    :param xc_screening_threshold:
+        The screening threshold the solver sets on its XCIntegrator, or None
+        where it sets none.
+
+    :return:
+        The memory in bytes, 0 without a functional.
+
+    .. note::
+        With get_number_of_threads() threads, as many boxes are held at once.
+        For each of the boxes that keep the most functions, a thread holds the
+        matrices _RESPONSE_FOCK_XC_BOX_MATRICES counts over the box's
+        functions squared and over its functions times its points. Arrays of
+        one value per point (the density and the functional derivatives on
+        the grid) are not counted.
+    """
+
+    if xcfun is None:
+        return 0
+
+    xcfun_type = xcfun.get_func_type()
+
+    assert_msg_critical(
+        (xcfun_type, bool(open_shell)) in _RESPONSE_FOCK_XC_BOX_MATRICES,
+        'get_response_fock_xc_call_memory: the response Fock XC integration '
+        'is implemented for LDA, GGA and closed-shell meta-GGA')
+
+    if 'response_fock_xc_largest_boxes' not in dft_dict:
+        xc_drv = XCIntegrator()
+
+        if xc_screening_threshold is not None:
+            xc_drv.set_screening_threshold(xc_screening_threshold)
+
+        dft_dict['response_fock_xc_largest_boxes'] = (
+            xc_drv.get_largest_boxes_for_response_fock_xc(
+                molecule, basis, dft_dict['molgrid'], xcfun,
+                get_number_of_threads()))
+
+    n_square, n_points = _RESPONSE_FOCK_XC_BOX_MATRICES[(xcfun_type,
+                                                         bool(open_shell))]
+
+    return 8 * sum(n_square * aocount * aocount + n_points * aocount * npoints
+                   for aocount, npoints in
+                   dft_dict['response_fock_xc_largest_boxes'])
 
 
 def print_xc_reference(xcfun, ostream):

@@ -84,16 +84,21 @@ class TestResponseRiBatch:
         calls = []
         real = module.get_ri_batch_size
 
-        def recorded(input_batch_size, n_total, n_ao, density_memory, comm):
+        def recorded(input_batch_size,
+                     n_total,
+                     n_ao,
+                     density_memory,
+                     comm,
+                     call_memory=0):
             if little_memory:
                 with monkeypatch.context() as patch:
                     patch.setattr(batchsize, 'get_available_memory',
                                   lambda: 1)
                     size = real(input_batch_size, n_total, n_ao,
-                                density_memory, comm)
+                                density_memory, comm, call_memory)
             else:
                 size = real(input_batch_size, n_total, n_ao, density_memory,
-                            comm)
+                            comm, call_memory)
             calls.append((n_total, density_memory, size))
             return size
 

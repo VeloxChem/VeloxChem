@@ -68,7 +68,8 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           write_unparsed_input_to_hdf5,
                           read_unparsed_input_from_hdf5)
 from .dftutils import (get_default_grid_level, get_optimal_grid_box_size,
-                       print_xc_reference, get_response_fock_xc_density_memory)
+                       print_xc_reference, get_response_fock_xc_density_memory,
+                       get_response_fock_xc_call_memory)
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_ri_batch_size
@@ -790,6 +791,30 @@ class LinearSolver:
 
         return get_ri_density_memory(n_ao, n_matrices, n_factor_columns,
                                      n_sliced, xc_density_memory)
+
+    def _ri_call_memory(self, molecule, basis, dft_dict, open_shell):
+        """
+        Gets the memory an RI Fock build holds on the master rank once,
+        whatever the number of its densities, as get_ri_batch_size takes it:
+        that of the exchange-correlation integration. Called on the master
+        only.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param dft_dict:
+            The dictionary of DFT information.
+        :param open_shell:
+            True where the build integrates open-shell densities.
+
+        :return:
+            The memory in bytes.
+        """
+
+        return get_response_fock_xc_call_memory(
+            molecule, basis, dft_dict, self.xcfun if self._dft else None,
+            open_shell, self.xc_screening_threshold)
 
     def _note_ri_batch_memory(self, density_memory, ndens):
         """
@@ -2085,14 +2110,18 @@ class LinearSolver:
             # trial vectors excite from: nocc, or fewer for core excitation or
             # a restricted subspace, which nocc bounds.
             density_memory = None
+            call_memory = None
 
             if self.rank == mpi_master():
                 density_memory = self._ri_density_memory(
                     molecule, basis, dft_dict, n_ao, _RI_BATCH_MATRICES,
                     2 * nocc if self._uses_ri_jk() else 0, 1)
+                call_memory = self._ri_call_memory(molecule, basis, dft_dict,
+                                                   False)
 
             batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
-                                           density_memory, self.comm)
+                                           density_memory, self.comm,
+                                           call_memory)
             self._note_ri_batch_memory(density_memory,
                                        min(batch_size, n_total))
         else:
@@ -3079,15 +3108,19 @@ class LinearSolver:
             # nocc_a and n_ao by nocc_b for each RI-JK right factor, which bound
             # the core excitation case.
             density_memory = None
+            call_memory = None
 
             if self.rank == mpi_master():
                 density_memory = self._ri_density_memory(
                     molecule, basis, dft_dict, n_ao,
                     _RI_BATCH_MATRICES_UNRESTRICTED,
                     2 * (nocc_a + nocc_b) if self._uses_ri_jk() else 0, 2)
+                call_memory = self._ri_call_memory(molecule, basis, dft_dict,
+                                                   True)
 
             batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
-                                           density_memory, self.comm)
+                                           density_memory, self.comm,
+                                           call_memory)
             self._note_ri_batch_memory(density_memory,
                                        min(batch_size, n_total))
         else:

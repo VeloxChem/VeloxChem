@@ -764,6 +764,16 @@ export_dft(py::module& m)
              "molecular_grid"_a,
              "xc_functional"_a,
              "count"_a)
+        .def("get_largest_boxes_for_response_fock_xc",
+             &CXCIntegrator::getLargestBoxesForResponseFockXC,
+             "Gets the (numbers of basis functions, numbers of grid points) of the largest boxes of this rank's share "
+             "of the grid in the exchange-correlation part of response Fock matrices (integrate_fxc_fock, "
+             "integrate_kxc_fock, integrate_kxclxc_fock), most functions first.",
+             "molecule"_a,
+             "basis"_a,
+             "molecular_grid"_a,
+             "xc_functional"_a,
+             "count"_a)
         .def(
             "compute_gto_values",
             [](CXCIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
