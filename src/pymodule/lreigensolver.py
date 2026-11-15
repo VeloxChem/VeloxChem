@@ -280,14 +280,21 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                 igs = self._initial_excitations(self.nstates, orb_ene, nocc,
                                                 norb, checkpoint_nstates)
                 if igs:
-                    bger, bung = self._setup_trials(igs, None, self._dist_bger,
-                                                    self._dist_bung)
+                    # projected onto the complement of the subspace restored
+                    # from the checkpoint; nothing may be left when it already
+                    # contains the guesses
+                    bger, bung = self._setup_trials(igs,
+                                                    None,
+                                                    self._dist_bger,
+                                                    self._dist_bung,
+                                                    allow_empty=True)
 
-                    profiler.set_timing_key('Preparation')
+                    if self._get_num_trial_vectors(bger, bung) > 0:
+                        profiler.set_timing_key('Preparation')
 
-                    self._e2n_half_size(bger, bung, molecule, basis,
-                                        scf_results, eri_dict, dft_dict,
-                                        pe_dict, profiler)
+                        self._e2n_half_size(bger, bung, molecule, basis,
+                                            scf_results, eri_dict, dft_dict,
+                                            pe_dict, profiler)
 
         # generate initial guess from scratch
         else:

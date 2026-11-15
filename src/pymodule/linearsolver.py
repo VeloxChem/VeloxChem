@@ -3796,7 +3796,8 @@ class LinearSolver:
                       precond,
                       dist_bger=None,
                       dist_bung=None,
-                      renormalize=True):
+                      renormalize=True,
+                      allow_empty=False):
         """
         Computes orthonormalized trial vectors.
 
@@ -3810,6 +3811,10 @@ class LinearSolver:
             The distributed ungerade subspace.
         :param renormalize:
             The flag for normalization.
+        :param allow_empty:
+            If True, return empty sets when no vector is left after the
+            projection onto the complement of the subspace and the removal of
+            linear dependence, instead of stopping.
 
         :return:
             The orthonormalized gerade and ungerade trial vectors.
@@ -3874,14 +3879,38 @@ class LinearSolver:
         # left of them after the projection is too small, for example when the
         # residuals lie inside the reduced space. The callers cannot continue
         # without new vectors, and the iteration could not make progress, so
-        # stop here.
-        if self.rank == mpi_master():
+        # stop here. Callers pass allow_empty=True only when adding guess
+        # vectors to a subspace restored from a checkpoint; there an empty set
+        # means that the subspace already contains the guesses, and the
+        # iterations add vectors where the residuals require them.
+        if self.rank == mpi_master() and not allow_empty:
             assert_msg_critical(
                 dist_new_ger.shape(1) + dist_new_ung.shape(1) > 0,
                 'LinearSolver: No new trial vectors can be added to the '
                 'reduced space. The remaining equations cannot be converged.')
 
         return dist_new_ger, dist_new_ung
+
+    def _get_num_trial_vectors(self, dist_ger, dist_ung):
+        """
+        Gets the total number of gerade and ungerade trial vectors, the same
+        on all ranks.
+
+        :param dist_ger:
+            The distributed gerade trial vectors.
+        :param dist_ung:
+            The distributed ungerade trial vectors.
+
+        :return:
+            The number of trial vectors.
+        """
+
+        if self.rank == mpi_master():
+            n_trials = dist_ger.shape(1) + dist_ung.shape(1)
+        else:
+            n_trials = None
+
+        return self.comm.bcast(n_trials, root=mpi_master())
 
     def get_prop_grad(self,
                       operator,

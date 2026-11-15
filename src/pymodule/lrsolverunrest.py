@@ -357,21 +357,28 @@ class LinearResponseUnrestrictedSolver(LinearResponseSolverBase):
 
                     dist_grad.update(extra_dist_grad)
 
+                    # projected onto the complement of the subspace restored
+                    # from the checkpoint; nothing may be left when it already
+                    # contains the guesses
                     bger, bung = self._setup_trials(extra_dist_grad,
-                                                    extra_precond)
+                                                    extra_precond,
+                                                    self._dist_bger,
+                                                    self._dist_bung,
+                                                    allow_empty=True)
 
-                    profiler.set_timing_key('Preparation')
+                    if self._get_num_trial_vectors(bger, bung) > 0:
+                        profiler.set_timing_key('Preparation')
 
-                    self._e2n_half_size(bger,
-                                        bung,
-                                        molecule,
-                                        basis,
-                                        scf_results,
-                                        eri_dict,
-                                        dft_dict,
-                                        pe_dict,
-                                        profiler,
-                                        method_type='unrestricted')
+                        self._e2n_half_size(bger,
+                                            bung,
+                                            molecule,
+                                            basis,
+                                            scf_results,
+                                            eri_dict,
+                                            dft_dict,
+                                            pe_dict,
+                                            profiler,
+                                            method_type='unrestricted')
 
         # generate initial guess from scratch
         else:
