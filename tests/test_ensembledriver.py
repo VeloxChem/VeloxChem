@@ -178,7 +178,13 @@ class TestEnsembleDriver:
                 got = np.loadtxt(generated_csv, delimiter=",", skiprows=1)
                 ref = np.loadtxt(ref_csv, delimiter=",", skiprows=1)
                 assert got.shape == ref.shape
-                np.testing.assert_allclose(got, ref, rtol=1.0e-8, atol=1.0e-6)
+                # The spectra follow from the oscillator strengths, which
+                # change at first order in the residual of the eigenvectors.
+                # For these two snapshots, the spectra at the default
+                # conv_thresh of the eigensolver (1e-4) differ from those at
+                # conv_thresh 1e-6 by up to 6.4e-5 relative, with and without
+                # RI.
+                np.testing.assert_allclose(got, ref, rtol=5.0e-4, atol=1.0e-6)
 
                 plt.close(ax.figure)
             except ImportError:
