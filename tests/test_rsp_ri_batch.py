@@ -313,22 +313,43 @@ class TestResponseRiBatch:
             for key in keys:
                 assert abs(whole[key] - cut[key]) < 1.0e-9
 
-    def test_factor_memory_counts_a_shared_array_once(self):
+    def test_factor_sizes_count_a_shared_array_once(self):
 
         left = np.zeros((4, 3))
         rights = [np.zeros((4, 2)) for _ in range(5)]
+        transposed = [np.zeros((4, 1)) for _ in range(5)]
 
-        assert nonlinearsolver._factor_memory(None) == 0
-        assert nonlinearsolver._factor_memory(
-            (left, rights)) == left.nbytes + 5 * rights[0].nbytes
+        assert nonlinearsolver._factor_sizes(None) == (0, 0)
+        assert nonlinearsolver._factor_sizes((left, rights)) == (left.nbytes,
+                                                                 2)
+        assert nonlinearsolver._factor_sizes(
+            (left, rights, transposed)) == (left.nbytes, 3)
 
         # NOTE: the two sets of a dictionary share their left factors.
-        split = {'second': (left, rights[:2]), 'third': (left, rights[2:])}
+        other = np.zeros((4, 6))
+        split = {
+            'second': (left, rights[:2], other, rights[:2]),
+            'third': (left, rights[2:], other, transposed[2:]),
+        }
 
-        assert nonlinearsolver._factor_memory(
-            split) == left.nbytes + 5 * rights[0].nbytes
+        assert nonlinearsolver._factor_sizes(split) == (left.nbytes +
+                                                        other.nbytes, 4)
 
-    def test_nonlinear_call_memory_holds_the_factors(self, monkeypatch):
+    @staticmethod
+    def run_thg(molecule, basis, scf_results, xcfun, frequencies):
+
+        driver = ThgDriver(MPI.COMM_WORLD, OutputStream(None))
+        driver.ostream.mute()
+        driver.update_settings(
+            {
+                'frequencies': frequencies,
+                'damping': 0.1,
+                'conv_thresh': 1.0e-6,
+            }, {'xcfun': xcfun})
+
+        return driver.compute(molecule, basis, scf_results)
+
+    def test_nonlinear_batch_memory_holds_the_factors(self, monkeypatch):
 
         molecule, basis = self.get_water()
         scf_results = self.run_scf(molecule, basis, 'b3lyp')
@@ -340,6 +361,15 @@ class TestResponseRiBatch:
             memory = real_xc(*args, **kwargs)
             xc_memory.append(memory)
             return memory
+
+        columns = []
+        real_density = nonlinearsolver.get_ri_density_memory
+
+        def recorded_density(n_ao, n_matrices, n_factor_columns, n_sliced,
+                             xc_density_memory):
+            columns.append(n_factor_columns)
+            return real_density(n_ao, n_matrices, n_factor_columns, n_sliced,
+                                xc_density_memory)
 
         calls = []
         real = nonlinearsolver.get_ri_batch_size
@@ -356,30 +386,23 @@ class TestResponseRiBatch:
 
         monkeypatch.setattr(nonlinearsolver,
                             'get_response_fock_xc_call_memory', recorded_xc)
+        monkeypatch.setattr(nonlinearsolver, 'get_ri_density_memory',
+                            recorded_density)
         monkeypatch.setattr(nonlinearsolver, 'get_ri_batch_size', recorded)
 
         frequencies = [0.05, 0.06]
 
-        driver = ThgDriver(MPI.COMM_WORLD, OutputStream(None))
-        driver.ostream.mute()
-        driver.update_settings(
-            {
-                'frequencies': frequencies,
-                'damping': 0.1,
-                'conv_thresh': 1.0e-6,
-            }, {'xcfun': 'b3lyp'})
-        driver.compute(molecule, basis, scf_results)
+        self.run_thg(molecule, basis, scf_results, 'b3lyp', frequencies)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             n_ao = basis.get_dimensions_of_basis()
             n_orb = scf_results['C_alpha'].shape[1]
-            per_matrix = 8 * n_ao * n_orb
 
             # NOTE: the first build of a THG takes 12 second-order and 6
             # third-order densities for each frequency. Each density has a
             # right factor of the occupied half and one of the virtual half,
-            # n_ao by n_orb together, and the two sets share the left
-            # factors, n_ao by n_orb together.
+            # n_orb columns together, and the two sets share the left factors,
+            # n_ao by n_orb together.
             n_fock = 18 * len(frequencies)
 
             first = [i for i, (n_total, _) in enumerate(calls)
@@ -387,12 +410,40 @@ class TestResponseRiBatch:
             assert first
 
             for i in first:
-                assert calls[i][1] == (xc_memory[i] +
-                                       (n_fock + 1) * per_matrix)
+                assert calls[i][1] == xc_memory[i] + 8 * n_ao * n_orb
+                assert columns[i] == n_orb
 
             # NOTE: every build of the driver is handed factors.
             for i, (_, call_memory) in enumerate(calls):
                 assert call_memory > xc_memory[i]
+                assert columns[i] > 0
+
+    @pytest.mark.parametrize('xcfun', ['b3lyp', 'hf'])
+    def test_thg(self, monkeypatch, xcfun):
+
+        molecule, basis = self.get_water()
+        scf_results = self.run_scf(molecule, basis, xcfun)
+
+        frequencies = [0.05, 0.06]
+
+        whole = self.run_thg(molecule, basis, scf_results, xcfun, frequencies)
+
+        calls = self.spy(monkeypatch, nonlinearsolver, little_memory=True)
+        batches = self.count_batches(monkeypatch, nonlinearsolver)
+
+        cut = self.run_thg(molecule, basis, scf_results, xcfun, frequencies)
+
+        self.assert_cut(calls)
+
+        # NOTE: with a functional a batch is made of whole groups, one for
+        # each frequency; two frequencies can be cut into two batches.
+        assert max(batches) > 1
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert len(whole['THG']) == len(frequencies)
+            for key, value in whole['THG'].items():
+                assert abs(value - cut['THG'][key]) < 1.0e-9 * max(
+                    abs(value), 1.0)
 
     def test_four_center_builds_do_not_take_it(self, monkeypatch):
 

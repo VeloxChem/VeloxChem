@@ -168,8 +168,8 @@ def get_four_center_batch_size(input_batch_size,
         The memory a build holds once, whatever the number of its densities,
         in bytes (the exchange-correlation integration's, from
         dftutils.get_response_fock_xc_call_memory, and in the nonlinear
-        solvers the RI-JK factors of every density, which are broadcast
-        whole); read on the master rank only.
+        solvers the left RI-JK factors the densities of a batch share); read
+        on the master rank only.
 
     :return:
         The batch size, the same on every rank: the input batch size where one
@@ -231,8 +231,8 @@ def get_ri_batch_size(input_batch_size,
         The memory a build holds once, whatever the number of its densities,
         in bytes (the exchange-correlation integration's, from
         dftutils.get_response_fock_xc_call_memory, and in the nonlinear
-        solvers the RI-JK factors of every density, which are broadcast
-        whole); read on the master rank only.
+        solvers the left RI-JK factors the densities of a batch share); read
+        on the master rank only.
 
     :return:
         The batch size, the same on every rank: the input batch size where one

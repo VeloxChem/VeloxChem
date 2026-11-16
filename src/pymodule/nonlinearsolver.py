@@ -69,37 +69,47 @@ _RI_BATCH_MATRICES = 3
 _RI_BATCH_MATRICES_CUBIC_DFT = 4
 
 
-def _factor_memory(dens_factors):
+def _factor_sizes(dens_factors):
     """
-    Gets the memory of the arrays in a set of RI-JK factors, as every rank
-    holds them after they are broadcast, in bytes.
+    Gets the sizes of a set of RI-JK factors: the memory of the left factors
+    the densities share, and the columns of the right factors of one density.
 
     :param dens_factors:
-        The factors, as _comp_two_el_int takes them (a tuple, or a dictionary
-        of tuples, of arrays and lists of arrays), or None.
+        The factors, as _comp_two_el_int takes them (a tuple of left factors
+        and lists of right factors, or a dictionary of such tuples), or None.
 
     :return:
-        The memory in bytes, 0 for None.
-
-    .. note::
-        An array which appears more than once (the left factors that the two
-        sets of a dictionary share) is counted once, as the broadcast pickles
-        it once.
+        The memory of the left factors in bytes, an array which the sets of a
+        dictionary share counted once, as a broadcast pickles it once; and the
+        most columns the right factors of one density have together, each of
+        them n_ao rows. Zero and zero for None.
     """
 
+    if dens_factors is None:
+        return 0, 0
+
+    sets = (list(dens_factors.values())
+            if isinstance(dens_factors, dict) else [dens_factors])
+
     seen = set()
+    left_memory = 0
+    columns = 0
 
-    def count(item):
-        if isinstance(item, dict):
-            return sum(count(value) for value in item.values())
-        if isinstance(item, (tuple, list)):
-            return sum(count(value) for value in item)
-        if item is None or id(item) in seen:
-            return 0
-        seen.add(id(item))
-        return int(getattr(item, 'nbytes', 0))
+    for factors in sets:
+        if factors is None:
+            continue
 
-    return count(dens_factors)
+        lists = [item for item in factors if isinstance(item, list)]
+
+        for item in factors:
+            if not isinstance(item, list) and id(item) not in seen:
+                seen.add(id(item))
+                left_memory += int(item.nbytes)
+
+        for i in range(len(lists[0]) if lists else 0):
+            columns = max(columns, sum(rights[i].shape[1] for rights in lists))
+
+    return left_memory, columns
 
 
 class NonlinearSolver:
@@ -603,7 +613,7 @@ class NonlinearSolver:
         else:
             return None
 
-    def _note_ri_batch_memory(self, density_memory, ndens, factor_memory=0):
+    def _note_ri_batch_memory(self, density_memory, ndens, left_memory=0):
         """
         Records, for memory profiling, the most the solver held on the master
         rank for the densities of one batch of an RI build.
@@ -613,14 +623,14 @@ class NonlinearSolver:
             from the master rank, where nothing is recorded.
         :param ndens:
             The densities of the batch.
-        :param factor_memory:
-            The memory of the RI-JK factors of the whole build, which every
-            rank holds through it (_factor_memory).
+        :param left_memory:
+            The memory of the left RI-JK factors the densities of the batch
+            share (_factor_sizes).
         """
 
         if density_memory is not None:
             self._ri_batch_memory = max(getattr(self, '_ri_batch_memory', 0),
-                                        density_memory * ndens + factor_memory)
+                                        density_memory * ndens + left_memory)
 
     def _print_ri_memory_check(self):
         """
@@ -633,7 +643,7 @@ class NonlinearSolver:
         rijkresponse.print_memory_check(self)
 
     def _ri_density_memory(self, molecule, ao_basis, dft_dict, n_ao, mode,
-                           mode_is_cubic):
+                           mode_is_cubic, n_factor_columns=0):
         """
         Gets the memory _comp_two_el_int holds on the master rank for each
         density it builds the Fock matrix of, as get_ri_batch_size takes it.
@@ -651,6 +661,9 @@ class NonlinearSolver:
             The mode for densities in quadratic/cubic response.
         :param mode_is_cubic:
             True for a cubic mode.
+        :param n_factor_columns:
+            The columns of n_ao rows of the right RI-JK factors of one
+            density (_factor_sizes).
 
         :return:
             The memory in bytes.
@@ -679,8 +692,79 @@ class NonlinearSolver:
             molecule, ao_basis, dft_dict, self.xcfun if self._dft else None,
             self.xc_screening_threshold)
 
-        return get_ri_density_memory(n_ao, n_matrices, 0, n_sliced,
-                                     xc_density_memory)
+        return get_ri_density_memory(n_ao, n_matrices, n_factor_columns,
+                                     n_sliced, xc_density_memory)
+
+    def _slice_batch_factors(self, dens_factors, batch_ind, batch_start,
+                             batch_end, batch_size_second_order,
+                             second_order_dens):
+        """
+        Cuts the RI-JK factors of one batch from the factors of every density
+        of a build, in the shape they were given in. Called on the master
+        only.
+
+        :param dens_factors:
+            The factors of the whole set: a tuple, or for a cubic mode with a
+            functional a dictionary of the 'second' and 'third' sets.
+        :param batch_ind:
+            The index of the batch.
+        :param batch_start:
+            The first density of the batch.
+        :param batch_end:
+            The density past the last of the batch.
+        :param batch_size_second_order:
+            The second-order densities of a batch of a cubic mode with a
+            functional, or None.
+        :param second_order_dens:
+            The second-order densities, whose columns the 'second' set
+            follows.
+
+        :return:
+            The factors of the batch.
+        """
+
+        # NOTE: two shapes of factors are taken. A two-time perturbed
+        # calculation hands the factors of its densities directly, as a tuple,
+        # and so does a three-time one without a functional, which joins its
+        # two-time and three-time densities into one array cut with one stride.
+        # A three-time one with a functional hands a dictionary of two sets,
+        # because its batch holds the two-time densities followed by the
+        # three-time ones, cut from two arrays with strides of their own and
+        # carrying two different block structures between them.
+        if not isinstance(dens_factors, dict):
+            return rijkresponse.slice_factors(dens_factors, batch_start,
+                                              batch_end)
+
+        batch_factors = {
+            'third':
+                rijkresponse.slice_factors(dens_factors['third'], batch_start,
+                                           batch_end)
+        }
+
+        second = dens_factors.get('second')
+
+        if second is not None:
+            # NOTE: the two-time densities are in the batch of a three-time
+            # calculation only when there is a functional to integrate, and the
+            # stride they are cut with is formed only there. Factors for them
+            # without it is a caller which has got the two cases the wrong way
+            # round, and is said so rather than left to fail inside the
+            # arithmetic.
+            assert_msg_critical(
+                batch_size_second_order is not None,
+                f'{type(self).__name__}: factors for the two-time ' +
+                'densities were given where the batch holds none')
+
+            # NOTE: the stride of the two-time array, formed the same way the
+            # densities were cut from it.
+            first_two = batch_size_second_order * batch_ind
+            last_two = min(first_two + batch_size_second_order,
+                           second_order_dens.shape(1))
+
+            batch_factors['second'] = rijkresponse.slice_factors(
+                second, first_two, last_two)
+
+        return batch_factors
 
     def _get_dft_group_sizes(self, mode):
         """
@@ -904,6 +988,10 @@ class NonlinearSolver:
 
         density_memory = None
 
+        # NOTE: set below only for a cubic mode with a functional, whose
+        # second-order densities are cut with a stride of their own.
+        batch_size_second_order = None
+
         # NOTE: without factors from the caller, use_ri_jk below is false and
         # the build takes the four-center integrals, and
         # get_four_center_batch_size as the four-center builds of the linear
@@ -925,27 +1013,28 @@ class NonlinearSolver:
         call_memory = None
 
         # NOTE: the factors the caller hands over are those of every density
-        # of the build. They are broadcast whole to every rank below, before
-        # the first batch, and each rank holds them until the build returns,
-        # whatever the batch size, so both kinds of build take them off the
-        # room with the exchange-correlation memory. The master holds them
-        # already when the room is read, so its node is charged for one copy
-        # more than it will hold. The pickled copy the broadcast holds while
-        # it runs, before any batch is formed, is not counted.
-        factor_memory = 0
+        # of the build, held on the master. Every rank is sent the factors of
+        # one batch at a time below: the right factors of its densities, which
+        # are counted with each density, and the left factors they share,
+        # which are taken off the room with the exchange-correlation memory.
+        # The master's whole set is resident when the room is read. The
+        # pickled copy a broadcast holds while it runs is not counted.
+        left_memory = 0
+        factor_columns = 0
 
         if self.rank == mpi_master():
-            factor_memory = _factor_memory(dens_factors)
+            left_memory, factor_columns = _factor_sizes(dens_factors)
 
             call_memory = get_response_fock_xc_call_memory(
                 molecule, ao_basis, dft_dict,
                 self.xcfun if self._dft else None, False,
-                self.xc_screening_threshold) + factor_memory
+                self.xc_screening_threshold) + left_memory
 
         if ri_build:
             if self.rank == mpi_master():
                 density_memory = self._ri_density_memory(
-                    molecule, ao_basis, dft_dict, n_ao, mode, mode_is_cubic)
+                    molecule, ao_basis, dft_dict, n_ao, mode, mode_is_cubic,
+                    factor_columns)
 
             batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
                                            density_memory, self.comm,
@@ -1019,7 +1108,7 @@ class NonlinearSolver:
                 fock_densities = batch_size
             self._note_ri_batch_memory(density_memory,
                                        min(fock_densities, n_total),
-                                       factor_memory)
+                                       left_memory)
 
         # NOTE: **the factors are broadcast as the densities are.** They are built
         # on the master rank alone, and the response driver sweeps only the share
@@ -1028,8 +1117,10 @@ class NonlinearSolver:
         # `use_ri_jk` to be false and build its share of the densities the four
         # centre way instead, and the reduction below would add that four centre
         # share to the fitted shares of the other ranks. What came back would be a
-        # Fock matrix of neither method.
-        dens_factors = self.comm.bcast(dens_factors, root=mpi_master())
+        # Fock matrix of neither method. Whether there are factors is broadcast
+        # here, and the factors of each batch with its densities below.
+        factors_given = self.comm.bcast(dens_factors is not None,
+                                        root=mpi_master())
 
         # go through batches
 
@@ -1191,6 +1282,19 @@ class NonlinearSolver:
             for idx in range(num_dts3):
                 dts3[idx] = self.comm.bcast(dts3[idx], root=mpi_master())
 
+            # NOTE: the factors of this batch and not of the whole set, cut from
+            # the same columns as the densities above.
+            batch_factors = None
+
+            if factors_given:
+                if self.rank == mpi_master():
+                    batch_factors = self._slice_batch_factors(
+                        dens_factors, batch_ind, batch_start, batch_end,
+                        batch_size_second_order, second_order_dens)
+
+                batch_factors = self.comm.bcast(batch_factors,
+                                                root=mpi_master())
+
             if self._dft:
                 if mode_is_quadratic:
                     dts_for_fock = dts2
@@ -1235,19 +1339,10 @@ class NonlinearSolver:
             # NOTE: the resolution of the identity takes the whole batch at once,
             # as the shared factor is transformed once for all of it, so it
             # replaces the loop rather than sitting inside it.
-            # NOTE: two shapes of factors are taken. A two-time perturbed
-            # calculation hands the factors of its densities directly, as a
-            # tuple. A three-time one hands a dictionary of two sets, because its
-            # batch holds the two-time densities followed by the three-time ones,
-            # cut from two arrays with strides of their own and carrying two
-            # different block structures between them.
-            factors_are_split = isinstance(dens_factors, dict)
+            # NOTE: the factors are a tuple or a dictionary of two sets (see
+            # _slice_batch_factors).
+            factors_are_split = isinstance(batch_factors, dict)
 
-            # NOTE: a three-time calculation without a functional concatenates
-            # its two-time and three-time densities into one array and cuts them
-            # with one stride, so its factors are one set and not two. With a
-            # functional they are two arrays with strides of their own and the
-            # factors are the dictionary. Both are taken.
             # NOTE: the simd Coulomb only driver takes the whole batch too: every
             # density is fitted against the same integrals, and the right hand sides
             # of the fittings are gathered and reduced in one collective rather than
@@ -1255,7 +1350,7 @@ class NonlinearSolver:
             use_ri_coulomb = (self._uses_ri_coulomb() and fock_type == 'j')
 
             use_ri_jk = (self._uses_ri_jk() and fock_type != 'j' and
-                         dens_factors is not None and
+                         batch_factors is not None and
                          (mode_is_quadratic or mode_is_cubic))
 
             # NOTE: a hybrid range-separated functional has its attenuated
@@ -1273,13 +1368,9 @@ class NonlinearSolver:
                     self, dts_for_fock, self.comm)
 
             elif use_ri_jk:
-                # NOTE: the factors of this batch and not of the whole set. The
-                # densities above were cut from the same columns.
                 if not factors_are_split:
                     fock_arrays = rijkresponse.fock_matrices(
-                        self, ao_basis,
-                        rijkresponse.slice_factors(dens_factors, batch_start,
-                                                   batch_end), fock_k_factor,
+                        self, ao_basis, batch_factors, fock_k_factor,
                         erf_k_factor)
                 else:
                     # NOTE: the two groups in the order dts_for_fock puts them,
@@ -1290,36 +1381,15 @@ class NonlinearSolver:
                     # two batches laid end to end are the batch.
                     fock_arrays = []
 
-                    second = dens_factors.get('second')
+                    second = batch_factors.get('second')
 
                     if second is not None:
-                        # NOTE: the two-time densities are in the batch of a
-                        # three-time calculation only when there is a functional
-                        # to integrate, and the stride they are cut with is formed
-                        # only there. Factors for them without it is a caller
-                        # which has got the two cases the wrong way round, and is
-                        # said so rather than left to fail inside the arithmetic.
-                        assert_msg_critical(
-                            batch_size_second_order is not None,
-                            f'{type(self).__name__}: factors for the two-time ' +
-                            'densities were given where the batch holds none')
-
-                        # NOTE: the stride of the two-time array, formed the same
-                        # way the densities above were cut from it.
-                        first_two = batch_size_second_order * batch_ind
-                        last_two = min(first_two + batch_size_second_order,
-                                       second_order_dens.shape(1))
-
                         fock_arrays += rijkresponse.fock_matrices(
-                            self, ao_basis,
-                            rijkresponse.slice_factors(second, first_two,
-                                                       last_two),
-                            fock_k_factor, erf_k_factor)
+                            self, ao_basis, second, fock_k_factor,
+                            erf_k_factor)
 
                     fock_arrays += rijkresponse.fock_matrices(
-                        self, ao_basis,
-                        rijkresponse.slice_factors(dens_factors['third'],
-                                                   batch_start, batch_end),
+                        self, ao_basis, batch_factors['third'],
                         fock_k_factor, erf_k_factor)
 
             for idx in range(0 if (use_ri_jk or use_ri_coulomb) else len(dts_for_fock)):
