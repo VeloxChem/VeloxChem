@@ -12,6 +12,9 @@ from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
+from veloxchem.thgdriver import ThgDriver
+from veloxchem.nonlinearsolver import NonlinearSolver
+from veloxchem.outputstream import OutputStream
 from veloxchem import rijkresponse
 from veloxchem import rijresponse
 
@@ -276,6 +279,71 @@ class TestResponseRiMemory:
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
             key = ('qrf', 0.2, 0.2)
             assert abs(fallen[key] - plain[key]) < 1.0e-8
+
+    @staticmethod
+    def run_thg(molecule, basis, scf_results, xcfun):
+
+        drv = ThgDriver(MPI.COMM_WORLD, OutputStream(None))
+        drv.update_settings(
+            {
+                'frequencies': [0.05],
+                'damping': 0.1,
+                'conv_thresh': 1.0e-6,
+            }, {'xcfun': xcfun})
+        results = drv.compute(molecule, basis, scf_results)
+
+        return drv, results
+
+    def test_nonlinear_reserve_floor(self):
+        """A nonlinear driver keeps back from its B vectors at least the
+        smallest batch of its Fock builds: for a THG with a functional one
+        group of 12 second-order and 6 third-order densities."""
+
+        molecule, basis = self.get_water()
+        scf_results = self.run_scf(molecule, basis, 'b3lyp')
+
+        drv, _ = self.run_thg(molecule, basis, scf_results, 'b3lyp')
+
+        assert not drv._ri_jk_fallback
+        assert drv._ri_jk_reserve_floor > 0
+        assert drv._ri_memory_reserve >= drv._ri_jk_reserve_floor
+
+        n_ao = basis.get_dimensions_of_basis()
+
+        # NOTE: of each of the 18 densities, at least the master's 4 matrices
+        # of n_ao by n_ao and its share of the 6 first-order densities.
+        assert drv._ri_jk_reserve_floor >= 18 * (4 + 6 / 18) * 8 * n_ao * n_ao
+
+    def test_nonlinear_driver_falls_back_for_its_floor(self, monkeypatch):
+        """A nonlinear driver whose smallest Fock batch does not fit beside the
+        B vectors falls back to the four-center integrals before any work, and
+        equals a four-center driver on the same orbitals."""
+
+        molecule, basis = self.get_water()
+        scf_results = self.run_scf(molecule, basis, 'b3lyp')
+
+        # NOTE: a memory of each density no rank has, which sets the floor
+        # alone; the batch sizes of a four-center build do not read it.
+        monkeypatch.setattr(NonlinearSolver, '_ri_density_memory',
+                            lambda *args, **kwargs: 10**15)
+
+        fallen_drv, fallen = self.run_thg(molecule, basis, scf_results,
+                                          'b3lyp')
+
+        assert fallen_drv._ri_jk_fallback
+        assert not fallen_drv._uses_ri_jk()
+        assert fallen_drv._ri_jk_drv is None
+
+        monkeypatch.undo()
+
+        _, plain = self.run_thg(molecule, basis, self.four_center(scf_results),
+                                'b3lyp')
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert fallen['THG'].keys() == plain['THG'].keys()
+            for key, value in plain['THG'].items():
+                assert abs(fallen['THG'][key] - value) < 1.0e-8 * max(
+                    abs(value), 1.0)
 
     def test_response_memory_model(self):
         """The prediction grows with the densities of a build, and the count

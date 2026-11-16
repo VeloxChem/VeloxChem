@@ -87,7 +87,7 @@ from .errorhandler import assert_msg_critical
 from .profiler import Profiler
 
 
-def memory_budget(solver, molecule, basis):
+def memory_budget(solver, molecule, basis, reserve_floor=0):
     """
     Gets the memory the simd RI driver of a response solver may hold, per rank,
     in bytes. Every rank must call this. RI-J and RI-JK both take it.
@@ -98,6 +98,10 @@ def memory_budget(solver, molecule, basis):
         The molecule, whose open shell doubles the rank reserve.
     :param basis:
         The AO basis set.
+    :param reserve_floor:
+        The least the rank's reserve may be, in bytes: what a nonlinear
+        driver's smallest Fock batch holds (see
+        NonlinearSolver._set_ri_jk_reserve_floor), and zero for the others.
 
     :return:
         The memory budget in bytes: ri_memory_budget where the solver sets it
@@ -117,7 +121,10 @@ def memory_budget(solver, molecule, basis):
     # which the SCF and its gradient share with a fixed reserve.
     free = get_ri_free_memory(solver.comm, 0)
 
-    reserve = rank_reserve(molecule, basis, free)
+    # NOTE: the larger of the two and not their sum. The share rank_reserve
+    # keeps is for the reduced space of a solver, and a nonlinear driver's Fock
+    # build runs after its solvers have returned.
+    reserve = max(rank_reserve(molecule, basis, free), reserve_floor)
 
     solver._ri_memory_reserve = reserve
 
@@ -377,7 +384,13 @@ def initialize(solver, molecule, basis, reuse=False):
     #
     # NOTE: the budget is the smallest of the ranks', so that every rank takes
     # the same decision against the largest of their peaks.
-    budget = min(solver.comm.allgather(memory_budget(solver, molecule, basis)))
+    # NOTE: a nonlinear driver sets the floor of its rank reserve before this;
+    # the linear solvers have none.
+    reserve_floor = getattr(solver, '_ri_jk_reserve_floor', 0)
+
+    budget = min(
+        solver.comm.allgather(
+            memory_budget(solver, molecule, basis, reserve_floor)))
 
     # NOTE: the exchange work arrays are a transient on top of the B vectors and
     # the rest of the live set, so they take a fraction of the rank's share and
@@ -435,6 +448,7 @@ def initialize(solver, molecule, basis, reuse=False):
             f'{Profiler.memory_to_string(max(peaks))} of ' +
             f'{Profiler.memory_to_string(budget)} {where}, so the response ' +
             'Fock matrices are formed from the four-center integrals.')
+        _print_reserve_floor(solver, reserve_floor)
         solver.ostream.print_blank()
         solver.ostream.flush()
         return
@@ -519,8 +533,31 @@ def initialize(solver, molecule, basis, reuse=False):
         f'{Profiler.memory_to_string(max(peaks))} of ' +
         f'{Profiler.memory_to_string(budget)} {where} for a build of one ' +
         'density; larger batches are cut to fit.')
+    _print_reserve_floor(solver, reserve_floor)
     solver.ostream.print_blank()
     solver.ostream.flush()
+
+
+def _print_reserve_floor(solver, reserve_floor):
+    """
+    Prints the memory each rank keeps for the smallest batch of a nonlinear
+    driver's Fock builds, where that and not the share of rank_reserve set the
+    reserve.
+
+    :param solver:
+        The solver.
+    :param reserve_floor:
+        The floor of the rank reserve, in bytes.
+    """
+
+    # NOTE: a budget the solver sets (ri_memory_budget) is taken as it is,
+    # with no reserve.
+    if (reserve_floor > 0 and
+            getattr(solver, 'ri_memory_budget', None) is None and
+            reserve_floor >= getattr(solver, '_ri_memory_reserve', 0)):
+        solver.ostream.print_info(
+            f'{Profiler.memory_to_string(reserve_floor)} of each rank is ' +
+            'kept for the smallest batch of the nonlinear Fock build.')
 
 
 def _worst_shapes(molecule, basis):

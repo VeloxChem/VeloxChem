@@ -91,6 +91,16 @@ class TpaReducedDriver(TpaDriverBase):
 
         super().update_settings(rsp_dict, method_dict)
 
+    def _get_nonlinear_fock_modes(self):
+        """
+        Gets the modes of the nonlinear Fock builds this driver makes.
+
+        :return:
+            A tuple of modes.
+        """
+
+        return ('redtpa_i', 'redtpa_ii')
+
     def _get_tpa_type(self):
         """
         Gets the type of TPA calculation.

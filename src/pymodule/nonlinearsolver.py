@@ -68,6 +68,10 @@ from .batchsize import get_number_of_batches
 _RI_BATCH_MATRICES = 3
 _RI_BATCH_MATRICES_CUBIC_DFT = 4
 
+# NOTE: the modes of _comp_two_el_int whose Fock matrices are three-time
+# transformed; the other modes are two-time transformed.
+_CUBIC_MODES = ('crf', 'tpa', '3pa', 'thg', 'thgred')
+
 
 def _factor_sizes(dens_factors):
     """
@@ -188,6 +192,12 @@ class NonlinearSolver:
         # an input keyword, as for the gradient's budget. The SCF's
         # ri_memory_budget is not handed on to response.
         self.ri_memory_budget = None
+
+        # NOTE: the memory each rank keeps back from the RI-JK B vectors for the
+        # smallest batch of this driver's nonlinear Fock builds, in bytes, set
+        # by _set_ri_jk_reserve_floor before the B vectors are formed and read
+        # by rijkresponse.memory_budget.
+        self._ri_jk_reserve_floor = 0
 
         # NOTE: whether this response fell back from RI to the four-center
         # integrals for want of memory of its own, and what the build was
@@ -766,6 +776,91 @@ class NonlinearSolver:
 
         return batch_factors
 
+    def _get_nonlinear_fock_modes(self):
+        """
+        Gets the modes of the nonlinear Fock builds (_comp_nlr_fock) this
+        driver makes. A driver which forms RI-JK B vectors returns its own.
+
+        :return:
+            A tuple of modes, empty here.
+        """
+
+        return ()
+
+    def _set_ri_jk_reserve_floor(self, molecule, basis, scf_results):
+        """
+        Sets the memory each rank keeps back from the RI-JK B vectors for the
+        smallest batch of this driver's nonlinear Fock builds, in bytes
+        (_ri_jk_reserve_floor). Every rank must call this, before the B vectors
+        are formed.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary of results from the converged SCF.
+
+        .. note::
+            With a functional a batch is one group of densities at least
+            (_get_dft_group_sizes), whatever the memory, as the
+            exchange-correlation integration takes a group at once; without
+            one it is one density. The memory is what _comp_two_el_int is
+            charged for those densities: the master's matrices of each
+            density (_ri_density_memory) with the right factors of the
+            general shape, max(norb, 2 nocc) columns, and the
+            exchange-correlation and left-factor memory of a call (n_ao by
+            norb). The largest over the driver's modes is kept.
+        """
+
+        self._ri_jk_reserve_floor = 0
+
+        modes = self._get_nonlinear_fock_modes()
+
+        # NOTE: the B vectors are formed under the same condition (see
+        # _init_eri).
+        if not (self.ri_jk and not self._ri_fallback and modes):
+            return
+
+        # NOTE: a grid made for this and let go; the one the builds integrate
+        # on is made later by the driver. The largest boxes of the grid set
+        # the exchange-correlation memory.
+        dft_dict = self._init_dft(molecule, scf_results)
+
+        floor = None
+
+        if self.rank == mpi_master():
+            n_ao, n_orb = scf_results['C_alpha'].shape
+            nocc = molecule.number_of_alpha_electrons()
+
+            columns = max(n_orb, 2 * nocc)
+            left_memory = 8 * n_ao * n_orb
+
+            call_memory = get_response_fock_xc_call_memory(
+                molecule, basis, dft_dict, self.xcfun if self._dft else None,
+                False, self.xc_screening_threshold)
+
+            floor = 0
+
+            for mode in modes:
+                mode_is_cubic = mode in _CUBIC_MODES
+
+                if self._dft:
+                    _, size_2, size_3 = self._get_dft_group_sizes(mode)
+                    n_fock = size_2 + (size_3 if mode_is_cubic else 0)
+                else:
+                    n_fock = 1
+
+                density_memory = self._ri_density_memory(
+                    molecule, basis, dft_dict, n_ao, mode, mode_is_cubic,
+                    columns)
+
+                floor = max(
+                    floor,
+                    int(n_fock * density_memory) + call_memory + left_memory)
+
+        self._ri_jk_reserve_floor = self.comm.bcast(floor, root=mpi_master())
+
     def _get_dft_group_sizes(self, mode):
         """
         Gets the sizes of a group of densities a nonlinear Fock build with a
@@ -964,7 +1059,7 @@ class NonlinearSolver:
         assert_msg_critical(mode_is_valid,
                             'NonlinearSolver: Invalid mode ' + mode.lower())
 
-        mode_is_cubic = mode.lower() in ['crf', 'tpa', '3pa', 'thg', 'thgred']
+        mode_is_cubic = mode.lower() in _CUBIC_MODES
         mode_is_quadratic = mode.lower() in [
             'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf', 'shg',
             'shg_red', 'tpa_quad', '3pa_ii', 'thg_ii', 'thgred_ii'

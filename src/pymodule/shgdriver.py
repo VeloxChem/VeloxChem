@@ -134,6 +134,17 @@ class ShgDriver(NonlinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
+    def _get_nonlinear_fock_modes(self):
+        """
+        Gets the modes of the nonlinear Fock builds this driver makes, which
+        shg_type chooses.
+
+        :return:
+            A tuple of modes.
+        """
+
+        return ('shg_red',) if self.shg_type == 'reduced' else ('shg',)
+
     def compute(self, molecule, ao_basis, scf_results):
         """
         Computes the isotropic quadratic response function for second-harmonic
@@ -272,6 +283,10 @@ class ShgDriver(NonlinearSolver):
         # formed by each. The integral setup in compute_quad_components
         # uses them again. Not gated on _uses_ri_jk(), for the reason given
         # in _init_eri.
+        # NOTE: before the B vectors are formed, which keep back from what
+        # they may hold the smallest batch of the nonlinear Fock builds.
+        self._set_ri_jk_reserve_floor(molecule, ao_basis, scf_results)
+
         if self.ri_jk and not self._ri_fallback:
             rijkresponse.initialize(self, molecule, ao_basis)
 

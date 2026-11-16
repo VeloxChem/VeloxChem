@@ -109,6 +109,16 @@ class ThgDriver(NonlinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
+    def _get_nonlinear_fock_modes(self):
+        """
+        Gets the modes of the nonlinear Fock builds this driver makes.
+
+        :return:
+            A tuple of modes.
+        """
+
+        return ('thg', 'thg_ii')
+
     def compute(self, molecule, ao_basis, scf_tensors):
         """
         Computes the isotropic cubic response function for third-harmonic
@@ -159,6 +169,10 @@ class ThgDriver(NonlinearSolver):
             self._print_header('Third-Harmonic Generation Driver Setup')
 
         start_time = time.time()
+
+        # NOTE: before the B vectors are formed, which keep back from what
+        # they may hold the smallest batch of the nonlinear Fock builds.
+        self._set_ri_jk_reserve_floor(molecule, ao_basis, scf_tensors)
 
         eri_dict = self._init_eri(molecule, ao_basis)
 
