@@ -69,6 +69,39 @@ _RI_BATCH_MATRICES = 3
 _RI_BATCH_MATRICES_CUBIC_DFT = 4
 
 
+def _factor_memory(dens_factors):
+    """
+    Gets the memory of the arrays in a set of RI-JK factors, as every rank
+    holds them after they are broadcast, in bytes.
+
+    :param dens_factors:
+        The factors, as _comp_two_el_int takes them (a tuple, or a dictionary
+        of tuples, of arrays and lists of arrays), or None.
+
+    :return:
+        The memory in bytes, 0 for None.
+
+    .. note::
+        An array which appears more than once (the left factors that the two
+        sets of a dictionary share) is counted once, as the broadcast pickles
+        it once.
+    """
+
+    seen = set()
+
+    def count(item):
+        if isinstance(item, dict):
+            return sum(count(value) for value in item.values())
+        if isinstance(item, (tuple, list)):
+            return sum(count(value) for value in item)
+        if item is None or id(item) in seen:
+            return 0
+        seen.add(id(item))
+        return int(getattr(item, 'nbytes', 0))
+
+    return count(dens_factors)
+
+
 class NonlinearSolver:
     """
     Implements nonlinear solver.
@@ -570,7 +603,7 @@ class NonlinearSolver:
         else:
             return None
 
-    def _note_ri_batch_memory(self, density_memory, ndens):
+    def _note_ri_batch_memory(self, density_memory, ndens, factor_memory=0):
         """
         Records, for memory profiling, the most the solver held on the master
         rank for the densities of one batch of an RI build.
@@ -580,11 +613,14 @@ class NonlinearSolver:
             from the master rank, where nothing is recorded.
         :param ndens:
             The densities of the batch.
+        :param factor_memory:
+            The memory of the RI-JK factors of the whole build, which every
+            rank holds through it (_factor_memory).
         """
 
         if density_memory is not None:
             self._ri_batch_memory = max(getattr(self, '_ri_batch_memory', 0),
-                                        density_memory * ndens)
+                                        density_memory * ndens + factor_memory)
 
     def _print_ri_memory_check(self):
         """
@@ -888,11 +924,23 @@ class NonlinearSolver:
         # XCIntegrator.integrateKxcFock).
         call_memory = None
 
+        # NOTE: the factors the caller hands over are those of every density
+        # of the build. They are broadcast whole to every rank below, before
+        # the first batch, and each rank holds them until the build returns,
+        # whatever the batch size, so both kinds of build take them off the
+        # room with the exchange-correlation memory. The master holds them
+        # already when the room is read, so its node is charged for one copy
+        # more than it will hold. The pickled copy the broadcast holds while
+        # it runs, before any batch is formed, is not counted.
+        factor_memory = 0
+
         if self.rank == mpi_master():
+            factor_memory = _factor_memory(dens_factors)
+
             call_memory = get_response_fock_xc_call_memory(
                 molecule, ao_basis, dft_dict,
                 self.xcfun if self._dft else None, False,
-                self.xc_screening_threshold)
+                self.xc_screening_threshold) + factor_memory
 
         if ri_build:
             if self.rank == mpi_master():
@@ -970,7 +1018,8 @@ class NonlinearSolver:
             else:
                 fock_densities = batch_size
             self._note_ri_batch_memory(density_memory,
-                                       min(fock_densities, n_total))
+                                       min(fock_densities, n_total),
+                                       factor_memory)
 
         # NOTE: **the factors are broadcast as the densities are.** They are built
         # on the master rank alone, and the response driver sweeps only the share
