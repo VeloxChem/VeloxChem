@@ -327,12 +327,22 @@ class TestResponseRiMemory:
         monkeypatch.setattr(NonlinearSolver, '_ri_density_memory',
                             lambda *args, **kwargs: 10**15)
 
+        warnings = []
+        monkeypatch.setattr(OutputStream, 'print_warning',
+                            lambda ostream, line: warnings.append(line))
+
         fallen_drv, fallen = self.run_thg(molecule, basis, scf_results,
                                           'b3lyp')
 
         assert fallen_drv._ri_jk_fallback
         assert not fallen_drv._uses_ri_jk()
         assert fallen_drv._ri_jk_drv is None
+
+        # NOTE: the floor is the reserve here, and the warning gives the free
+        # memory and the floor.
+        assert fallen_drv._ri_memory_reserve == fallen_drv._ri_jk_reserve_floor
+        assert any('for the smallest batch of the nonlinear Fock build' in line
+                   and 'four-center integrals' in line for line in warnings)
 
         monkeypatch.undo()
 

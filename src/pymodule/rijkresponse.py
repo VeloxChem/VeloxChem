@@ -106,14 +106,16 @@ def memory_budget(solver, molecule, basis, reserve_floor=0):
     :return:
         The memory budget in bytes: ri_memory_budget where the solver sets it
         (in GB, taken as it is), and otherwise the memory free to this rank less
-        the reserves of the node and of the rank. The rank's reserve is kept on
-        the solver, for memory profiling to report.
+        the reserves of the node and of the rank. The rank's reserve and the
+        memory free to it are kept on the solver, for memory profiling and the
+        fallback warning to report.
     """
 
     ri_memory_budget = getattr(solver, 'ri_memory_budget', None)
 
     if ri_memory_budget is not None:
         solver._ri_memory_reserve = 0
+        solver._ri_memory_free = None
         return int(ri_memory_budget * 1.0e9)
 
     # NOTE: the rank's reserve is taken from what is free to the rank after the
@@ -127,6 +129,7 @@ def memory_budget(solver, molecule, basis, reserve_floor=0):
     reserve = max(rank_reserve(molecule, basis, free), reserve_floor)
 
     solver._ri_memory_reserve = reserve
+    solver._ri_memory_free = free
 
     return max(free - reserve, 0)
 
@@ -388,9 +391,13 @@ def initialize(solver, molecule, basis, reuse=False):
     # the linear solvers have none.
     reserve_floor = getattr(solver, '_ri_jk_reserve_floor', 0)
 
-    budget = min(
+    # NOTE: the free memory and the reserve of the rank whose budget is the
+    # smallest go with it into the fallback warning.
+    budget = memory_budget(solver, molecule, basis, reserve_floor)
+    budget, budget_free, budget_reserve = min(
         solver.comm.allgather(
-            memory_budget(solver, molecule, basis, reserve_floor)))
+            (budget, solver._ri_memory_free, solver._ri_memory_reserve)),
+        key=lambda entry: entry[0])
 
     # NOTE: the exchange work arrays are a transient on top of the B vectors and
     # the rest of the live set, so they take a fraction of the rank's share and
@@ -443,12 +450,24 @@ def initialize(solver, molecule, basis, reuse=False):
         solver._ri_jk_aux_basis = None
         solver._ri_jk_memory = None
 
+        # NOTE: where the floor of a nonlinear driver set the reserve of the
+        # rank with the smallest budget, the warning gives that rank's free
+        # memory and the floor. The budget is their difference, or zero where
+        # the floor exceeds the free memory.
+        floor_text = ''
+        if (reserve_floor > 0 and budget_free is not None and
+                budget_reserve == reserve_floor):
+            floor_text = (
+                f' ({Profiler.memory_to_string(budget_free)} free less ' +
+                f'{Profiler.memory_to_string(reserve_floor)} for the ' +
+                'smallest batch of the nonlinear Fock build)')
+
         solver.ostream.print_warning(
             'RI-JK would need roughly ' +
             f'{Profiler.memory_to_string(max(peaks))} of ' +
-            f'{Profiler.memory_to_string(budget)} {where}, so the response ' +
-            'Fock matrices are formed from the four-center integrals.')
-        _print_reserve_floor(solver, reserve_floor)
+            f'{Profiler.memory_to_string(budget)} {where}{floor_text}, so ' +
+            'the response Fock matrices are formed from the four-center ' +
+            'integrals.')
         solver.ostream.print_blank()
         solver.ostream.flush()
         return
