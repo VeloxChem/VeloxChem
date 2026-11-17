@@ -663,6 +663,7 @@ class EvbFepDriver:
         # resulting positions / velocities seed the first forward sweep.
         if not self.skip_initial_equil and 0 in self.Lambda:
             system = self.systems[0]
+            n_constraints = system.getNumConstraints()
             if self.constrain_H:
                 self.ostream.print_info(
                     "Constraining all bonds involving H atoms")
@@ -673,8 +674,7 @@ class EvbFepDriver:
             if self.constrain_H:
                 self.ostream.print_info(
                     "Removing constraints involving H atoms")
-                for _ in range(system.getNumConstraints()):
-                    system.removeConstraint(0)
+                self._remove_added_constraints(system, n_constraints)
         elif self.skip_initial_equil:
             self.ostream.print_info(
                 "Skipping initial equilibration because skip_initial_equil is set to True."
@@ -860,6 +860,7 @@ class EvbFepDriver:
         for l in lambda_order:
             system = self.systems[l]
 
+            n_constraints = system.getNumConstraints()
             if self.constrain_H:
                 self.ostream.print_info(
                     "Constraining all bonds involving H atoms")
@@ -872,8 +873,7 @@ class EvbFepDriver:
             if self.constrain_H:
                 self.ostream.print_info(
                     "Removing constraints involving H atoms")
-                for _ in range(system.getNumConstraints()):
-                    system.removeConstraint(0)
+                self._remove_added_constraints(system, n_constraints)
 
             state = self._sample(system, l, equil_state, replica, direction)
             positions = state.getPositions()
@@ -2037,12 +2037,24 @@ class EvbFepDriver:
         )
         return evb_reporter
 
+    @staticmethod
+    def _remove_added_constraints(system, n_keep):
+        """Removes the constraints after the first n_keep: those that
+        _constrain_H_bonds appended for an equilibration. The system's own
+        constraints (rigid water) stay."""
+        while system.getNumConstraints() > n_keep:
+            system.removeConstraint(system.getNumConstraints() - 1)
+
     def _constrain_H_bonds(self, system):
         harm_bond_forces = [
             force for force in system.getForces()
             if isinstance(force, mm.HarmonicBondForce)
         ]
-        constrained_H_bonds = []
+        # Pairs constrained already (rigid water) are not constrained twice.
+        constrained_H_bonds = {
+            tuple(sorted(system.getConstraintParameters(i)[:2]))
+            for i in range(system.getNumConstraints())
+        }
         count = 0
         for harmbond in harm_bond_forces:
             for i in range(harmbond.getNumBonds()):
@@ -2051,9 +2063,9 @@ class EvbFepDriver:
                         mmunit.dalton) - 1.007947 < 0.01
                         or system.getParticleMass(particle2).value_in_unit(
                             mmunit.dalton) - 1.007947 < 0.01):
-                    H_bond = sorted((particle1, particle2))
+                    H_bond = tuple(sorted((particle1, particle2)))
                     if H_bond not in constrained_H_bonds:
-                        constrained_H_bonds.append(H_bond)
+                        constrained_H_bonds.add(H_bond)
                         system.addConstraint(particle1, particle2, length)
                         count += 1
         self.ostream.print_info(f"Constrained {count} bonds involving H atoms")

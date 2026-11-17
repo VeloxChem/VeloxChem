@@ -48,6 +48,7 @@ from .evbfepdriver import EvbFepDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
 from .solvationbuilder import SolvationBuilder
+from .waterparameters import get_water_parameters
 from .errorhandler import assert_msg_critical
 
 try:
@@ -79,7 +80,9 @@ class EvbDriver:
         - results: The computed EVB results dictionary.
         - system_confs: The list of system configurations to run FEP on.
         - mute_scf: The flag for muting SCF output during force field building.
-        - water_model: The water model used for solvated configurations.
+        - water_model: The water model used for solvated configurations. None
+          (default) uses TIP3P for protein (pdb) configurations and the
+          configuration's water solvent (cSPC/E in the presets) otherwise.
         - ffbuilder: The reaction force field builder.
         - comm: The MPI communicator.
         - rank: The rank of MPI process.
@@ -129,7 +132,11 @@ class EvbDriver:
         self.mute_scf = True
 
         self.t_label = int(time.time())
-        self.water_model = 'cspce'
+        # None chooses per configuration: 'tip3p' for a protein (pdb)
+        # configuration, the configuration's own water solvent otherwise (the
+        # presets use 'cspce'). A configuration's 'water_model' key overrides
+        # it. See _configuration_water_model.
+        self.water_model = None
         self.data_folder_override = None
 
         self.ffbuilder = ReactionForceFieldBuilder(ostream=self.ostream)
@@ -306,7 +313,7 @@ class EvbDriver:
                 step's state to the next to skip reaction matching.
         """
 
-        self.ffbuilder.water_model = self.water_model
+        self.ffbuilder.water_model = self._preset_water_model()
 
         results = self.ffbuilder.build_many_force_fields(states=states,
                                                          **kwargs)
@@ -393,6 +400,8 @@ class EvbDriver:
 
         # Per configuration
         for conf in self.configurations:
+            # Before the folder name: a preset name carries the water model.
+            water_model = self._configuration_water_model(conf)
             # create folders,
             if self.data_folder_override is not None:
                 data_folder = self.data_folder_override
@@ -443,7 +452,7 @@ class EvbDriver:
                 conf.pop("pressure")
             # build the system
             system_builder = ReactionSystemBuilder(ostream=self.ostream)
-            system_builder.water_model = self.water_model
+            system_builder.water_model = water_model
             self.ostream.print_blank()
             self.ostream.print_header(f"Building systems for {conf['name']}")
             self.ostream.flush()
@@ -1608,6 +1617,68 @@ class EvbDriver:
             self.ostream.print_info(f"Saving results to {file_path}")
             save_group(data, file)
 
+    def _preset_water_model(self):
+        """The water model the presets name: the driver's, else 'cspce'.
+
+        A protein configuration built from a water preset is switched to TIP3P
+        by _configuration_water_model when no water model was chosen.
+        """
+        return self.water_model if self.water_model is not None else 'cspce'
+
+    def _configuration_water_model(self, conf):
+        """Chooses the water model of one configuration and records it.
+
+        The model is, in order: the configuration's 'water_model' key, the
+        driver's water_model, 'tip3p' for a protein (pdb) configuration, and
+        the configuration's water solvent. The amber14 protein force field is
+        parameterized with TIP3P; ReactionSystemBuilder warns when a protein
+        is solvated in another water model.
+
+        A configuration whose solvent is water gets 'solvent' and
+        'water_model' set to the chosen model (so options.json records it),
+        and a preset name ("water_cspce_NVT") is renamed to match. Any other
+        configuration is left unchanged.
+
+        :param conf:
+            The configuration dictionary; changed in place.
+
+        :return:
+            The water model for ReactionSystemBuilder.
+        """
+        water_models = get_water_parameters()
+        chosen = conf.get('water_model', self.water_model)
+        assert_msg_critical(
+            chosen is None or chosen in water_models,
+            f"EvbDriver: unknown water model '{chosen}'. Known models: "
+            f"{', '.join(water_models)}.")
+
+        solvent = conf.get('solvent', None)
+        if solvent is None or solvent.lower() not in water_models:
+            return chosen if chosen is not None else 'cspce'
+
+        solvent = solvent.lower()
+        if chosen is not None:
+            model = chosen
+        elif conf.get('pdb', None) is not None:
+            model = 'tip3p'
+        else:
+            model = solvent
+
+        if model != solvent:
+            preset_names = {
+                f"water_{solvent}_NVT": f"water_{model}_NVT",
+                f"water_{solvent}_NPT": f"water_{model}_NPT",
+                f"water_E_field_{solvent}": f"water_E_field_{model}",
+            }
+            if conf.get('name') in preset_names:
+                conf['name'] = preset_names[conf['name']]
+            self.ostream.print_info(
+                f"Configuration {conf.get('name')}: solvent {model} "
+                f"(was {solvent}).")
+        conf['solvent'] = model
+        conf['water_model'] = model
+        return model
+
     def default_system_configurations(self, name: str) -> dict:
         """
         Returns a dictionary with a default configuration. Options not given in
@@ -1628,6 +1699,7 @@ class EvbDriver:
         :raises ValueError:
             If name is not a known configuration or solvent.
         """
+        wm = self._preset_water_model()
         if name == "vacuum" or name == "vacuum_NVT":
             conf = {
                 "name": name,
@@ -1652,8 +1724,8 @@ class EvbDriver:
             }
         elif name == "water" or name == "water_NVT":
             conf = {
-                "name": f"water_{self.water_model}_NVT",
-                "solvent": self.water_model,
+                "name": f"water_{wm}_NVT",
+                "solvent": wm,
                 "temperature": self.temperature,
                 "pressure": 1,
                 "isothermal": True,
@@ -1663,8 +1735,8 @@ class EvbDriver:
             }
         elif name == "water_NVE":
             conf = {
-                "name": f"water_{self.water_model}_NVT",
-                "solvent": self.water_model,
+                "name": f"water_{wm}_NVT",
+                "solvent": wm,
                 "temperature": self.temperature,
                 "pressure": 1,
                 "isothermal": False,
@@ -1674,8 +1746,8 @@ class EvbDriver:
             }
         elif name == "water_NPT":
             conf = {
-                "name": f"water_{self.water_model}_NPT",
-                "solvent": self.water_model,
+                "name": f"water_{wm}_NPT",
+                "solvent": wm,
                 "temperature": self.temperature,
                 "pressure": 1,
                 "isobaric": True,
@@ -1685,8 +1757,8 @@ class EvbDriver:
             }
         elif name == "E_field":
             conf = {
-                "name": f"water_E_field_{self.water_model}",
-                "solvent": self.water_model,
+                "name": f"water_E_field_{wm}",
+                "solvent": wm,
                 "temperature": self.temperature,
                 "pressure": 1,
                 "padding": 1.5,
@@ -1696,7 +1768,7 @@ class EvbDriver:
         elif name == "no_reactant":
             conf = {
                 "name": "no_reactant",
-                "solvent": self.water_model,
+                "solvent": wm,
                 "temperature": self.temperature,
                 "pressure": 1,
                 "padding": 1.5,

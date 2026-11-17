@@ -258,7 +258,12 @@ class ReactionSystemBuilder():
         self.CNT_radius_nm = 0.5
 
         self.begin_index = 0
-        self.water_model: str
+        # Parameters of water solvent molecules (waterparameters.py). None
+        # takes the water solvent's own name. TIP3P ('tip3p', 'ctip3p') is
+        # rigid (constrained O-H and H-H), as the force fields that use it
+        # intend; with 'tip3p' the counter-ions take amber14's TIP3P ion
+        # parameters. EvbDriver chooses 'tip3p' for protein configurations.
+        self.water_model: str | None = None
 
         # Multi-step bookkeeping. reactive_bonds is the union, over every step
         # of the reaction path, of the bonds that form or break anywhere along
@@ -308,6 +313,7 @@ class ReactionSystemBuilder():
             "dynamic_bond_fc_factor": float,
             "pressure": float,
             "solvent": str,
+            "water_model": str,
             "padding": float,
             "no_reactant": bool,
             "E_field": list,
@@ -2721,6 +2727,71 @@ class ReactionSystemBuilder():
 
         return box
 
+    # Water models whose force fields use rigid water molecules.
+    _rigid_water_models = ('tip3p', 'ctip3p')
+
+    # amber14/tip3p.xml residue names of the counter-ions SolvationBuilder adds.
+    _amber14_ion_residues = {'Na': 'NA', 'K': 'K', 'Li': 'LI', 'Cl': 'CL'}
+
+    def _solvent_water_model(self, solvent):
+        """The water model for the water molecules of a solvent.
+
+        It is self.water_model, or the solvent's own name when that is a water
+        model and no water model was set. A protein (pdb) solvated in water
+        other than TIP3P gets a warning: the amber14 protein force field is
+        parameterized with TIP3P.
+        """
+
+        water_models = get_water_parameters()
+        is_water = solvent.lower() in water_models
+        model = self.water_model
+        if model is None:
+            model = solvent.lower() if is_water else 'cspce'
+        assert_msg_critical(
+            model in water_models,
+            f"EvbSystemBuilder: unknown water model '{model}'. Known models: "
+            f"{', '.join(water_models)}.")
+        if self.pdb is not None and is_water and model != 'tip3p':
+            self.ostream.print_warning(
+                f"The protein is solvated in {model} water. The amber14 "
+                "protein force field is parameterized with TIP3P; set "
+                "water_model to 'tip3p' unless another model is intended.")
+            self.ostream.flush()
+        return model
+
+    @staticmethod
+    def _rigid_water_distances(water_params):
+        """Constrained (O-H, H-H) distances in nm of a rigid water model, from
+        its O-H bond length and H-O-H angle."""
+
+        r_oh = water_params['bonds']['equilibrium']
+        theta = math.radians(water_params['angles']['equilibrium'])
+        return r_oh, 2.0 * r_oh * math.sin(0.5 * theta)
+
+    def _amber14_tip3p_ion(self, element):
+        """(charge, sigma in nm, epsilon in kJ/mol) of a counter-ion from
+        OpenMM's amber14/tip3p.xml, the ion set amber14 uses with TIP3P."""
+
+        import xml.etree.ElementTree as ET
+
+        residue = self._amber14_ion_residues.get(element)
+        assert_msg_critical(
+            residue is not None,
+            f"EvbSystemBuilder: no amber14/tip3p.xml parameters for the "
+            f"counter-ion {element}.")
+        path = Path(mmapp.__file__).parent / 'data' / 'amber14' / 'tip3p.xml'
+        root = ET.parse(path).getroot()
+        atom = root.find(f"./Residues/Residue[@name='{residue}']/Atom")
+        params = None
+        if atom is not None:
+            params = root.find(
+                f"./NonbondedForce/Atom[@type='{atom.get('type')}']")
+        assert_msg_critical(
+            params is not None,
+            f"EvbSystemBuilder: counter-ion {element} not found in {path}.")
+        return (float(atom.get('charge')), float(params.get('sigma')),
+                float(params.get('epsilon')))
+
     def _add_solvent(self, system, system_mol, solvent, topology, nb_force,
                      neutralize, padding, box):
 
@@ -2728,6 +2799,7 @@ class ReactionSystemBuilder():
                             'openmm is required for EvbSystemBuilder.')
 
         solv_builder = SolvationBuilder(ostream=self.ostream)
+        water_model = self._solvent_water_model(solvent)
 
         mols_per_nm3, density, smiles_code = solv_builder._solvent_properties(
             solvent)
@@ -2780,21 +2852,40 @@ class ReactionSystemBuilder():
             solvent_ff = MMForceFieldGenerator(ostream=self.ostream)
 
             solvent_ff.create_topology(vlx_solvent_molecule,
-                                       water_model=self.water_model)
+                                       water_model=water_model)
 
+            # Rigid water: the O-H and H-H distances are constrained and the
+            # harmonic bond and angle terms are left out.
+            rigid_water = None
             atom_types = [atom['type'] for atom in solvent_ff.atoms.values()]
             if 'ow' in atom_types and 'hw' in atom_types and len(
                     atom_types) == 3:
-                water_model = get_water_parameters()[self.water_model]
+                water_params = get_water_parameters()[water_model]
                 for atom_id, atom in solvent_ff.atoms.items():
                     solvent_ff.atoms[atom_id] = copy.copy(
-                        water_model[atom['type']])
+                        water_params[atom['type']])
                     solvent_ff.atoms[atom_id]['name'] = solvent_ff.atoms[
                         atom_id]['name'][0] + str(atom_id)
                 for bond_id in solvent_ff.bonds.keys():
-                    solvent_ff.bonds[bond_id] = water_model['bonds']
+                    solvent_ff.bonds[bond_id] = water_params['bonds']
                 for ang_id in solvent_ff.angles.keys():
-                    solvent_ff.angles[ang_id] = water_model['angles']
+                    solvent_ff.angles[ang_id] = water_params['angles']
+                if water_model in self._rigid_water_models:
+                    rigid_water = self._rigid_water_distances(water_params)
+                    self.ostream.print_info(
+                        f"Rigid {water_model} water: O-H "
+                        f"{rigid_water[0]:.5f} nm, H-H "
+                        f"{rigid_water[1]:.5f} nm constrained")
+            elif resname == "ION" and water_model == 'tip3p':
+                charge, sigma, epsilon = self._amber14_tip3p_ion(elements[0])
+                for atom in solvent_ff.atoms.values():
+                    atom['charge'] = charge
+                    atom['sigma'] = sigma
+                    atom['epsilon'] = epsilon
+                self.ostream.print_info(
+                    f"Counter-ion {elements[0]}: amber14/tip3p.xml parameters "
+                    f"(charge {charge:+.1f}, sigma {sigma:.6f} nm, "
+                    f"epsilon {epsilon:.6f} kJ/mol)")
 
             self.solvent_atom_ids = []
             for i in range(solvent_count):
@@ -2818,23 +2909,32 @@ class ReactionSystemBuilder():
                     # Add this atom to the nonbonded force
 
                 # add all bonded interactions in this molecule
-                for key, bond in solvent_ff.bonds.items():
-                    atom_ids = self._key_to_id(key, local_solvent_atoms)
-                    self._add_bond(
-                        harmonic_bond_force,
-                        atom_ids,
-                        bond['equilibrium'],
-                        bond['force_constant'],
-                    )
+                if rigid_water is not None:
+                    r_oh, r_hh = rigid_water
+                    for key in solvent_ff.bonds.keys():
+                        p1, p2 = self._key_to_id(key, local_solvent_atoms)
+                        system.addConstraint(p1, p2, r_oh)
+                    for key in solvent_ff.angles.keys():
+                        p1, _, p3 = self._key_to_id(key, local_solvent_atoms)
+                        system.addConstraint(p1, p3, r_hh)
+                else:
+                    for key, bond in solvent_ff.bonds.items():
+                        atom_ids = self._key_to_id(key, local_solvent_atoms)
+                        self._add_bond(
+                            harmonic_bond_force,
+                            atom_ids,
+                            bond['equilibrium'],
+                            bond['force_constant'],
+                        )
 
-                for key, angle in solvent_ff.angles.items():
-                    atom_ids = self._key_to_id(key, local_solvent_atoms)
-                    self._add_angle(
-                        harmonic_angle_force,
-                        atom_ids,
-                        angle['equilibrium'],
-                        angle['force_constant'],
-                    )
+                    for key, angle in solvent_ff.angles.items():
+                        atom_ids = self._key_to_id(key, local_solvent_atoms)
+                        self._add_angle(
+                            harmonic_angle_force,
+                            atom_ids,
+                            angle['equilibrium'],
+                            angle['force_constant'],
+                        )
 
                 for key, dihedral in solvent_ff.dihedrals.items():
                     atom_ids = self._key_to_id(key, local_solvent_atoms)
