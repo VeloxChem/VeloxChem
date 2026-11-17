@@ -852,6 +852,9 @@ class UnrestrictedHessianOrbitalResponse(CphfSolver):
         screener_atom = T4CScreener()
         screener_atom.partition_atom(basis, molecule, 'eri', i)
 
+        # NOTE: four-center also where the orbital response uses the
+        # resolution of the identity, as the derivative integrals of
+        # ScfHessianDriver are.
         # Fock gradient
         fock_grad_drv = FockGeom1000Driver()
 

@@ -237,6 +237,13 @@ class PolarizabilityGradient:
             # sanity check input frequencies
             polgrad_sanity_check_1(self)
 
+            if (self._scf_drv._uses_ri_jk() or
+                    self._scf_drv._uses_ri_coulomb()):
+                self.ostream.print_info(
+                    'The derivative integrals are computed without the '
+                    'resolution of the identity.')
+                self.ostream.print_blank()
+
             # compute
             self.polgradient = self.compute_analytical(molecule, basis,
                                                        scf_tensors, lr_results)
@@ -693,6 +700,9 @@ class PolarizabilityGradient:
         # ERI threshold
         thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
 
+        # NOTE: four-center also where the SCF and the orbital response use
+        # the resolution of the identity: the polarizability gradient is not
+        # the derivative of an RI polarizability.
         # Fock gradient driver
         fock_grad_drv = FockGeom1000Driver()
 
@@ -886,6 +896,9 @@ class PolarizabilityGradient:
         # ERI threshold
         thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
 
+        # NOTE: four-center also where the SCF and the orbital response use
+        # the resolution of the identity: the polarizability gradient is not
+        # the derivative of an RI polarizability.
         # Fock gradient driver
         fock_grad_drv = FockGeom1000Driver()
 

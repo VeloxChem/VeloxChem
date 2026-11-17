@@ -269,6 +269,11 @@ class ScfHessianDriver(HessianDriver):
         hess_ref += ' Chem. Phys. Lett. 2002, 362, 511-518.'
         self.ostream.print_reference('Reference: ' + hess_ref)
         self.ostream.print_blank()
+        if (self.scf_driver._uses_ri_jk() or
+                self.scf_driver._uses_ri_coulomb()):
+            self.ostream.print_info('The derivative integrals are computed '
+                                    'without the resolution of the identity.')
+            self.ostream.print_blank()
         self.ostream.flush()
 
         # Preparation
@@ -403,6 +408,12 @@ class ScfHessianDriver(HessianDriver):
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
             ]
 
+        # NOTE: the derivative integrals of the electron repulsion are
+        # four-center also where the SCF and the orbital response use the
+        # resolution of the identity. The Hessian is then the analytical
+        # Hessian of the four-center energy evaluated with the RI density
+        # and response, not the derivative of the RI gradient, and differs
+        # from a Hessian by finite differences of RI gradients.
         fock_hess_2000_drv = FockGeom2000Driver()
         fock_hess_1100_drv = FockGeom1100Driver()
         fock_hess_1010_drv = FockGeom1010Driver()
@@ -1070,6 +1081,11 @@ class ScfHessianDriver(HessianDriver):
         hess_ref += ' Chem. Phys. Lett. 2002, 362, 511-518.'
         self.ostream.print_reference('Reference: ' + hess_ref)
         self.ostream.print_blank()
+        if (self.scf_driver._uses_ri_jk() or
+                self.scf_driver._uses_ri_coulomb()):
+            self.ostream.print_info('The derivative integrals are computed '
+                                    'without the resolution of the identity.')
+            self.ostream.print_blank()
         self.ostream.flush()
 
         # Preparation
@@ -1216,6 +1232,12 @@ class ScfHessianDriver(HessianDriver):
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
             ]
 
+        # NOTE: the derivative integrals of the electron repulsion are
+        # four-center also where the SCF and the orbital response use the
+        # resolution of the identity. The Hessian is then the analytical
+        # Hessian of the four-center energy evaluated with the RI density
+        # and response, not the derivative of the RI gradient, and differs
+        # from a Hessian by finite differences of RI gradients.
         fock_hess_2000_drv = FockGeom2000Driver()
         fock_hess_1100_drv = FockGeom1100Driver()
         fock_hess_1010_drv = FockGeom1010Driver()
