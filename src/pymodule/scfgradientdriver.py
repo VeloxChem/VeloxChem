@@ -61,6 +61,7 @@ from .environment import get_available_memory, get_ri_free_memory
 from .errorhandler import assert_msg_critical
 from .profiler import Profiler
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           get_ri_auxiliary_basis,
                            dft_and_ri_sanity_check)
 
 
@@ -569,10 +570,12 @@ class ScfGradientDriver(GradientDriver):
         if not used:
             return None
 
-        aux_basis = MolecularBasis.read(molecule,
-                                        self.scf_driver.ri_auxiliary_basis,
-                                        ostream=None,
-                                        auxiliary_basis=True)
+        aux_basis = MolecularBasis.read(
+            molecule,
+            get_ri_auxiliary_basis(self.scf_driver.ri_auxiliary_basis,
+                                   label),
+            ostream=None,
+            auxiliary_basis=True)
 
         nspins = len(norbitals)
 
@@ -1146,7 +1149,8 @@ class ScfGradientDriver(GradientDriver):
         if ri_label == 'RI-J':
             basis_ri_j = MolecularBasis.read(
                 molecule,
-                self.scf_driver.ri_auxiliary_basis,
+                get_ri_auxiliary_basis(self.scf_driver.ri_auxiliary_basis,
+                                       'RI-J'),
                 auxiliary_basis=True)
 
             t0 = time.time()
@@ -1200,7 +1204,8 @@ class ScfGradientDriver(GradientDriver):
 
             basis_ri_jk = MolecularBasis.read(
                 molecule,
-                self.scf_driver.ri_auxiliary_basis,
+                get_ri_auxiliary_basis(self.scf_driver.ri_auxiliary_basis,
+                                       'RI-JK'),
                 auxiliary_basis=True)
 
             nao = D.shape[0]
@@ -1469,7 +1474,8 @@ class ScfGradientDriver(GradientDriver):
 
             basis_ri_jk = MolecularBasis.read(
                 molecule,
-                self.scf_driver.ri_auxiliary_basis,
+                get_ri_auxiliary_basis(self.scf_driver.ri_auxiliary_basis,
+                                       'RI-JK'),
                 auxiliary_basis=True)
 
             nao = Da.shape[0]
@@ -1538,7 +1544,8 @@ class ScfGradientDriver(GradientDriver):
         elif ri_label == 'RI-J':
             basis_ri_j = MolecularBasis.read(
                 molecule,
-                self.scf_driver.ri_auxiliary_basis,
+                get_ri_auxiliary_basis(self.scf_driver.ri_auxiliary_basis,
+                                       'RI-J'),
                 auxiliary_basis=True)
 
             t0 = time.time()

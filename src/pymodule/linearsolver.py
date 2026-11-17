@@ -162,7 +162,9 @@ class LinearSolver:
         self.ri = True
         self.ri_coulomb = False
         self.ri_jk = False
-        self.ri_auxiliary_basis = 'def2-universal-jfit'
+        # NOTE: None takes the auxiliary basis set of the RI kind used
+        # (sanitychecks.get_ri_auxiliary_basis).
+        self.ri_auxiliary_basis = None
         self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
 

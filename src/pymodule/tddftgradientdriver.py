@@ -59,6 +59,7 @@ from .errorhandler import assert_msg_critical
 from .profiler import Profiler
 from .inputparser import parse_input
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           get_ri_auxiliary_basis,
                            dft_and_ri_sanity_check)
 
 
@@ -684,7 +685,8 @@ class TddftGradientDriver(GradientDriver):
             if self.rank == mpi_master():
                 basis_ri_j = MolecularBasis.read(
                     molecule,
-                    self._scf_drv.ri_auxiliary_basis,
+                    get_ri_auxiliary_basis(self._scf_drv.ri_auxiliary_basis,
+                                           'RI-J'),
                     auxiliary_basis=True)
             else:
                 basis_ri_j = None
@@ -745,7 +747,8 @@ class TddftGradientDriver(GradientDriver):
                 'TddftGradientDriver: RI-JK is not applicable to pure DFT')
 
             assert_msg_critical(
-                'jkfit' in str(self._scf_drv.ri_auxiliary_basis).lower(),
+                'jkfit' in get_ri_auxiliary_basis(
+                    self._scf_drv.ri_auxiliary_basis, 'RI-JK').lower(),
                 'TddftGradientDriver: RI-JK needs a jkfit auxiliary basis')
 
             ri_jk_drv = self._scf_drv._ri_drv
@@ -757,7 +760,8 @@ class TddftGradientDriver(GradientDriver):
             if self.rank == mpi_master():
                 basis_ri_jk = MolecularBasis.read(
                     molecule,
-                    self._scf_drv.ri_auxiliary_basis,
+                    get_ri_auxiliary_basis(self._scf_drv.ri_auxiliary_basis,
+                                           'RI-JK'),
                     auxiliary_basis=True)
             else:
                 basis_ri_jk = None
@@ -1096,10 +1100,12 @@ class TddftGradientDriver(GradientDriver):
         if not used:
             return None
 
-        aux_basis = MolecularBasis.read(molecule,
-                                        self._scf_drv.ri_auxiliary_basis,
-                                        ostream=None,
-                                        auxiliary_basis=True)
+        aux_basis = MolecularBasis.read(
+            molecule,
+            get_ri_auxiliary_basis(self._scf_drv.ri_auxiliary_basis,
+                                   label),
+            ostream=None,
+            auxiliary_basis=True)
 
         budget = min(
             self.comm.allgather(self._get_ri_gradient_memory_budget(basis)))

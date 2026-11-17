@@ -84,6 +84,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 from .dftutils import (get_default_grid_level, get_optimal_grid_box_size,
                        print_xc_reference)
 from .sanitychecks import (molecule_sanity_check, dft_and_ri_sanity_check,
+                           get_ri_auxiliary_basis,
                            pe_sanity_check,
                            solvation_model_sanity_check, gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
@@ -248,7 +249,9 @@ class ScfDriver:
         self.ri = True
         self.ri_coulomb = True
         self.ri_jk = True
-        self.ri_auxiliary_basis = 'def2-universal-jfit'
+        # NOTE: None takes the auxiliary basis set of the RI kind used
+        # (sanitychecks.get_ri_auxiliary_basis).
+        self.ri_auxiliary_basis = None
         self.ri_metric_threshold = 1.0e-12
         self.ri_metric_route = 'cholesky'
         # NOTE: the density of the B vectors at which the SIMD RI-JK exchange of
@@ -1933,8 +1936,22 @@ class ScfDriver:
                 self._ri_aux_atoms = []
 
         if use_ri_coulomb:
+            ri_aux_label = get_ri_auxiliary_basis(self.ri_auxiliary_basis,
+                                                  'RI-J')
+
+            # NOTE: def2-universal-jkfit is used for RI-J only where it is set,
+            # in place of def2-universal-jfit, the RI-J default and a smaller
+            # basis set.
+            if ri_aux_label.lower() == 'def2-universal-jkfit':
+                self.ostream.print_warning(
+                    'RI-J uses def2-universal-jkfit as set, an auxiliary ' +
+                    'basis set made for RI-JK; def2-universal-jfit is the ' +
+                    'one made for RI-J.')
+                self.ostream.print_blank()
+                self.ostream.flush()
+
             basis_ri = MolecularBasis.read(molecule,
-                                           self.ri_auxiliary_basis,
+                                           ri_aux_label,
                                            auxiliary_basis=True)
 
             self._ri_drv = SimdRIJFockDriver()
@@ -2040,9 +2057,10 @@ class ScfDriver:
                 self.ostream.flush()
 
         elif use_ri_jk and not self._ri_fallback:
-            basis_ri = MolecularBasis.read(molecule,
-                                           self.ri_auxiliary_basis,
-                                           auxiliary_basis=True)
+            basis_ri = MolecularBasis.read(
+                molecule,
+                get_ri_auxiliary_basis(self.ri_auxiliary_basis, 'RI-JK'),
+                auxiliary_basis=True)
 
             self._ri_drv = SimdRIJKFockDriver()
 
@@ -2600,6 +2618,9 @@ class ScfDriver:
                     # RI info
                     self._scf_results['ri_coulomb'] = self.ri_coulomb
                     self._scf_results['ri_jk'] = self.ri_jk
+                    # NOTE: the auxiliary basis set as set, None where the RI
+                    # kind chooses it, as the response takes it over: a
+                    # response with another functional then chooses its own.
                     self._scf_results[
                         'ri_auxiliary_basis'] = self.ri_auxiliary_basis
                     # NOTE: ri_coulomb and ri_jk above are what was asked for.

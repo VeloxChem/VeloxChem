@@ -50,6 +50,7 @@ from .veloxchemlib import SimdRIJFockDriver
 from .veloxchemlib import mat_t
 from .veloxchemlib import rimode
 from .molecularbasis import MolecularBasis
+from .sanitychecks import get_ri_auxiliary_basis
 from .profiler import Profiler
 from . import rijkresponse
 
@@ -76,7 +77,8 @@ def initialize(solver, molecule, basis):
     rijkresponse.mark_setup(solver)
 
     basis_ri = MolecularBasis.read(molecule,
-                                   solver.ri_auxiliary_basis,
+                                   get_ri_auxiliary_basis(
+                                       solver.ri_auxiliary_basis, 'RI-J'),
                                    ostream=None,
                                    auxiliary_basis=True)
 

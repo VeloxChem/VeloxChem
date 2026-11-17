@@ -447,11 +447,45 @@ def dft_and_ri_sanity_check(obj, method_flag='compute',
         if obj.acc_type.upper() == 'L2_DIIS':
             obj.acc_type = 'DIIS'
 
-    if obj.ri_coulomb and obj.ri_auxiliary_basis == 'def2-universal-jkfit':
-        obj.ri_auxiliary_basis = 'def2-universal-jfit'
+    # NOTE: ri_auxiliary_basis is left as set. None takes the auxiliary basis
+    # set of the RI kind (get_ri_auxiliary_basis) each time, also for a driver
+    # used again with another functional.
+    aux_basis = obj.ri_auxiliary_basis
+    assert_msg_critical(
+        not (obj.ri_jk and aux_basis is not None and
+             aux_basis.lower() == 'def2-universal-jfit'),
+        f'{type(obj).__name__}: RI-JK needs a jkfit auxiliary basis, and ' +
+        'def2-universal-jfit fits the Coulomb alone')
 
-    if obj.ri_jk and obj.ri_auxiliary_basis == 'def2-universal-jfit':
-        obj.ri_auxiliary_basis = 'def2-universal-jkfit'
+
+def get_ri_auxiliary_basis(ri_auxiliary_basis, ri_kind):
+    """
+    Gets the auxiliary basis set of a calculation with the resolution of the
+    identity.
+
+    :param ri_auxiliary_basis:
+        The auxiliary basis set as set (a driver's ri_auxiliary_basis), or
+        None.
+    :param ri_kind:
+        'RI-J' or 'RI-JK'.
+
+    :return:
+        ri_auxiliary_basis where it is set, and otherwise def2-universal-jfit
+        for RI-J and def2-universal-jkfit for RI-JK.
+    """
+
+    defaults = {
+        'RI-J': 'def2-universal-jfit',
+        'RI-JK': 'def2-universal-jkfit',
+    }
+
+    assert_msg_critical(ri_kind in defaults,
+                        f'get_ri_auxiliary_basis: unknown RI kind {ri_kind}')
+
+    if ri_auxiliary_basis is not None:
+        return ri_auxiliary_basis
+
+    return defaults[ri_kind]
 
 
 def polorbrsp_sanity_check_1(obj):

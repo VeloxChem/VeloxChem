@@ -82,6 +82,7 @@ from .veloxchemlib import PackedMatrix
 from .veloxchemlib import mat_t
 from .veloxchemlib import rimode
 from .molecularbasis import MolecularBasis
+from .sanitychecks import get_ri_auxiliary_basis
 from .environment import get_ri_free_memory
 from .errorhandler import assert_msg_critical
 from .profiler import Profiler
@@ -344,13 +345,15 @@ def initialize(solver, molecule, basis, reuse=False):
 
     mark_setup(solver)
 
+    ri_aux_label = get_ri_auxiliary_basis(solver.ri_auxiliary_basis, 'RI-JK')
+
     assert_msg_critical(
-        'jkfit' in solver.ri_auxiliary_basis.lower(),
+        'jkfit' in ri_aux_label.lower(),
         f'{type(solver).__name__}: RI-JK needs a jkfit auxiliary basis, and ' +
-        f'{solver.ri_auxiliary_basis} fits the Coulomb alone')
+        f'{ri_aux_label} fits the Coulomb alone')
 
     solver._ri_jk_aux_basis = MolecularBasis.read(molecule,
-                                                  solver.ri_auxiliary_basis,
+                                                  ri_aux_label,
                                                   ostream=None,
                                                   auxiliary_basis=True)
 

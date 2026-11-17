@@ -169,7 +169,9 @@ class NonlinearSolver:
         self.ri = True
         self.ri_coulomb = False
         self.ri_jk = False
-        self.ri_auxiliary_basis = 'def2-universal-jfit'
+        # NOTE: None takes the auxiliary basis set of the RI kind used
+        # (sanitychecks.get_ri_auxiliary_basis).
+        self.ri_auxiliary_basis = None
         self._ri_jk_drv = None
         self._ri_jk_response_drv = None
         self._ri_jk_aux_basis = None
