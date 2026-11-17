@@ -392,6 +392,8 @@ class TdaEigenSolver(TdaEigenSolverBase):
         profiler.print_memory_usage(self.ostream)
         self._print_ri_memory_check()
 
+        self._release_freed_memory()
+
         # compute 1e dipole integrals
 
         integrals = self._comp_onee_integrals(molecule, basis)

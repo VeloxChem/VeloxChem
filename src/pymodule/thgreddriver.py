@@ -306,6 +306,8 @@ class ThgReducedDriver(NonlinearSolver):
         # solvers it drives print their own.
         self._print_ri_memory_check()
 
+        self._release_freed_memory()
+
         return tpa_dict
 
     def compute_thg_components(self, Focks, w, X, d_a_mo, Nx, track,

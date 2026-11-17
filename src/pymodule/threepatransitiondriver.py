@@ -342,6 +342,8 @@ class ThreePATransitionDriver(NonlinearSolver):
         # solvers it drives print their own.
         self._print_ri_memory_check()
 
+        self._release_freed_memory()
+
         if self.rank == mpi_master():
             ret_dict.update({
                 'oscillator_strengths': oscillator_strengths,

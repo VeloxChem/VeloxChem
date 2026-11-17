@@ -40,6 +40,7 @@ import sys
 import h5py
 
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import release_free_memory
 from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
@@ -831,6 +832,21 @@ class LinearSolver:
         if density_memory is not None:
             self._ri_batch_memory = max(getattr(self, '_ri_batch_memory', 0),
                                         density_memory * ndens)
+
+    def _release_freed_memory(self):
+        """
+        Returns the memory the allocator holds free to the system. Each solver
+        calls this once at the end of its solve, after it has dropped its trial
+        and sigma vectors (the TDA solvers keep theirs in self.solver, and
+        CphfSolver.compute calls it after compute_subspace_solver returns),
+        not after every iteration.
+        """
+
+        # NOTE: the memory a solve frees is partly in pieces the allocator
+        # keeps rather than returns. Kept, it stays resident, and what runs
+        # next reads it as memory in use and takes a smaller batch or RI
+        # budget.
+        release_free_memory()
 
     def _print_ri_memory_check(self):
         """

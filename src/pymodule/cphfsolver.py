@@ -360,6 +360,8 @@ class CphfSolver(LinearSolver):
         self.cphf_results = self.compute_subspace_solver(
             molecule, basis, scf_results, *args)
 
+        self._release_freed_memory()
+
     def compute_subspace_solver(self, molecule, basis, scf_results, *args):
         """
         Performs CPHF calculation for a molecule and a basis set.

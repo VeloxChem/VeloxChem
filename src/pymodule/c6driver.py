@@ -626,6 +626,8 @@ class C6Driver(LinearSolver):
         self._dist_e2bger = None
         self._dist_e2bung = None
 
+        self._release_freed_memory()
+
         # calculate response functions
         a_grad = self.get_complex_prop_grad(self.a_operator, self.a_components,
                                             molecule, basis, scf_results)

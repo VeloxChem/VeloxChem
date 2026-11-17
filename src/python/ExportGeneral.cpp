@@ -142,8 +142,9 @@ export_general(py::module &m) -> void
     // When the memory spans several drivers or arrays held in Python, or what
     // matters is what the next calculation finds free, the Python driver which
     // runs the phases trims once, through this function, as the SCF gradient
-    // does after its RI term. Either way the call is made from C++, where the
-    // allocator is known, rather than through ctypes.
+    // does after its two-electron term and the response solvers at the end of
+    // a solve. Either way the call is made from C++, where the allocator is
+    // known, rather than through ctypes.
     m.def(
         "release_free_memory",
         []() -> bool {

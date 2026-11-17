@@ -459,6 +459,8 @@ class CubicResponseDriver(NonlinearSolver):
         # solvers it drives print their own.
         self._print_ri_memory_check()
 
+        self._release_freed_memory()
+
         return cubic_dict
 
     def compute_cubic_components(self, Focks, freqtriples, X, d_a_mo, Nx, track,

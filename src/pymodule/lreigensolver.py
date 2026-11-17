@@ -524,6 +524,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
+        self._release_freed_memory()
+
         # calculate properties
         if self.is_converged:
             edip_grad = self.get_prop_grad('electric dipole', 'xyz', molecule,

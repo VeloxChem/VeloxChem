@@ -743,6 +743,8 @@ class ComplexResponseTdaSolver(LinearSolver):
 
         self._dist_fock_ger = None
 
+        self._release_freed_memory()
+
         # calculate response functions
         if not self.nonlinear:
             a_grad = self.get_complex_prop_grad(self.a_operator,

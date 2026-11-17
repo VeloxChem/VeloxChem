@@ -528,6 +528,8 @@ class LinearResponseSolver(LinearResponseSolverBase):
         self._dist_e2bger = None
         self._dist_e2bung = None
 
+        self._release_freed_memory()
+
         # calculate response functions
         if not self.has_external_rhs:
             a_grad = self.get_prop_grad(self.a_operator, self.a_components,

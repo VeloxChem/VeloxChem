@@ -419,6 +419,8 @@ class QuadraticResponseDriver(NonlinearSolver):
         # solvers it drives print their own.
         self._print_ri_memory_check()
 
+        self._release_freed_memory()
+
         return quad_dict
 
     def compute_quad_components(self, Focks, freqpairs, X, d_a_mo, Nx, track,

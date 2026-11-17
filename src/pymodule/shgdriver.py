@@ -331,6 +331,8 @@ class ShgDriver(NonlinearSolver):
         # solvers it drives print their own.
         self._print_ri_memory_check()
 
+        self._release_freed_memory()
+
         # Compute dipole vector
         scf_prop = FirstOrderProperties(self.comm, self.ostream)
         scf_prop.compute_scf_prop(molecule, ao_basis, scf_results)

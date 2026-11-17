@@ -309,6 +309,8 @@ class TpaDriverBase(NonlinearSolver):
         # solvers it drives print their own.
         self._print_ri_memory_check()
 
+        self._release_freed_memory()
+
         if self.rank == mpi_master() and self.filename is not None:
             self._write_final_hdf5(self.filename, tpa_dict)
 

@@ -380,6 +380,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         # solvers it drives print their own.
         self._print_ri_memory_check()
 
+        self._release_freed_memory()
+
         return ret_dict
 
     def compute_quad_components(self, Focks, freqs, X, d_a_mo, Nx, scf_results,

@@ -36,6 +36,7 @@ import time as tm
 import math
 
 from .veloxchemlib import XCIntegrator, MolecularGrid
+from .veloxchemlib import release_free_memory
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master
 from .veloxchemlib import make_matrix, mat_t
@@ -641,6 +642,20 @@ class NonlinearSolver:
         if density_memory is not None:
             self._ri_batch_memory = max(getattr(self, '_ri_batch_memory', 0),
                                         density_memory * ndens + left_memory)
+
+    def _release_freed_memory(self):
+        """
+        Returns the memory the allocator holds free to the system. Each
+        nonlinear driver calls this once at the end of its calculation, not
+        after every iteration; the solvers it drives call their own at the end
+        of each solve.
+        """
+
+        # NOTE: the memory a calculation frees is partly in pieces the
+        # allocator keeps rather than returns. Kept, it stays resident, and
+        # what runs next reads it as memory in use and takes a smaller batch or
+        # RI budget.
+        release_free_memory()
 
     def _print_ri_memory_check(self):
         """

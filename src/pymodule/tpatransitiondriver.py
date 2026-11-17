@@ -369,6 +369,8 @@ class TpaTransitionDriver(NonlinearSolver):
         # solvers it drives print their own.
         self._print_ri_memory_check()
 
+        self._release_freed_memory()
+
         if self.rank == mpi_master():
             # add OPA results
             ret_dict.update({

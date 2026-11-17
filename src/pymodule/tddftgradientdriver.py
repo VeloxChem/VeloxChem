@@ -893,14 +893,14 @@ class TddftGradientDriver(GradientDriver):
         self._mark_ri_memory_peak()
         self._print_ri_memory_check()
 
-        # NOTE: the RI term frees its per-thread buffers, the derivative blocks
-        # of each auxiliary atom, the panels and the fitted densities in pieces
-        # the allocator keeps rather than returns. Kept, they stay resident
-        # after the gradient, and in an optimization the next SCF reads them as
-        # memory in use and takes a smaller RI budget. They are returned here,
-        # after the RI term only, as ScfGradientDriver does after its own.
-        if ri_label is not None:
-            release_free_memory()
+        # NOTE: the two-electron term frees its per-thread buffers, and with RI
+        # the derivative blocks of each auxiliary atom, the panels and the
+        # fitted densities, in pieces the allocator keeps rather than returns.
+        # Kept, they stay resident after the gradient, and in an optimization
+        # the next SCF reads them as memory in use and takes a smaller RI
+        # budget. They are returned here, after the RI and the four-center
+        # term alike, as ScfGradientDriver does after its own.
+        release_free_memory()
 
         grad_timing['Fock_grad'] += time.time() - t0
 
