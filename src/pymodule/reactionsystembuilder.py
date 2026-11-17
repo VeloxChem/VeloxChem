@@ -2746,7 +2746,7 @@ class ReactionSystemBuilder():
         is_water = solvent.lower() in water_models
         model = self.water_model
         if model is None:
-            model = solvent.lower() if is_water else 'cspce'
+            model = solvent.lower() if is_water else 'tip3p'
         assert_msg_critical(
             model in water_models,
             f"EvbSystemBuilder: unknown water model '{model}'. Known models: "

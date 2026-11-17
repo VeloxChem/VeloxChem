@@ -2,10 +2,11 @@
 
 Dev-only (test_claude_*): never to master.
 
-- EvbDriver.water_model None (default) chooses per configuration: TIP3P for a
-  protein (pdb) configuration, the configuration's water solvent otherwise
-  (the presets name cSPC/E). A configuration's 'water_model' key, then the
-  driver's water_model, override it.
+- EvbDriver.water_model None (default) means TIP3P: the presets name it, and a
+  protein (pdb) configuration uses it whatever its solvent says. A
+  non-protein configuration that names another water solvent keeps it. A
+  configuration's 'water_model' key, then the driver's water_model ('cspce'
+  stays available), override it.
 - ReactionSystemBuilder warns when a protein is solvated in water other than
   TIP3P (amber14 is parameterized with TIP3P).
 - 'tip3p' and 'ctip3p' water is rigid: O-H and H-H constraints, no harmonic
@@ -50,23 +51,37 @@ def _driver(water_model=None):
 # ---------------------------------------------------------------- resolution
 
 
-def test_auto_non_protein_keeps_the_preset():
+@pytest.mark.parametrize("pdb", [None, "protein.cif"])
+def test_default_preset_is_tip3p(pdb):
     evb = _driver()
+    conf = evb.default_system_configurations("water")
+    assert (conf["name"], conf["solvent"]) == ("water_tip3p_NVT", "tip3p")
+    if pdb is not None:
+        conf["pdb"] = pdb
+    assert evb._configuration_water_model(conf) == "tip3p"
+    assert (conf["name"], conf["water_model"]) == ("water_tip3p_NVT",
+                                                   "tip3p")
+
+
+def test_cspce_stays_available():
+    evb = _driver("cspce")
     conf = evb.default_system_configurations("water")
     assert (conf["name"], conf["solvent"]) == ("water_cspce_NVT", "cspce")
     assert evb._configuration_water_model(conf) == "cspce"
-    assert conf["name"] == "water_cspce_NVT"
-    assert conf["water_model"] == "cspce"
+    conf = {"name": "w", "solvent": "spce", "water_model": "cspce"}
+    assert _driver()._configuration_water_model(conf) == "cspce"
+    assert conf["solvent"] == "cspce"
 
 
 @pytest.mark.parametrize("preset, name", [("water", "water_tip3p_NVT"),
                                           ("water_NPT", "water_tip3p_NPT"),
                                           ("E_field", "water_E_field_tip3p")])
-def test_auto_protein_uses_tip3p(preset, name):
-    evb = _driver()
-    conf = evb.default_system_configurations(preset)
+def test_protein_switches_a_cspce_preset(preset, name):
+    """A preset made for cSPC/E (driver set at the time) is switched when the
+    driver is back on the default and the configuration is a protein."""
+    conf = _driver("cspce").default_system_configurations(preset)
     conf["pdb"] = "protein.cif"
-    assert evb._configuration_water_model(conf) == "tip3p"
+    assert _driver()._configuration_water_model(conf) == "tip3p"
     assert (conf["name"], conf["solvent"], conf["water_model"]) == (name,
                                                                     "tip3p",
                                                                     "tip3p")
@@ -80,11 +95,19 @@ def test_auto_protein_keeps_a_custom_name():
     assert conf["name"] == "PRO"
 
 
-def test_water_solvent_names_the_model_when_none_chosen():
-    """Before, the solvent placed the molecules and the driver's model gave
-    the parameters, so solvent 'tip3p' ran with cSPC/E parameters."""
-    conf = {"name": "w", "solvent": "ctip3p"}
-    assert _driver()._configuration_water_model(conf) == "ctip3p"
+@pytest.mark.parametrize("solvent", ["ctip3p", "cspce"])
+def test_water_solvent_names_the_model_when_none_chosen(solvent):
+    """A non-protein configuration naming a water solvent keeps it. Before,
+    the solvent placed the molecules and the driver's model gave the
+    parameters, so solvent 'tip3p' ran with cSPC/E parameters."""
+    conf = {"name": "w", "solvent": solvent}
+    assert _driver()._configuration_water_model(conf) == solvent
+
+
+def test_protein_hand_written_cspce_solvent_gets_tip3p():
+    conf = {"name": "PRO", "solvent": "cspce", "pdb": "protein.cif"}
+    assert _driver()._configuration_water_model(conf) == "tip3p"
+    assert conf["solvent"] == "tip3p"
 
 
 def test_explicit_choices_win():
@@ -105,7 +128,7 @@ def test_unknown_model_refused():
                                   {"name": "eth", "solvent": "ethanol"}])
 def test_other_configurations_untouched(conf):
     before = dict(conf)
-    assert _driver()._configuration_water_model(conf) == "cspce"
+    assert _driver()._configuration_water_model(conf) == "tip3p"
     assert conf == before
 
 

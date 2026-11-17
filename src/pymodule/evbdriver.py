@@ -81,8 +81,8 @@ class EvbDriver:
         - system_confs: The list of system configurations to run FEP on.
         - mute_scf: The flag for muting SCF output during force field building.
         - water_model: The water model used for solvated configurations. None
-          (default) uses TIP3P for protein (pdb) configurations and the
-          configuration's water solvent (cSPC/E in the presets) otherwise.
+          (default) means TIP3P (rigid), unless a non-protein configuration
+          names another water solvent; set e.g. 'cspce' to use that instead.
         - ffbuilder: The reaction force field builder.
         - comm: The MPI communicator.
         - rank: The rank of MPI process.
@@ -132,10 +132,11 @@ class EvbDriver:
         self.mute_scf = True
 
         self.t_label = int(time.time())
-        # None chooses per configuration: 'tip3p' for a protein (pdb)
-        # configuration, the configuration's own water solvent otherwise (the
-        # presets use 'cspce'). A configuration's 'water_model' key overrides
-        # it. See _configuration_water_model.
+        # None means TIP3P: the presets name 'tip3p', and a protein (pdb)
+        # configuration uses it whatever its solvent says. A non-protein
+        # configuration that names another water solvent keeps it, and a
+        # configuration's 'water_model' key overrides everything. See
+        # _configuration_water_model.
         self.water_model = None
         self.data_folder_override = None
 
@@ -313,7 +314,10 @@ class EvbDriver:
                 step's state to the next to skip reaction matching.
         """
 
-        self.ffbuilder.water_model = self._preset_water_model()
+        # Water molecules that are part of a reacting state (not solvent)
+        # keep the previous default; only the solvent default became TIP3P.
+        self.ffbuilder.water_model = (self.water_model if self.water_model
+                                      is not None else 'cspce')
 
         results = self.ffbuilder.build_many_force_fields(states=states,
                                                          **kwargs)
@@ -1618,25 +1622,23 @@ class EvbDriver:
             save_group(data, file)
 
     def _preset_water_model(self):
-        """The water model the presets name: the driver's, else 'cspce'.
-
-        A protein configuration built from a water preset is switched to TIP3P
-        by _configuration_water_model when no water model was chosen.
-        """
-        return self.water_model if self.water_model is not None else 'cspce'
+        """The water model the presets name: the driver's, else 'tip3p'."""
+        return self.water_model if self.water_model is not None else 'tip3p'
 
     def _configuration_water_model(self, conf):
         """Chooses the water model of one configuration and records it.
 
         The model is, in order: the configuration's 'water_model' key, the
         driver's water_model, 'tip3p' for a protein (pdb) configuration, and
-        the configuration's water solvent. The amber14 protein force field is
-        parameterized with TIP3P; ReactionSystemBuilder warns when a protein
-        is solvated in another water model.
+        the configuration's water solvent (the presets name 'tip3p'). So
+        TIP3P is the default; another model (e.g. 'cspce') is used when it
+        is named. The amber14 protein force field is parameterized with
+        TIP3P; ReactionSystemBuilder warns when a protein is solvated in
+        another water model.
 
         A configuration whose solvent is water gets 'solvent' and
         'water_model' set to the chosen model (so options.json records it),
-        and a preset name ("water_cspce_NVT") is renamed to match. Any other
+        and a preset name ("water_tip3p_NVT") is renamed to match. Any other
         configuration is left unchanged.
 
         :param conf:
@@ -1654,7 +1656,7 @@ class EvbDriver:
 
         solvent = conf.get('solvent', None)
         if solvent is None or solvent.lower() not in water_models:
-            return chosen if chosen is not None else 'cspce'
+            return chosen if chosen is not None else 'tip3p'
 
         solvent = solvent.lower()
         if chosen is not None:
