@@ -17,13 +17,18 @@ class TestBatchSize:
     @staticmethod
     def memory(monkeypatch, available, nthreads):
 
-        # NOTE: get_batch_size reads the node's memory through psutil and the
-        # threads from OMP_NUM_THREADS; both are set here, the same on every
-        # rank.
+        # NOTE: get_batch_size reads the node's total memory through psutil,
+        # the free memory through environment.get_available_memory and the
+        # threads from OMP_NUM_THREADS; all are set here, the same on every
+        # rank. The node's free memory from psutil is set four times larger
+        # than the free memory, so that the result tells which of the two was
+        # used.
         memory = namedtuple('memory', ['total', 'available'])
 
         monkeypatch.setattr(batchsize.psutil, 'virtual_memory',
-                            lambda: memory(64 * 1024**3, available))
+                            lambda: memory(64 * 1024**3, 4 * available))
+        monkeypatch.setattr(batchsize, 'get_available_memory',
+                            lambda: available)
         monkeypatch.setenv('OMP_NUM_THREADS', str(nthreads))
 
     def per_density(self, nthreads):

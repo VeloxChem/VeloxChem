@@ -86,8 +86,9 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
         if total_mem > min(total_mem_list):
             mem_adjust = total_mem - min(total_mem_list)
 
-        # computes maximum batch size from available memory
-        avail_mem = psutil.virtual_memory().available - mem_adjust
+        # NOTE: the master's free memory, the smaller of the node's and what
+        # its control groups leave (see environment.get_available_memory).
+        avail_mem = get_available_memory() - mem_adjust
         avail_mem //= ntasks_per_node
         mem_per_mat = n_ao**2 * ctypes.sizeof(ctypes.c_double)
         nthreads = int(environ['OMP_NUM_THREADS'])
