@@ -1698,13 +1698,6 @@ class NonlinearSolver:
             self.damping)
         self.ostream.print_header(cur_str.ljust(width))
 
-        if self._uses_ri_coulomb():
-            cur_str = 'Resolution of the Identity      : RI-J'
-            self.ostream.print_header(cur_str.ljust(width))
-        elif self._uses_ri_jk():
-            cur_str = 'Resolution of the Identity      : RI-JK'
-            self.ostream.print_header(cur_str.ljust(width))
-
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()

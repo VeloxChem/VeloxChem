@@ -97,8 +97,8 @@ class TestRIBatchSize:
                                  self.comm) == expected
 
     def test_a_control_group_limit_is_followed(self, monkeypatch):
-        """The RI batch follows the memory a control group leaves, which
-        get_batch_size does not read."""
+        """The RI batch and get_batch_size follow the memory a control group
+        leaves, not the node's free memory."""
 
         # NOTE: psutil sees a node with 512 GB free, and the control group
         # leaves 8 GB of it.
@@ -117,7 +117,7 @@ class TestRIBatchSize:
         plain = get_batch_size(None, 10**9, self.nao, self.comm)
 
         assert ri == room // density_memory
-        assert ri < plain
 
+        # NOTE: get_batch_size divides by SLURM_NTASKS_PER_NODE, set to 1.
         if self.comm.Get_rank() == mpi_master():
-            assert plain == 512 * 1024**3 // self.estimate()
+            assert plain == 8 * 1024**3 // self.estimate()

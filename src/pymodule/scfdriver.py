@@ -4618,13 +4618,6 @@ class ScfDriver:
             self.ovl_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        if self.ri_coulomb:
-            cur_str = 'Resolution of the Identity      : RI-J'
-            self.ostream.print_header(cur_str.ljust(str_width))
-        elif self.ri_jk:
-            cur_str = 'Resolution of the Identity      : RI-JK'
-            self.ostream.print_header(cur_str.ljust(str_width))
-
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
