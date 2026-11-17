@@ -53,11 +53,17 @@ class TestFourCenterBatchSize:
 
         return self.nao**2 * 8 * self.nthreads
 
+    def eri_memory(self):
+        """The memory of the ERI integration, held once by a build."""
+
+        return (batchsize._FOUR_CENTER_ERI_MATRICES_PER_THREAD * self.nao**2 *
+                8 * self.nthreads)
+
     def test_the_count_follows_the_room(self, monkeypatch):
 
         room = self.set_memory(monkeypatch, 8 * 1024**3)
 
-        reserve = batchsize._FOUR_CENTER_ERI_RESERVE * self.per_density()
+        reserve = self.eri_memory()
 
         assert get_four_center_batch_size(
             None, 10**9, self.nao,
@@ -85,7 +91,7 @@ class TestFourCenterBatchSize:
 
     def test_no_room_still_gives_one_density(self, monkeypatch):
 
-        # NOTE: a room below the ERI reserve, or none, gives one density; the
+        # NOTE: a room below the ERI integration's memory, or none, gives one density; the
         # build is attempted, never stopped.
         for available in [0, 1, self.per_density()]:
             self.set_memory(monkeypatch, available)
@@ -109,7 +115,7 @@ class TestFourCenterBatchSize:
             a // self.comm.allgather(here).count(h)
             for h, a in self.comm.allgather((here, available)))
 
-        reserve = batchsize._FOUR_CENTER_ERI_RESERVE * self.per_density()
+        reserve = self.eri_memory()
 
         assert get_four_center_batch_size(
             None, 10**9, self.nao,

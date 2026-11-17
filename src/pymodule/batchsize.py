@@ -132,17 +132,17 @@ def _get_smallest_room(comm):
                for host, available in hosts_and_memory)
 
 
-# NOTE: the memory the four-center response Fock build reserves for what the
-# ERI integration holds besides the Fock matrix, in densities of
-# 8 x n_ao^2 x threads bytes. The build forms one density at a time, so this
-# is held once, whatever the batch size. Measured peaks of one '2jkx' build (MN15,
+# NOTE: the matrices of 8 x n_ao^2 bytes, for each thread, that the
+# four-center response Fock build reserves for what the ERI integration holds
+# besides the Fock matrix. The build forms one density at a time, so this is
+# held once, whatever the batch size. Measured peaks of one '2jkx' build (MN15,
 # def2-SVPD, 16 threads, one rank's share of the work), besides the Fock
 # matrix and its copy: a 43-atom molecule with 689 basis functions, share of
 # 16 ranks, block size factor 8: 19 n_ao^2 (1.2 for each thread); a 248-atom
 # molecule with 3860 basis functions, share of 64 ranks, block size factor
 # 16: 37 n_ao^2 (2.3 for each thread), and 19 n_ao^2 (2.4 for each thread)
 # with 8 threads.
-_FOUR_CENTER_ERI_RESERVE = 3
+_FOUR_CENTER_ERI_MATRICES_PER_THREAD = 3
 
 
 def get_four_center_batch_size(input_batch_size,
@@ -175,13 +175,14 @@ def get_four_center_batch_size(input_batch_size,
     :return:
         The batch size, the same on every rank: the input batch size where one
         is given, and otherwise as many densities as the smallest room of a
-        rank holds after call_memory and the ERI reserve, at least one and at
-        most n_total (zero where n_total is zero).
+        rank holds after call_memory and the memory of the ERI integration,
+        at least one and at most n_total (zero where n_total is zero).
 
     .. note::
-        The memory of a density is 8 x n_ao^2 bytes for each thread, as
-        get_batch_size takes it, and _FOUR_CENTER_ERI_RESERVE such densities
-        are reserved for the ERI integration.
+        The ERI integration's memory, _FOUR_CENTER_ERI_MATRICES_PER_THREAD
+        matrices of 8 x n_ao^2 bytes for each thread, is held once, as
+        call_memory is. Each density of the batch takes 8 x n_ao^2 bytes for
+        each thread, as get_batch_size takes it.
     """
 
     if input_batch_size is not None:
@@ -192,13 +193,17 @@ def get_four_center_batch_size(input_batch_size,
     batch_size = None
 
     if comm.Get_rank() == mpi_master():
-        per_density = n_ao * n_ao * 8 * get_number_of_threads()
-        eri_reserve = _FOUR_CENTER_ERI_RESERVE * per_density
+        matrix_memory = n_ao * n_ao * 8 * get_number_of_threads()
+
+        # NOTE: what the build holds once, and what each density of the batch
+        # adds.
+        eri_memory = _FOUR_CENTER_ERI_MATRICES_PER_THREAD * matrix_memory
+        per_density = matrix_memory
 
         # NOTE: batch_size is zero where n_total is zero.
         batch_size = min(
             n_total,
-            max((room - call_memory - eri_reserve) // per_density, 1))
+            max((room - call_memory - eri_memory) // per_density, 1))
 
     return comm.bcast(batch_size, root=mpi_master())
 
