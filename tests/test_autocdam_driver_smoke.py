@@ -198,6 +198,53 @@ class TestAutoCdamAttributeInterface:
         cdamfit.plot_optimization(str(tmp_path / "al"))
         assert (tmp_path / "al_optimization.png").is_file()
 
+    def test_every_keyword_is_a_settable_attribute(self):
+        import pytest
+        from veloxchem import Molecule, OutputStream
+
+        cdamfit = AutoCDAM(ostream=OutputStream(None))
+        for key in cdamfit._input_keywords["autocdam"]:
+            assert hasattr(cdamfit, key), key
+
+        mol = Molecule.read_smiles("[Al]")
+        mol.set_charge(3)
+        cdamfit.target = mol
+        cdamfit.properties = {
+            "IOD": {"value": 1.90, "tolerance": 0.05},
+            "CN": {"value": 6.0, "tolerance": 0.3}}
+        cdamfit.parameters = {"sigma": (1.5, 2.5)}
+        cdamfit.calculator = _ToyCalculator()
+        cdamfit.cache = False
+        cdamfit.search_method = "staged"
+        cdamfit.samples_per_stage = 2
+        cdamfit.max_iterations = 1
+        cdamfit.fit()
+        assert set(_fitted(cdamfit)) == {"metal_lj_sigma"}
+        quiet = cdamfit.generator
+
+        # arguments of fit() win over the attributes; a changed setting
+        # applies to the next fit
+        cdamfit.coordination_type = "tetrahedral"
+        cdamfit.print_level = 2
+        cdamfit.fit(mol, {"IOD": {"value": 1.90, "tolerance": 0.05}},
+                    parameters={"sigma": (1.5, 2.5), "epsilon": (0.1, 1.0)})
+        assert set(_fitted(cdamfit)) == {"metal_lj_sigma", "metal_lj_epsilon"}
+        assert cdamfit.candidate.geometry == "tetrahedral"
+        assert cdamfit.generator is not quiet
+
+        # the systems attribute reaches setup like the systems argument
+        class Given(Exception):
+            pass
+
+        def setup(*args):
+            raise Given(args[3])
+
+        cdamfit.setup = setup
+        cdamfit.systems = {"water": {"type": "aqueous"}}
+        with pytest.raises(Given) as given:
+            cdamfit.fit()
+        assert given.value.args[0] == {"water": {"type": "aqueous"}}
+
     def test_molecule_target_must_be_a_charged_ion(self):
         import pytest
         from veloxchem import Molecule, OutputStream

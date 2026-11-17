@@ -98,9 +98,9 @@ class AutoCDAM:
     """
     Fits the parameters of a cationic dummy-atom model (CDAM) of a metal ion.
 
-    Settings are attributes (see ``_input_keywords`` and ``update_settings``);
-    the study itself (candidate, targets, parameters, systems) is given to
-    ``setup`` or directly to ``fit``. ``search_method`` selects the Bayesian
+    Settings are attributes (see ``print_keywords`` and ``update_settings``);
+    the study itself (``target``, ``properties``, ``parameters``, ``systems``)
+    is set as attributes or given to ``fit`` (arguments win). ``search_method`` selects the Bayesian
     (default) or the staged search; ``geometries`` repeats the search per
     dummy geometry and keeps the best.
 
@@ -140,6 +140,10 @@ class AutoCDAM:
         self.target = None
         self.properties = None
         self.parameters = None
+
+        # named systems the targets refer to, e.g. {'water': {'type':
+        # 'aqueous'}, 'mof': {...}} (None: only the aqueous ion)
+        self.systems = None
 
         # ion model of a Molecule target (None: the CDAMCandidate default)
         self.water_model = None
@@ -205,6 +209,7 @@ class AutoCDAM:
                 'target': ('raw', 'the ion: one-atom Molecule or CDAMCandidate'),
                 'properties': ('raw', 'target properties, name: settings'),
                 'parameters': ('raw', 'fitted parameters (default: LJ, UFF)'),
+                'systems': ('raw', 'named systems: aqueous and frameworks'),
                 'water_model': ('str_lower', 'tip3p, spce or tip4pew'),
                 'coordination_type':
                     ('str_lower', 'dummy geometry, e.g. octahedral'),
@@ -452,8 +457,14 @@ class AutoCDAM:
                 'whether the metal-dummy distance is fitted')
 
         # Collaborators: generator -> (system router) -> (cache) calculator -> evaluator.
-        if self.generator is None:
-            self.generator = CoordinateGenerator(ostream=ostream)
+        # Default collaborators are rebuilt per setup (print_level applies);
+        # user-given ones are kept.
+        if not hasattr(self, '_base_generator'):
+            self._base_generator = self.generator
+            self._base_evaluator = self.evaluator
+        self.generator = (self._base_generator
+                          if self._base_generator is not None else
+                          CoordinateGenerator(ostream=ostream))
         # Keep the user's calculator so a repeated setup does not wrap the
         # router or cache of an earlier one.
         if not hasattr(self, '_base_calculator'):
@@ -461,7 +472,12 @@ class AutoCDAM:
         self.calculator = (self._base_calculator
                            if self._base_calculator is not None else
                            Calculator(comm=self.comm, ostream=ostream))
-        self.systems = self._build_systems(systems, ostream)
+        self.system_router = self._build_systems(systems, ostream)
+        # A template built by an earlier setup may belong to another ion
+        # model; only a user-given template is kept.
+        if not hasattr(self, '_base_openmm_template'):
+            self._base_openmm_template = self.openmm_template
+        self.openmm_template = self._base_openmm_template
         self.parameter_warnings = self._ineffective_parameter_warnings()
         if self.cache:
             # Calculated properties are kept in the run file, so a later run
@@ -470,8 +486,9 @@ class AutoCDAM:
                                                self.filename,
                                                write=self.rank == mpi_master())
         self._resolve_md_protocol()
-        if self.evaluator is None:
-            self.evaluator = Evaluator(ostream=ostream)
+        self.evaluator = (self._base_evaluator
+                          if self._base_evaluator is not None else
+                          Evaluator(ostream=ostream))
 
         self.fitting_driver: FittingDriver | BayesianFittingDriver | None = None
         self.generated_batch: GeneratedBatch | None = None
@@ -598,14 +615,14 @@ class AutoCDAM:
 
     def _ineffective_parameter_warnings(self) -> list[str]:
         """Warn about adjustable parameters no fitted system can respond to."""
-        if self.systems is None:
+        if self.system_router is None:
             return []
-        used = {self.systems.system_of(t) for t in self.targets}
-        if used & self.systems.aqueous_names:
+        used = {self.system_router.system_of(t) for t in self.targets}
+        if used & self.system_router.aqueous_names:
             return []
         ineffective = None
         for name in used:
-            names = set(self.systems.systems[name].ineffective_parameters(
+            names = set(self.system_router.systems[name].ineffective_parameters(
                 self.parameter_specs))
             ineffective = names if ineffective is None else ineffective & names
         warnings = [
@@ -627,10 +644,10 @@ class AutoCDAM:
         aqueous_md_targets = [
             t for t in self.search_targets
             if t.property_name in {"IOD", "CN"} and
-            (not self.systems or
-             self.systems.system_of(t) in self.systems.aqueous_names)
+            (not self.system_router or
+             self.system_router.system_of(t) in self.system_router.aqueous_names)
         ]
-        aqueous = self.systems.aqueous if self.systems is not None else self.calculator
+        aqueous = self.system_router.aqueous if self.system_router is not None else self.calculator
         aqueous = aqueous.inner if isinstance(aqueous,
                                               CachedCalculator) else aqueous
         if isinstance(aqueous, Calculator) and aqueous_md_targets:
@@ -739,9 +756,9 @@ class AutoCDAM:
         Runs the configured search; ``fitting_result`` gets the result,
         ``fitting_report`` prints a short report.
 
-        Without arguments the study is set up from the ``target``,
-        ``properties`` and ``parameters`` attributes (or kept from an earlier
-        ``setup``).
+        Arguments that are not given are taken from the ``target``,
+        ``properties``, ``parameters`` and ``systems`` attributes; with none
+        of them set, the study of an earlier ``setup`` is kept.
 
         :param candidate:
             The CDAM candidate, or a one-atom Molecule with the ion charge;
@@ -756,15 +773,21 @@ class AutoCDAM:
             Explicit parameter specifications instead of ``parameters``.
         """
 
+        # Arguments not given are taken from the attributes.
+        if candidate is None:
+            candidate = self.target
+        if fit_targets is None and self.properties is not None:
+            fit_targets = self._properties(self.properties)
+        if parameters is None and fit_parameters is None:
+            parameters = self.parameters
+        if systems is None:
+            systems = self.systems
         if candidate is not None or fit_targets is not None:
+            assert_msg_critical(
+                candidate is not None and fit_targets is not None,
+                'AutoCDAM: set both target and properties before fit()')
             self.setup(self._candidate(candidate), fit_targets, parameters,
                        systems, fit_parameters)
-        elif self.target is not None or self.properties is not None:
-            assert_msg_critical(
-                self.target is not None and self.properties is not None,
-                'AutoCDAM: set both target and properties before fit()')
-            self.setup(self._candidate(self.target),
-                       self._properties(self.properties), self.parameters)
         assert_msg_critical(
             hasattr(self, 'candidate'),
             'AutoCDAM: set target and properties (or give candidate and '
@@ -808,9 +831,9 @@ class AutoCDAM:
 
         result.warnings.extend(self.parameter_warnings)
         result.diagnostics['study_id'] = self.study_id
-        if self.systems is not None:
+        if self.system_router is not None:
             result.diagnostics["systems"] = reporting.system_report(
-                self.systems, self._samples(), self.candidate.water_model)
+                self.system_router, self._samples(), self.candidate.water_model)
         if self.geometries:
             self.openmm_template = None
 
@@ -1135,7 +1158,7 @@ class AutoCDAM:
             options['fep_options'] = fep_settings(options.get('fep_options'))
         metadata["calculator_options"] = options
         metadata["search_method"] = self.search_method
-        if self.systems is not None:
+        if self.system_router is not None:
             # Baselines are prepared once here; fingerprints guard resume.
             metadata["systems"] = {
                 name: ("aqueous" if system is None else {
@@ -1143,7 +1166,7 @@ class AutoCDAM:
                     "target": system.labels[system.target_index],
                     "representation": system.representation,
                     "protocol": system.protocol
-                }) for name, system in self.systems.systems.items()
+                }) for name, system in self.system_router.systems.items()
             }
         return metadata
 
@@ -1286,7 +1309,7 @@ class AutoCDAM:
         if self.rank != mpi_master():
             return []
         return export_cdam_model(path, self.candidate, parameters,
-                                 self.systems)
+                                 self.system_router)
 
     def _best_parameters(self) -> dict[str, float]:
         """Measured best parameters of the search; raises ValueError if none."""
