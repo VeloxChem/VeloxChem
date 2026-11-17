@@ -49,8 +49,10 @@ from functools import lru_cache
 from copy import deepcopy
 from typing import Any
 import collections
+import logging
 import math
 import os
+import re
 import tempfile
 from pathlib import Path
 
@@ -66,7 +68,8 @@ from ..solvationfepdriver import SolvationFepDriver
 from ..veloxchemlib import bohr_in_angstrom, hartree_in_kjpermol
 from .candidate import CDAMCandidate
 from .generator import C4_FORCE_NAME
-from .models import ANGSTROM_TO_NM, default_ostream, print_settings
+from .models import (ANGSTROM_TO_NM, PROGRESS_STATUS, default_ostream,
+                     print_settings)
 
 # ==========================================================================
 # md
@@ -377,10 +380,24 @@ FEP_DEFAULTS = {
 }
 
 
+# quick_dirty=True (pilot runs only): the production lambda windows with 0.5
+# ps of sampling each (2 fs steps) and one MBAR solve per stage; tests that the
+# FEP runs, the HFE value is not meaningful.
+QUICK_DIRTY_FEP_OPTIONS = {
+    "num_steps": 250,
+    "num_snapshots": 10,
+    "num_equil_steps": 100,
+}
+
+
 def fep_settings(options: dict[str, Any] | None = None) -> dict[str, Any]:
-    """The production FEP protocol, then explicit overrides."""
+    """The production FEP protocol (or the quick_dirty preset), then explicit
+    overrides."""
+    options = dict(options or {})
     settings = deepcopy(FEP_DEFAULTS)
-    settings.update(options or {})
+    if options.get("quick_dirty"):
+        settings.update(deepcopy(QUICK_DIRTY_FEP_OPTIONS))
+    settings.update(options)
     return settings
 
 # Finite-size correction constants (OpenMM units: nm, e, kJ/mol).
@@ -439,15 +456,18 @@ def is_rigid_cluster(topology) -> bool:
 def _make_driver(fep_options: dict[str, Any], ostream) -> SolvationFepDriver:
     """``SolvationFepDriver`` with the production protocol, overridden by ``fep_options``.
 
-    Only ``DRIVER_OPTIONS`` and ``timestep_fs`` are applied; other keys are ignored here.
+    ``DRIVER_OPTIONS``, the lambdas and ``timestep_fs`` are applied; other keys are
+    ignored here.
     """
     settings = fep_settings(fep_options)
-    driver = SolvationFepDriver(ostream=ostream)
+    driver = (_QuickMbarFepDriver(ostream=ostream)
+              if settings.get("quick_dirty") else
+              SolvationFepDriver(ostream=ostream))
     for name in DRIVER_OPTIONS:
         if name in settings:
             setattr(driver, name, settings[name])
-    driver.lambdas_stage1 = list(STAGE1_LAMBDAS)
-    driver.lambdas_stage2 = list(STAGE2_LAMBDAS)
+    driver.lambdas_stage1 = list(settings["lambdas_stage1"])
+    driver.lambdas_stage2 = list(settings["lambdas_stage2"])
     driver.timestep = float(settings["timestep_fs"]) * unit.femtoseconds
     return driver
 
@@ -467,6 +487,8 @@ def run_fep(systems, final_state: mm.State | None, work_dir: Path,
     ostream.flush()
     system = systems.solvated_system
     driver = _make_driver(fep_options, ostream)
+    driver.ostream = _FepStatus(ostream, driver)
+    PROGRESS_STATUS.set("FEP setup")
 
     c4_active = any(
         force.getName() == C4_FORCE_NAME for force in system.getForces())
@@ -492,6 +514,8 @@ def run_fep(systems, final_state: mm.State | None, work_dir: Path,
     step_ps = driver.timestep.value_in_unit(unit.picoseconds)
     print_settings(ostream, "Solvation FEP Setup", [
         ("Backend", "SolvationFepDriver (OpenMM files)"),
+        ("Protocol", "quick_dirty (workflow test only)"
+         if fep_options.get("quick_dirty") else "production"),
         ("Temperature", f"{getattr(driver, 'temperature', 298.15)} K"),
         ("Time Step",
          f"{driver.timestep.value_in_unit(unit.femtoseconds):g} fs"),
@@ -533,11 +557,147 @@ def run_fep(systems, final_state: mm.State | None, work_dir: Path,
                                       TEMPERATURE_K * unit.kelvin, 25))
         system_xml.write_text(mm.XmlSerializer.serialize(system),
                               encoding="utf-8")
-        return driver.compute_solvation_from_openmm_files(
-            solute_pdb=str(pdb_path),
-            solute_xml=str(xml_path),
-            system_pdb=str(system_pdb),
-            system_xml=str(system_xml))
+        with _PymbarLog() as mbar_log:
+            output = driver.compute_solvation_from_openmm_files(
+                solute_pdb=str(pdb_path),
+                solute_xml=str(xml_path),
+                system_pdb=str(system_pdb),
+                system_xml=str(system_xml))
+        usable, summary = mbar_log.summary()
+        output["mbar"] = {"usable": usable, "summary": summary,
+                          "solves": mbar_log.solves,
+                          "unconverged_solves": mbar_log.unconverged}
+        (ostream.print_info if usable else ostream.print_warning)(summary)
+        ostream.flush()
+        return output
+
+
+class _QuickMbarFepDriver(SolvationFepDriver):
+    """
+    SolvationFepDriver with one MBAR solve per stage (analytical uncertainty)
+    instead of 50 bootstrap solves, for the quick_dirty workflow test.
+    """
+
+    def _calculate_free_energy(self, u_kn):
+        from pymbar import MBAR
+
+        mbar = MBAR(u_kn, N_k=self.N_k, solver_protocol='robust')
+        delta_f = mbar.compute_free_energy_differences()
+        delta_f['overlap_matrix'] = np.asarray(mbar.compute_overlap()['matrix'],
+                                               dtype=float)
+        delta_f['effective_sample_sizes'] = np.asarray(
+            mbar.compute_effective_sample_number(), dtype=float)
+        return delta_f
+
+
+class _FepStatus:
+    """
+    Output stream of the FEP driver that also tells the progress bar which
+    stage and lambda window is running.
+    """
+
+    _PATTERNS = (
+        (re.compile(r"Generating systems for stage (\d+)"), "setup"),
+        (re.compile(r"Running lambda = (\S+), stage = (\d+)"), "lambda"),
+        (re.compile(r"Recalculating energies for stage (\d+)"), "energies"),
+        (re.compile(r"free energy with MBAR for stage (\d+)"), "MBAR"),
+    )
+
+    def __init__(self, ostream, driver):
+        self._ostream = ostream
+        self._driver = driver
+
+    def __getattr__(self, name):
+        return getattr(self._ostream, name)
+
+    def print_info(self, line):
+        for pattern, step in self._PATTERNS:
+            match = pattern.search(line)
+            if match is None:
+                continue
+            if step == "lambda":
+                stage = int(match.group(2))
+                lambdas = getattr(self._driver, f"lambdas_stage{stage}", [])
+                index = next((i for i, lam in enumerate(lambdas)
+                              if f"{lam}" == match.group(1).rstrip(".,")),
+                             None)
+                step = (f"lambda {index + 1}/{len(lambdas)}"
+                        if index is not None else f"lambda {match.group(1)}")
+            else:
+                stage = int(match.group(1))
+            PROGRESS_STATUS.set(f"FEP stage {stage}/2: {step}")
+            break
+        self._ostream.print_info(line)
+
+
+class _PymbarLog(logging.Handler):
+    """
+    Keeps pymbar's solver messages (and its JAX notice) off the console during
+    the FEP and sums them up in one conclusion.
+    """
+
+    _GRADIENT = re.compile(r"smallest gradient (\S+) norm")
+    _FINAL = re.compile(r"Final gradient norm: (\S+)")
+    _DELTA = re.compile(r"max_delta = (\S+),")
+
+    def __init__(self):
+        super().__init__(logging.INFO)
+        self.solves = 0
+        self.unconverged = 0
+        self.gradients = []
+        self.deltas = []
+        self._logger = logging.getLogger("pymbar")
+
+    def emit(self, record):
+        message = record.getMessage()
+        if self._FINAL.search(message):
+            self.solves += 1
+        if "No solution found" in message:
+            self.unconverged += 1
+        for pattern, values in ((self._GRADIENT, self.gradients),
+                                (self._DELTA, self.deltas)):
+            match = pattern.search(message)
+            if match:
+                try:
+                    values.append(float(match.group(1)))
+                except ValueError:
+                    pass
+
+    def summary(self):
+        """
+        Gets the conclusion of the MBAR solves.
+
+        :return:
+            (usable, text): whether the free energies can be used, and why.
+        """
+
+        solves = max(self.solves, self.unconverged)
+        if not self.unconverged:
+            return True, f"MBAR converged ({solves} solve(s))"
+        change = max(self.deltas, default=0.0)
+        gradient = max(self.gradients, default=float("nan"))
+        if change <= 1e-10:
+            return True, (
+                f"MBAR usable: {self.unconverged} of {solves} solve(s) ended "
+                f"at gradient {gradient:.1e}, above pymbar's 1e-12 tolerance, "
+                "but the free energies had stopped changing")
+        return False, (
+            f"MBAR not converged: {self.unconverged} of {solves} solve(s), "
+            f"free energies still changing by {change:.1e}; check the HFE")
+
+    def __enter__(self):
+        self._propagate = self._logger.propagate
+        self._level = self._logger.level
+        self._logger.addHandler(self)
+        self._logger.propagate = False
+        self._logger.setLevel(logging.INFO)
+        return self
+
+    def __exit__(self, *exc):
+        self._logger.removeHandler(self)
+        self._logger.propagate = self._propagate
+        self._logger.setLevel(self._level)
+        return False
 
 
 def finite_size_correction(formal_charge: float, box_length_nm: float,

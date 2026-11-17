@@ -71,7 +71,8 @@ from mpi4py import MPI
 from ..errorhandler import assert_msg_critical
 from ..veloxchemlib import mpi_master
 from .evaluator import within_tolerance
-from .models import (CalculationResult, EvaluationResult, FitTarget,
+from .models import (PROGRESS_STATUS, CalculationResult, EvaluationResult,
+                     FitTarget,
                      GeneratedBatch, ParameterSet, ParameterSpec, all_finite,
                      FitResult, format_value, h5_filename, print_settings,
                      read_h5_group, write_h5_groups)
@@ -422,6 +423,16 @@ SHORT_NAMES = {
 }
 
 
+def _interactive() -> bool:
+    """True on a terminal or in a Jupyter kernel."""
+    try:
+        if sys.stdout.isatty():
+            return True
+    except (AttributeError, ValueError):
+        return False
+    return "ipykernel" in sys.modules
+
+
 class FitProgress:
     """
     Prints one line per calculated candidate and, on a terminal or notebook,
@@ -452,9 +463,14 @@ class FitProgress:
         self._candidate_started = None
         self._stop = threading.Event()
         self._thread = None
+        self._lock = threading.Lock()
+        self._drawn = False
+        self._ostream_flush = None
+        # Redrawn in place only on a terminal or in a notebook; in a file
+        # every redraw would be one more line.
         self._live = (ostream is not None and ostream.get_state() and
                       not ostream.is_muted and
-                      ostream.stream is sys.stdout)
+                      ostream.stream is sys.stdout and _interactive())
 
     def bar(self) -> str:
         """The progress bar line."""
@@ -467,6 +483,8 @@ class FitProgress:
         if self._candidate_started is not None:
             line += (f" | candidate {running}: "
                      f"{_clock(time.monotonic() - self._candidate_started)}")
+            if PROGRESS_STATUS.text:
+                line += f" ({PROGRESS_STATUS.text})"
         if self.runtimes and self.total:
             mean = sum(self.runtimes) / len(self.runtimes)
             left = max(self.total - self.done, 0) * mean
@@ -475,13 +493,43 @@ class FitProgress:
             line += f" | remaining ~{_clock(max(left, 0.0))}"
         return line
 
-    def _draw(self) -> None:
-        sys.stdout.write("\r" + self.bar().ljust(self.ostream.width)[:self.ostream.width])
+    def _write_bar(self) -> None:
+        width = self.ostream.width
+        sys.stdout.write("\r" + self.bar().ljust(width)[:width])
         sys.stdout.flush()
+        self._drawn = True
+
+    def _erase_bar(self) -> None:
+        if self._drawn:
+            sys.stdout.write("\r" + " " * self.ostream.width + "\r")
+            sys.stdout.flush()
+            self._drawn = False
+
+    def _draw(self) -> None:
+        with self._lock:
+            self._write_bar()
 
     def _clear(self) -> None:
-        sys.stdout.write("\r" + " " * self.ostream.width + "\r")
-        sys.stdout.flush()
+        with self._lock:
+            self._erase_bar()
+
+    def _flush_around_bar(self) -> None:
+        """Output stream flush that moves the bar below the new lines."""
+        with self._lock:
+            self._erase_bar()
+            self._ostream_flush()
+            if self._candidate_started is not None:
+                self._write_bar()
+
+    def _hook_flush(self, on: bool) -> None:
+        """Route output stream flushes around the bar while a candidate
+        runs, so printed lines never land on the bar line."""
+        if on and self._ostream_flush is None:
+            self._ostream_flush = self.ostream.flush
+            self.ostream.flush = self._flush_around_bar
+        elif not on and self._ostream_flush is not None:
+            self.ostream.__dict__.pop("flush", None)
+            self._ostream_flush = None
 
     def _refresh(self) -> None:
         while not self._stop.wait(self.REFRESH_SECONDS):
@@ -490,8 +538,10 @@ class FitProgress:
     def start_candidate(self) -> None:
         """Marks the start of a candidate calculation."""
         self._candidate_started = time.monotonic()
+        PROGRESS_STATUS.set(None)
         if self._live:
             self.ostream.flush()
+            self._hook_flush(True)
             self._draw()
             self._stop.clear()
             self._thread = threading.Thread(target=self._refresh, daemon=True)
@@ -513,7 +563,9 @@ class FitProgress:
             self._stop.set()
             self._thread.join()
             self._thread = None
+        self._hook_flush(False)
         self._candidate_started = None
+        PROGRESS_STATUS.set(None)
         self.done += 1
         self.runtimes.append(runtime)
         if self.ostream is None:
@@ -531,15 +583,31 @@ class FitProgress:
                 f"{name}={float(value):.4g}"
                 for name, value in calculation.values.items()
                 if np.ndim(value) == 0)
+            skipped = [
+                name for name, meta in calculation.metadata.items()
+                if isinstance(meta, dict) and meta.get("skipped")
+            ]
+            if skipped:
+                result += f" (cheap first, skipped: {', '.join(skipped)})"
         self.ostream.print_info(f"Candidate {self.done}{total} "
                                 f"({_clock(runtime)}): {values} -> {result}")
+        for name, meta in calculation.metadata.items():
+            if isinstance(meta, dict) and meta.get("mbar"):
+                self.ostream.print_info(f"    {name}: {meta['mbar']}")
         self.ostream.flush()
         if self._live:
             self._draw()
 
     def close(self) -> None:
-        """Removes the progress bar line."""
-        if self._live and self.done:
+        """Stops the redraw and removes the progress bar line."""
+        if self._thread is not None:
+            self._stop.set()
+            self._thread.join()
+            self._thread = None
+        self._hook_flush(False)
+        self._candidate_started = None
+        PROGRESS_STATUS.set(None)
+        if self._live:
             self._clear()
 
 
@@ -705,8 +773,13 @@ class SearchDriver:
         for parameters, sample_id in zip(proposals, sample_ids):
             started = time.monotonic()
             progress.start_candidate()
-            item = next(inputs)
-            calculation = self._calculate(item, parameters)
+            try:
+                item = next(inputs)
+                calculation = self._calculate(item, parameters)
+            except BaseException:
+                # also on an interrupt: stop the bar redraw
+                progress.close()
+                raise
             progress.finish_candidate(parameters, calculation,
                                       time.monotonic() - started)
             quality = self.quality_check(calculation)

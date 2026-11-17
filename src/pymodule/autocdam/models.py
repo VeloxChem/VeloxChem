@@ -73,6 +73,33 @@ OUTPUT_WIDTH = 122  # the default width of a VeloxChem OutputStream
 LABEL_WIDTH = 32
 
 
+class ProgressStatus:
+    """
+    What the running candidate is calculating (MD, FEP window, framework),
+    shown by the progress bar.
+    """
+
+    def __init__(self):
+        """
+        Initializes an empty status.
+        """
+
+        self.text = None
+
+    def set(self, text):
+        """
+        Sets the status.
+
+        :param text:
+            The status text, or None.
+        """
+
+        self.text = text
+
+
+PROGRESS_STATUS = ProgressStatus()
+
+
 def default_ostream(ostream: OutputStream | None = None,
                     comm=None) -> OutputStream:
     """Return ``ostream``, or the VeloxChem default stream for ``comm``.
@@ -717,6 +744,9 @@ class FitTarget:
     ``reference`` may be a scalar or a sequence.  Names such as HFE, IOD, CN,
     and QM_ENERGY are target labels, not architectural special cases.
 
+    A target without a reference value has weight 0 and is not fitted: a
+    monitor reports its calculated value, any other role skips it.
+
     ``role`` is ``required`` (a hard tolerance constraint that also enters the
     loss), ``weighted`` (loss only) or ``monitor`` (reported, never optimized).
     The legacy names ``objective`` and ``analysis`` mean weighted and monitor.
@@ -768,6 +798,25 @@ class FitTarget:
             self.scale is None or
             (math.isfinite(self.scale) and self.scale > 0),
             "target scale must be positive")
+        assert_msg_critical(
+            self.reference is not None or not self.is_required,
+            f"required target {self.name!r} needs a 'value'")
+        if self.reference is None:
+            self.weight = 0.0
+
+    @property
+    def is_fitted(self) -> bool:
+        """
+        Checks whether the target steers the fit.
+
+        :return:
+            True for a required target, or a weighted target with a reference
+            value and a positive weight.
+        """
+
+        return self.is_required or (self.kind == "weighted" and
+                                    self.reference is not None and
+                                    self.weight > 0)
 
     @property
     def kind(self) -> str:
@@ -862,13 +911,9 @@ class FitTarget:
             The fit target.
         """
 
-        if "reference" in values:
-            reference = values["reference"]
-        elif "value" in values:
-            reference = values["value"]
-        else:
-            assert_msg_critical(
-                False, f"target {name!r} needs a 'reference' or 'value'")
+        # No value: weight 0, so the target is only reported (monitor) or
+        # skipped; see FitTarget.
+        reference = values.get("reference", values.get("value"))
         known = {
             "reference", "value", "tolerance", "weight", "metric", "unit",
             "role", "metadata", "scale", *TARGET_SELECTION_KEYS
@@ -885,7 +930,8 @@ class FitTarget:
             name=name,
             reference=reference,
             tolerance=float(values.get("tolerance", 1.0)),
-            weight=float(values.get("weight", 1.0)),
+            weight=float(values.get("weight",
+                                    1.0 if reference is not None else 0.0)),
             metric=str(values.get("metric", default_metric)),
             unit=values.get("unit"),
             role=str(values.get("role", "objective")),
@@ -956,6 +1002,8 @@ class EvaluationResult:
         Whether all required targets are within tolerance.
     :param constraint_violations:
         The violated required targets.
+    :param skipped:
+        The expensive targets not calculated (cheap-first), with the reason.
     """
 
     objective: float
@@ -967,6 +1015,7 @@ class EvaluationResult:
     warnings: list[str] = field(default_factory=list)
     feasible: bool = True
     constraint_violations: dict[str, float] = field(default_factory=dict)
+    skipped: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

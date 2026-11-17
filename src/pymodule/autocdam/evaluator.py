@@ -118,14 +118,32 @@ class Evaluator:
         target_results: dict[str, dict[str, object]] = {}
         violations: dict[str, float] = {}
 
+        skipped: dict[str, str] = {}
+
         for target in targets:
             if target.name not in calculation.values:
                 if target.is_monitor:
                     # Monitors are usually calculated for the final candidate only.
                     continue
+                reason = (calculation.metadata.get(target.name) or {}).get(
+                    "skipped")
+                if reason:
+                    # Cheap-first: a required cheap target already failed.
+                    skipped[target.name] = reason
+                    continue
                 reason = f"missing calculated value for target {target.name}"
                 return self._failure(reason, calculation.warnings)
             prediction = calculation.values[target.name]
+            if target.reference is None:
+                # No value to compare with: reported, never scored.
+                target_results[target.name] = {
+                    "prediction": prediction,
+                    "reference": None,
+                    "role": target.role,
+                    "kind": target.kind,
+                    "weight": target.weight,
+                }
+                continue
             try:
                 raw_error, metric_name = self._error(prediction,
                                                      target.reference,
@@ -165,6 +183,7 @@ class Evaluator:
             warnings=list(calculation.warnings),
             feasible=not violations,
             constraint_violations=violations,
+            skipped=skipped,
         )
 
     def _failure(self, reason: str, warnings: list[str]) -> EvaluationResult:
@@ -272,3 +291,31 @@ def within_tolerance(evaluation: EvaluationResult,
                evaluation.metrics[target.name] <= target.tolerance
                for target in targets
                if target.is_objective)
+
+
+def cheap_first_reason(values, targets, margin) -> str | None:
+    """
+    Gets why the expensive calculations of a candidate are skipped.
+
+    :param values:
+        The calculated values by target name, in the target units.
+    :param targets:
+        The required cheap targets (IOD, CN, ... of the aqueous MD).
+    :param margin:
+        The miss, in tolerances, beyond which a required target cannot be
+        recovered.
+
+    :return:
+        The reason, or None to calculate the expensive targets.
+    """
+
+    for target in targets:
+        if target.name not in values or target.reference is None:
+            continue
+        error, _ = Evaluator._error(values[target.name], target.reference,
+                                    target.metric)
+        if error > margin * target.tolerance:
+            return (f"cheap first: {target.name} misses its value by "
+                    f"{error / target.tolerance:.3g} tolerances "
+                    f"(> {margin:g})")
+    return None

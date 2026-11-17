@@ -49,7 +49,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from copy import deepcopy
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
 
@@ -73,7 +73,7 @@ from .framework import FrameworkSystem
 from .candidate import PARAMETER_UNITS, CDAMCandidate
 from .generator import CoordinateGenerator
 from .md import fep_settings, md_settings
-from .models import (print_settings, table_lines, CalculationResult, EvaluationResult, FitResult, FitTarget,
+from .models import (AQUEOUS_PROPERTIES, print_settings, table_lines, CalculationResult, EvaluationResult, FitResult, FitTarget,
                      GeneratedBatch, ParameterSet, ParameterSpec,
                      coerce_parameter_specs, coerce_targets, h5_filename,
                      parse_parameters,
@@ -176,9 +176,18 @@ class AutoCDAM:
             if key != 'seed':
                 setattr(self, key, deepcopy(value))
 
+        # cheap first: the aqueous MD runs first; HFE and framework systems
+        # are skipped when a required MD target (IOD, CN, ...) misses its
+        # value by more than cheap_first_margin tolerances
+        self.cheap_first = True
+        self.cheap_first_margin = 3.0
+
         # calculations
         self.pilot = False
         self.fast_mode = False
+        # pilot only: a minutes-long FEP that tests HFE runs (values not
+        # meaningful)
+        self.quick_dirty_hfe = False
         self.work_dir = None
         self.md_options = None
         self.fep_options = None
@@ -251,8 +260,14 @@ class AutoCDAM:
                     ('float', 'Bayesian: widening fraction of the width'),
                 'bound_expansion_evaluations':
                     ('int', 'Bayesian: extra budget per widening'),
+                'cheap_first':
+                    ('bool', 'skip HFE and frameworks if required MD fails'),
+                'cheap_first_margin':
+                    ('float', 'cheap first: allowed miss in tolerances'),
                 'pilot': ('bool', 'workflow test: 0.05 ps MD, minutes'),
                 'fast_mode': ('bool', 'short MD (50 ps production)'),
+                'quick_dirty_hfe':
+                    ('bool', 'pilot only: 0.5 ps per FEP window, tests HFE'),
                 'work_dir': ('str', 'working directory of the calculations'),
                 'md_options': ('raw', 'MD protocol settings'),
                 'fep_options': ('raw', 'solvation FEP settings'),
@@ -373,6 +388,15 @@ class AutoCDAM:
                     mode: True,
                     **options.get('md_options', {})
                 }
+        if self.quick_dirty_hfe:
+            assert_msg_critical(
+                self.pilot,
+                'AutoCDAM: quick_dirty_hfe is a workflow test; set pilot = '
+                'True as well')
+            options['fep_options'] = {
+                'quick_dirty': True,
+                **options.get('fep_options', {})
+            }
         return options
 
     def setup(self,
@@ -421,7 +445,18 @@ class AutoCDAM:
 
         # Targets. Monitors are reported, never optimized: they are calculated
         # once for the final result unless metadata asks for evaluate="always".
-        self.targets = coerce_targets(fit_targets)
+        # A target steers the fit with a value and a weight; without, it is
+        # only reported (monitor) or not calculated at all.
+        self.targets = []
+        for target in coerce_targets(fit_targets):
+            if target.is_fitted or target.is_monitor:
+                self.targets.append(target)
+                continue
+            reason = ('no value' if target.reference is None else 'weight 0')
+            self.ostream.print_info(
+                f'Target {target.name}: {reason}, not fitted and not '
+                "calculated; set role 'monitor' to report it")
+        self.ostream.flush()
         self.search_targets = [
             t for t in self.targets
             if not t.is_monitor or t.metadata.get("evaluate") == "always"
@@ -486,6 +521,8 @@ class AutoCDAM:
                                                self.filename,
                                                write=self.rank == mpi_master())
         self._resolve_md_protocol()
+        self._set_cheap_first(self._cheap_first_on())
+        self._print_cheap_first()
         self.evaluator = (self._base_evaluator
                           if self._base_evaluator is not None else
                           Evaluator(ostream=ostream))
@@ -654,6 +691,68 @@ class AutoCDAM:
             self.calculator_options["md_options"] = md_settings(
                 self.calculator_options.get("md_options"))
 
+    def _cheap_first_targets(self) -> list[FitTarget]:
+        """Required aqueous MD targets that decide on the expensive ones."""
+        router = self.system_router
+        return [
+            t for t in self.search_targets
+            if t.is_required and t.reference is not None and
+            AQUEOUS_PROPERTIES.get(t.property_name) is not None and
+            AQUEOUS_PROPERTIES[t.property_name].job == "md" and
+            (router is None or router.system_of(t) in router.aqueous_names)
+        ]
+
+    def _cheap_first_on(self) -> bool:
+        """Cheap first is on unless quick_dirty_hfe tests that the FEP runs."""
+        return bool(self.cheap_first) and not self.quick_dirty_hfe
+
+    def _set_cheap_first(self, enabled) -> None:
+        """Give the calculators the cheap-first check (MD before FEP and
+        framework systems), or remove it."""
+        assert_msg_critical(
+            float(self.cheap_first_margin) >= 1.0,
+            'AutoCDAM: cheap_first_margin must be at least 1 tolerance')
+        router = self.system_router
+        aqueous = router.aqueous if router is not None else self.calculator
+        aqueous = (aqueous.inner
+                   if isinstance(aqueous, CachedCalculator) else aqueous)
+        gate = self._cheap_first_targets() if enabled else []
+        margin = float(self.cheap_first_margin)
+        if isinstance(aqueous, Calculator):
+            aqueous.cheap_first = ([
+                replace(t, name=t.property_name) for t in gate
+            ], margin) if gate else None
+        if router is not None:
+            router.cheap_first = (gate, margin) if gate else None
+
+    def _print_cheap_first(self) -> None:
+        """State which targets the cheap-first check skips, and when."""
+        router = self.system_router
+        gate = self._cheap_first_targets()
+        margin = float(self.cheap_first_margin)
+        expensive = [
+            t.name for t in self.search_targets
+            if t.property_name == 'HFE' or
+            (router is not None and
+             router.system_of(t) not in router.aqueous_names)
+        ]
+        if self.cheap_first and self.quick_dirty_hfe and expensive:
+            self.ostream.print_info(
+                'Cheap first is off with quick_dirty_hfe: every candidate '
+                'runs the FEP')
+        elif self.cheap_first and expensive:
+            if gate:
+                self.ostream.print_info(
+                    f'Cheap first: {", ".join(expensive)} calculated only '
+                    f'when {", ".join(t.name for t in gate)} are within '
+                    f'{margin:g} tolerances')
+            else:
+                self.ostream.print_info(
+                    'Cheap first needs a required IOD or CN target; '
+                    f'{", ".join(expensive)} are calculated for every '
+                    'candidate')
+            self.ostream.flush()
+
     def _prepare_template(self) -> None:
         """Build the shared solvent template once when the calculator needs it."""
         if all(target.property_name == "QM_ENERGY" for target in self.targets):
@@ -798,6 +897,10 @@ class AutoCDAM:
             self.ostream.print_info(
                 'Pilot mode: 0.05 ps MD per candidate tests the workflow only; '
                 'the fitted values are not meaningful')
+            if self.quick_dirty_hfe:
+                self.ostream.print_info(
+                    'Quick-dirty HFE: 0.5 ps per lambda window tests that the FEP '
+                    'runs; the HFE values are not meaningful')
             self.ostream.print_blank()
             self.ostream.flush()
         if self.fast_mode:
@@ -1158,6 +1261,11 @@ class AutoCDAM:
             options['fep_options'] = fep_settings(options.get('fep_options'))
         metadata["calculator_options"] = options
         metadata["search_method"] = self.search_method
+        gate = self._cheap_first_targets() if self._cheap_first_on() else []
+        metadata["cheap_first"] = ({
+            "targets": [t.name for t in gate],
+            "margin": float(self.cheap_first_margin)
+        } if gate else None)
         if self.system_router is not None:
             # Baselines are prepared once here; fingerprints guard resume.
             metadata["systems"] = {
@@ -1253,9 +1361,14 @@ class AutoCDAM:
             return result
         self._prepare_template()
         batch = self.generate(result.parameters)
-        calculation = self.calculator.calculate(batch, result.parameters,
-                                                self.monitor_targets,
-                                                **self.calculator_options)
+        # Monitors are always calculated: no cheap-first skipping.
+        self._set_cheap_first(False)
+        try:
+            calculation = self.calculator.calculate(batch, result.parameters,
+                                                    self.monitor_targets,
+                                                    **self.calculator_options)
+        finally:
+            self._set_cheap_first(self._cheap_first_on())
         evaluation = self.evaluator.evaluate(calculation, self.monitor_targets)
         result.diagnostics["monitor"] = reporting.monitor_report(
             calculation, evaluation, self.monitor_targets)

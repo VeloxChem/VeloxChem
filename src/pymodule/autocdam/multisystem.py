@@ -40,9 +40,10 @@ from typing import Iterable
 from ..errorhandler import assert_msg_critical
 from ..outputstream import OutputStream
 from .calculator import Calculator
+from .evaluator import cheap_first_reason
 from .framework import FrameworkSystem
 from .candidate import CDAMCandidate
-from .models import (CalculationResult, FitTarget, GeneratedBatch, ParameterSet,
+from .models import (PROGRESS_STATUS, CalculationResult, FitTarget, GeneratedBatch, ParameterSet,
                      default_ostream, AQUEOUS_PROPERTIES, convert_units)
 
 
@@ -86,6 +87,10 @@ class MultiSystemCalculator:
             name for name, system in self.systems.items() if system is None
         }
         self.requires_openmm_systems = False
+        # cheap first: (required aqueous MD targets, margin); framework
+        # systems are skipped when one misses its value by more than margin
+        # tolerances
+        self.cheap_first = None
 
     def system_of(self, target: FitTarget) -> str:
         """
@@ -161,9 +166,21 @@ class MultiSystemCalculator:
         merged = CalculationResult()
         failures = []
         framework_protocol = kwargs.pop("framework_protocol", None)
-        for name, system in self.systems.items():
+        skipped = None
+        # The aqueous system first: its MD decides whether the frameworks run.
+        order = sorted(self.systems.items(), key=lambda item: item[1] is not None)
+        for name, system in order:
             group = [t for t in targets if self.system_of(t) == name]
             if not group:
+                continue
+            if system is not None and self.cheap_first and skipped is None:
+                skipped = cheap_first_reason(merged.values, *self.cheap_first)
+            if system is not None and skipped:
+                for target in group:
+                    merged.metadata[target.name] = {"skipped": skipped,
+                                                    "system": name}
+                self.ostream.print_info(f"System {name} skipped, {skipped}")
+                self.ostream.flush()
                 continue
             started = time.monotonic()
             if system is None:
@@ -178,6 +195,7 @@ class MultiSystemCalculator:
                                                 list(inner.values()), **kwargs)
             else:
                 candidate = CDAMCandidate.from_generated_batch(batch)
+                PROGRESS_STATUS.set(f"{name} framework")
                 result = system.calculate(candidate,
                                           group,
                                           protocol=framework_protocol)

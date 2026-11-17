@@ -388,10 +388,12 @@ class TestAutoCdamMultisystemProperties:
         }
         fit = AutoCDAM()
         fit.calculator = aqueous
+        # every candidate calculates both systems (no cheap-first skipping)
         fit.update_settings({
             "search_method": "staged",
             "max_iterations": 1,
-            "samples_per_stage": 4
+            "samples_per_stage": 4,
+            "cheap_first": False
         })
         fit.setup(CDAMCandidate("Al", 3),
                   targets,

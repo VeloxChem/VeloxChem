@@ -75,9 +75,11 @@ from .generator import CoordinateGenerator
 from .geometry import analyze_trajectory, count_waters
 from .md import (check_fep_backend, fep_uncertainty, finite_size_correction,
                  run_fep, default_platform, md_settings, run_md)
+from .evaluator import cheap_first_reason
 from .models import (print_settings, CalculationResult, FitTarget,
                      GeneratedBatch, OpenMMSystems, ParameterSet,
-                     default_ostream, aqueous_property, convert_units)
+                     default_ostream, aqueous_property, convert_units,
+                     PROGRESS_STATUS)
 
 # ==========================================================================
 # qm
@@ -264,6 +266,9 @@ class Calculator:
         self.comm = comm if comm is not None else MPI.COMM_WORLD
         self.ostream = default_ostream(ostream, self.comm)
         self.qm = SinglePointCalculator(self.comm, self.ostream)
+        # cheap first: (required MD targets, margin); the FEP is skipped when
+        # one misses its value by more than margin tolerances
+        self.cheap_first = None
 
     # ------------------------------------------------------------ public API
 
@@ -344,6 +349,7 @@ class Calculator:
         results = _Results(targets, plan)
 
         if "qm" in plan.jobs:
+            PROGRESS_STATUS.set("QM single point")
             self._calculate_qm(batch, targets, kwargs, results)
             if set(plan.jobs) == {"qm"}:
                 return results.finish(parameters)
@@ -357,13 +363,22 @@ class Calculator:
         final_state, md_analysis, r1_nm = None, {}, DEFAULT_ION_RADIUS_NM
         equilibrate = "fep" in plan.jobs and fep_options.get(
             "equilibrate_first", True)
+        gate, margin = ((self.cheap_first if "fep" in plan.jobs else None) or
+                        ([], None))
+        skipped = None
         if "md" in plan.jobs or equilibrate:
             # HFE alone still runs the MD protocol: short FEP windows started
             # from the minimized template biased Al3+ charging by ~400 kJ/mol.
+            requested = list(plan.jobs.get("md", []))
+            extra = [t.name for t in gate if t.name not in requested]
             final_state, md_results = self._execute_md_block(
-                systems, plan.jobs.get("md", []), md_options)
+                systems, requested + extra, md_options)
             if final_state is None:
                 return self._generate_failed_result(targets, parameters)
+            skipped = self._cheap_first_check(md_results, gate, margin)
+            for name in extra:
+                md_results.pop(name, None)
+                md_results.pop(f"{name}_std", None)
             if "md" in plan.jobs:
                 r1_nm = md_results.pop("R1", r1_nm)
                 md_analysis = md_results.pop("_analysis", {})
@@ -372,10 +387,28 @@ class Calculator:
                 r1_nm = md_results.get("R1", r1_nm)
                 results.metadata["HFE"]["equilibration_md_options"] = md_options
 
-        if "fep" in plan.jobs:
+        if "fep" in plan.jobs and skipped:
+            for name in plan.jobs["fep"]:
+                results.metadata[name]["skipped"] = skipped
+            self.ostream.print_info(f"FEP skipped, {skipped}")
+            self.ostream.flush()
+        elif "fep" in plan.jobs:
             self._calculate_hfe(systems, final_state, r1_nm, work_dir,
                                 fep_options, batch, results)
         return results.finish(parameters, md_analysis=md_analysis)
+
+    @staticmethod
+    def _cheap_first_check(md_results, gate, margin):
+        """Why the FEP is skipped (cheap first), or None."""
+        if not gate:
+            return None
+        values, metadata = {}, {}
+        for target in gate:
+            if target.name in md_results:
+                values[target.name] = md_results[target.name]
+                metadata[target.name] = {}
+        convert_units(values, metadata, gate)
+        return cheap_first_reason(values, gate, margin)
 
     # ----------------------------------------------------------------- setup
 
@@ -468,6 +501,7 @@ class Calculator:
             options=None) -> tuple[mm.State | None, dict[str, Any]]:
         """Run MD of the solvated box and analyse ``md_targets``; (None, {}) if either fails."""
         self.ostream.print_info("Starting NPT MD...")
+        PROGRESS_STATUS.set("water MD")
         started = time.time()
         topology, positions = systems.solvated_topology, systems.solvated_positions
         trajectory = run_md(systems.solvated_system,
@@ -480,6 +514,7 @@ class Calculator:
         try:
             self.ostream.print_info("Analyzing trajectory...")
             self.ostream.flush()
+            PROGRESS_STATUS.set("water MD analysis")
             reference = np.array(positions.value_in_unit(unit.nanometer))
             md_results = analyze_trajectory(trajectory.frames, trajectory.boxes,
                                             topology, md_targets, reference)
@@ -531,7 +566,11 @@ class Calculator:
             results.warnings.append(
                 "HFE correction uses the default ion radius of 0.20 nm; "
                 "no MD/RDF radius was calculated.")
-        if fep_options:
+        if fep_options.get("quick_dirty"):
+            results.warnings.append(
+                "Quick-dirty FEP (0.5 ps per lambda window) only tests that the "
+                "HFE runs; its value is not meaningful.")
+        elif fep_options:
             results.warnings.append(
                 "FEP sampling settings were overridden; inspect the "
                 "VeloxChem MBAR output before interpreting HFE.")
@@ -568,6 +607,15 @@ class Calculator:
         uncertainty = fep_uncertainty(fep_output)
         if uncertainty is not None:
             meta["uncertainty"] = uncertainty
+        mbar = fep_output.get("mbar") or {}
+        if mbar.get("summary"):
+            meta["mbar"] = mbar["summary"]
+        if not mbar.get("usable", True):
+            results.warnings.append(mbar["summary"])
+        elif uncertainty is not None and math.isfinite(uncertainty):
+            # MBAR converged to a finite error estimate: the HFE may train
+            # the fit
+            meta["quality_status"] = "usable"
         meta["analytical_correction_kj_mol"] = correction
 
     def _generate_failed_result(self, targets: list[FitTarget],
