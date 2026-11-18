@@ -37,6 +37,7 @@ import numpy as np
 import time
 import sys
 import gc
+import copy
 import warnings
 import json
 
@@ -438,38 +439,46 @@ class EvbFepDriver:
         self.ostream.print_info(info)
         self.ostream.flush()
 
+        # Ensemble of the lambda windows (equilibration and sampling alike):
+        # NPT when isobaric is set, NVT otherwise. The systems of a solvated
+        # build carry a MonteCarloBarostat whatever the ensemble; every stage
+        # sets its frequency (see _barostat_frequency), so NPT needs one.
+        has_barostat = self._systems_have_barostat()
+        if self.systems is not None and self.isobaric:
+            pressures = [
+                barostat.getDefaultPressure().value_in_unit(mmunit.bar)
+                for barostat in self._barostats(next(iter(
+                    self.systems.values())))
+            ]
+            assert_msg_critical(
+                has_barostat and min(pressures) > 0,
+                "isobaric is set, but the systems have no barostat with a "
+                f"positive pressure (pressures in bar: {pressures})")
+
         self.total_steps = 0
         self.run_steps = 0
         # Per-lambda equilibration + sampling, summed over every lambda window in
         # a single sweep, then scaled by the number of sweeps.
-        self.pass_steps = (self.equil_NVT_steps + self.sample_steps) * len(
-            self.Lambda)
-        if self.isobaric:
-            self.pass_steps += self.equil_NPT_steps * len(self.Lambda)
+        self.pass_steps = (self._window_equil_steps() +
+                           self.sample_steps) * len(self.Lambda)
         self.total_steps += self.pass_steps * n_passes
 
         # Initial equilibration / PDB warm-up. This is only executed once, for
         # the l == 0 window and only when skip_initial_equil is not set, so
-        # mirror exactly the step counts that _initial_equilibrate will run.
+        # mirror exactly the step counts that _initial_equilibrate will run:
+        # the NVT stage(s), then one NPT stage whenever the systems have a
+        # barostat (the windows then start at the equilibrated density).
         if not self.skip_initial_equil and 0 in self.Lambda:
             if self.pdb is None:
                 self.total_steps += self.initial_equil_NVT_steps
-                if self.isobaric:
-                    self.total_steps += self.initial_equil_NPT_steps
             else:
                 for T in self.pdb_temperatures:
-                    if T == self.temperature:
+                    if T == self.temperature or self.warmup_NVT_steps <= 0:
                         self.total_steps += self.initial_equil_NVT_steps
-                        if self.isobaric:
-                            self.total_steps += self.initial_equil_NPT_steps
                     else:
-                        self.total_steps += (self.warmup_NVT_steps
-                                             if self.warmup_NVT_steps > 0 else
-                                             self.initial_equil_NVT_steps)
-                        if self.isobaric:
-                            self.total_steps += (self.warmup_NPT_steps if
-                                                 self.warmup_NPT_steps > 0 else
-                                                 self.initial_equil_NPT_steps)
+                        self.total_steps += self.warmup_NVT_steps
+            if has_barostat:
+                self.total_steps += self.initial_equil_NPT_steps
 
         # Resolve the recalculation mode. Deferred - sample a whole window, then
         # re-score its frames in one batched GPU pass - is the only supported
@@ -650,17 +659,25 @@ class EvbFepDriver:
                 mmunit.nanometer)
             velocities = seed_state.getVelocities(asNumpy=True).value_in_unit(
                 mmunit.nanometer / mmunit.picosecond)
-            self._seed_box_vectors = seed_state.getPeriodicBoxVectors()
+            box = seed_state.getPeriodicBoxVectors()
             self.ostream.print_info(
                 f"Starting from the state in {self._initial_state_file}")
             self.ostream.flush()
         else:
             positions = initial_positions * 0.1
             velocities = None
-            self._seed_box_vectors = None
+            # The topology's cell: the built box, or the cell of the cif a
+            # restart was loaded from (load_initialisation restart_pdb).
+            box = self.topology.getPeriodicBoxVectors()
+
+        # Positions, velocities and the periodic box travel together from
+        # every stage to the next (initial equilibration -> windows -> sweeps
+        # -> replicas): a context built from a system starts in the system's
+        # default box, and positions from an NPT-changed box set into it
+        # overlap at the faces (defect E3-2).
 
         # Initial equilibration, performed once on the l == 0 system. The
-        # resulting positions / velocities seed the first forward sweep.
+        # resulting state seeds the first forward sweep.
         if not self.skip_initial_equil and 0 in self.Lambda:
             system = self.systems[0]
             n_constraints = system.getNumConstraints()
@@ -668,9 +685,11 @@ class EvbFepDriver:
                 self.ostream.print_info(
                     "Constraining all bonds involving H atoms")
                 system = self._constrain_H_bonds(system)
-            state = self._initial_equilibrate(system, positions)
+            with self._barostat_frequency(system, npt=False):
+                state = self._initial_equilibrate(system, positions, box)
             positions = state.getPositions()
             velocities = state.getVelocities()
+            box = state.getPeriodicBoxVectors()
             if self.constrain_H:
                 self.ostream.print_info(
                     "Removing constraints involving H atoms")
@@ -702,8 +721,9 @@ class EvbFepDriver:
         backward_order = list(reversed(self.Lambda))
         for replica in range(self.n_replicas):
             # Forward sweep (l: 0 -> 1), direction = 0.
-            positions, velocities = self.run_FEP(forward_order, replica, 0,
-                                                 positions, velocities)
+            positions, velocities, box = self.run_FEP(forward_order, replica,
+                                                      0, positions, velocities,
+                                                      box)
 
             # Save the lambda=1 endpoint of the first replica's forward sweep,
             # so that the next step of a reaction path can start from an
@@ -717,8 +737,9 @@ class EvbFepDriver:
                 self._save_final_state()
             # Backward sweep (l: 1 -> 0), direction = 1, seeded by the final
             # state of the forward sweep.
-            positions, velocities = self.run_FEP(backward_order, replica, 1,
-                                                 positions, velocities)
+            positions, velocities, box = self.run_FEP(backward_order, replica,
+                                                      1, positions, velocities,
+                                                      box)
             # Deferred mode: re-score this replica's frames in one batched GPU
             # pass now that all of its sampling contexts have been released.
             if self._deferred:
@@ -836,12 +857,19 @@ class EvbFepDriver:
         )
         server.serve()
 
-    def run_FEP(self, lambda_order, replica, direction, positions, velocities):
+    def run_FEP(self,
+                lambda_order,
+                replica,
+                direction,
+                positions,
+                velocities,
+                box=None):
         """Run a single lambda sweep (one replica, one direction).
 
         Equilibrates then samples each lambda window in ``lambda_order``,
-        carrying positions/velocities forward, and returns the final
-        positions/velocities so the caller can chain the next sweep.
+        carrying positions, velocities and the periodic box forward, and
+        returns the final positions, velocities and box so the caller can
+        chain the next sweep. box None keeps the system's default box.
         """
         dir_label = "forward" if direction == 0 else "backward"
         self.ostream.print_info(
@@ -853,9 +881,7 @@ class EvbFepDriver:
         pass_timer = Timer(self.pass_steps)
         pass_timer.start()
         pass_run_steps = 0
-        window_steps = self.equil_NVT_steps + self.sample_steps
-        if self.isobaric:
-            window_steps += self.equil_NPT_steps
+        window_steps = self._window_equil_steps() + self.sample_steps
 
         for l in lambda_order:
             system = self.systems[l]
@@ -866,25 +892,31 @@ class EvbFepDriver:
                     "Constraining all bonds involving H atoms")
                 system = self._constrain_H_bonds(system)
 
-            equil_state = self._equilibrate(system,
-                                            f"r{replica}_d{direction}_l{l:.3}",
-                                            positions, velocities)
+            # One ensemble for equilibration and sampling at every lambda:
+            # NPT if isobaric, else NVT (defect E3-3).
+            with self._barostat_frequency(system, npt=self.isobaric):
+                equil_state = self._equilibrate(
+                    system, f"r{replica}_d{direction}_l{l:.3}", positions,
+                    velocities, box)
 
             if self.constrain_H:
                 self.ostream.print_info(
                     "Removing constraints involving H atoms")
                 self._remove_added_constraints(system, n_constraints)
 
-            state = self._sample(system, l, equil_state, replica, direction)
+            with self._barostat_frequency(system, npt=self.isobaric):
+                state = self._sample(system, l, equil_state, replica,
+                                     direction)
             positions = state.getPositions()
             velocities = state.getVelocities()
+            box = state.getPeriodicBoxVectors()
             self._last_state = state
 
             pass_run_steps += window_steps
             self._print_progress(pass_timer, pass_run_steps, replica, dir_label,
                                  l)
 
-        return positions, velocities
+        return positions, velocities, box
 
     def _save_final_state(self):
         """Serialize the last sampled state to final_state.xml.
@@ -920,8 +952,17 @@ class EvbFepDriver:
         self.ostream.print_info(msg)
         self.ostream.flush()
 
-    def _initial_equilibrate(self, system, positions):
+    def _initial_equilibrate(self, system, positions, box=None):
+        """NVT stage(s) - the PDB warm-up ramp for a PDB system - then one NPT
+        stage at the target temperature when the system has a barostat.
+
+        The caller runs this with the barostat off (_barostat_frequency); the
+        NPT stage switches it on in the running context (the context reads the
+        frequency from the System's Force at every step).
+        """
         simulation = self._get_simulation(system, self.equil_step_size)
+        if box is not None:
+            simulation.context.setPeriodicBoxVectors(*box)
         simulation.context.setPositions(positions)
 
         platformname = simulation.context.getPlatform()
@@ -943,19 +984,9 @@ class EvbFepDriver:
                 self.data_folder, 'initial_equil_data.csv')
             simulation.reporters.append(equil_data_reporter)
         if self.pdb is None:
-            barostat = self._get_barostat(simulation)
-            if barostat:
-                barostat.setFrequency(0)
-                self._safe_step(simulation, self.initial_equil_NVT_steps,
-                                "initial NVT equilibration")
-                barostat.setFrequency(25)
-                self._safe_step(simulation, self.initial_equil_NPT_steps,
-                                "initial NPT equilibration")
-                barostat.setFrequency(0)
-            else:
-                self._safe_step(simulation, self.initial_equil_NVT_steps,
-                                "initial NVT equilibration")
-
+            self._safe_step(simulation, self.initial_equil_NVT_steps,
+                            "initial NVT equilibration")
+            npt_name = "initial NPT equilibration"
         else:
             self.ostream.print_info(
                 f"Perfoming PDB warmup with T-vector {np.array(self.pdb_temperatures)}"
@@ -982,14 +1013,13 @@ class EvbFepDriver:
                         cif=True,
                     )
 
-            barostat = self._get_barostat(simulation)
-            if barostat:
-                barostat.setFrequency(25)
-                self._safe_step(
-                    simulation, self.initial_equil_NPT_steps,
-                    f"NPT equilibration at target temperature T = {self.temperature}"
-                )
-                barostat.setFrequency(0)
+            npt_name = ("NPT equilibration at target temperature "
+                        f"T = {self.temperature}")
+
+        if self._barostats(simulation.system):
+            self._set_npt(simulation.system, True)
+            self._safe_step(simulation, self.initial_equil_NPT_steps, npt_name)
+            self._set_npt(simulation.system, False)
 
         equil_state = simulation.context.getState(
             getPositions=True,
@@ -1014,15 +1044,21 @@ class EvbFepDriver:
 
         return equil_state
 
-    def _equilibrate(self, system, name, positions, velocities=None):
+    def _equilibrate(self,
+                     system,
+                     name,
+                     positions,
+                     velocities=None,
+                     box=None):
+        """Window equilibration: equil_NPT_steps if isobaric, else
+        equil_NVT_steps. The caller sets the barostat (_barostat_frequency).
+        """
         simulation = self._get_simulation(system, self.equil_step_size)
-        # The box of a seeded state has to be restored before the positions are
-        # set: an NPT run in the previous step will have changed it away from
-        # the system's default, and the coordinates only make sense in it.
-        seed_box = getattr(self, "_seed_box_vectors", None)
-        if seed_box is not None:
-            simulation.context.setPeriodicBoxVectors(*seed_box)
-            self._seed_box_vectors = None
+        # The box goes in before the positions: they only make sense in the box
+        # the previous stage ended in, which an NPT stage has moved away from
+        # the system's default (defect E3-2).
+        if box is not None:
+            simulation.context.setPeriodicBoxVectors(*box)
         simulation.context.setPositions(positions)
         if velocities is not None:
             simulation.context.setVelocities(velocities)
@@ -1065,13 +1101,11 @@ class EvbFepDriver:
             simulation.reporters.append(equil_traj_reporter)
 
         if self.isobaric:
-            barostat = self._get_barostat(simulation)
-
-            barostat.setFrequency(25)
             self._safe_step(simulation, self.equil_NPT_steps,
                             "NPT equilibration")
         else:
-            self._safe_step(simulation, self.equil_NVT_steps, "equilibration")
+            self._safe_step(simulation, self.equil_NVT_steps,
+                            "NVT equilibration")
 
         equil_state = simulation.context.getState(
             getPositions=True,
@@ -1106,26 +1140,74 @@ class EvbFepDriver:
         self.ostream.print_info("Minimizing energy")
         self.ostream.flush()
         simulation.minimizeEnergy()
-        positions = simulation.context.getState(
-            getPositions=True, enforcePeriodicBox=True).getPositions()
+        state = simulation.context.getState(getPositions=True,
+                                            enforcePeriodicBox=True)
+        positions = state.getPositions()
         if filename is not None:
             mmapp.PDBxFile.writeFile(
-                self.topology,
+                self._topology_in_box(state),
                 np.array(positions.value_in_unit(mm.unit.angstrom)),
                 open(self.run_folder / f"minim_{filename}.cif", "w"),
             )
 
+    # Attempt frequency (steps) of the MonteCarloBarostat in an NPT stage.
+    _npt_barostat_frequency = 25
+
     @staticmethod
-    def _get_barostat(simulation):
-        barostats = [
-            force for force in simulation.system.getForces()
-            if isinstance(force, mm.MonteCarloBarostat)
-            or isinstance(force, mm.MonteCarloFlexibleBarostat)
+    def _barostats(system):
+        return [
+            force for force in system.getForces()
+            if isinstance(force, (mm.MonteCarloBarostat,
+                                  mm.MonteCarloFlexibleBarostat))
         ]
-        if len(barostats) == 0:
-            return None
-        else:
-            return barostats[0]
+
+    def _systems_have_barostat(self):
+        """Whether the systems carry a barostat (all are built alike)."""
+        if not self.systems:
+            return False
+        system = next(iter(self.systems.values()))
+        return len(self._barostats(system)) > 0
+
+    def _window_equil_steps(self):
+        return self.equil_NPT_steps if self.isobaric else self.equil_NVT_steps
+
+    def _set_npt(self, system, npt):
+        """Switch the system's barostat on (NPT) or off (NVT). A context built
+        from the system follows at its next step."""
+        for barostat in self._barostats(system):
+            barostat.setFrequency(self._npt_barostat_frequency if npt else 0)
+
+    @contextmanager
+    def _barostat_frequency(self, system, npt):
+        """Run a block with the barostat on (npt) or off, then give the system
+        back the frequency it was built with.
+
+        The systems are shared by every stage, so a frequency left behind by
+        one stage would set the ensemble of the next one built from the same
+        system (defect E3-3: the lambda 0 window ran NVT, every other window
+        NPT, whatever isobaric said).
+        """
+        barostats = self._barostats(system)
+        built = [barostat.getFrequency() for barostat in barostats]
+        try:
+            self._set_npt(system, npt)
+            yield
+        finally:
+            for barostat, frequency in zip(barostats, built):
+                barostat.setFrequency(frequency)
+
+    def _topology_in_box(self, state):
+        """The topology with the cell of state, for structure files.
+
+        self.topology keeps the built cell; a file written with it would give a
+        restart from that file the wrong box. A shallow copy carries the
+        state's cell and leaves self.topology as it is.
+        """
+        if self.topology.getPeriodicBoxVectors() is None:
+            return self.topology
+        topology = copy.copy(self.topology)
+        topology.setPeriodicBoxVectors(state.getPeriodicBoxVectors())
+        return topology
 
     def _sample(self, system, l, initial_state, replica=0, direction=0):
         if self._deferred:
@@ -2089,15 +2171,16 @@ class EvbFepDriver:
                                                 enforcePeriodicBox=True)
             positions = np.array(state.getPositions().value_in_unit(
                 mm.unit.angstrom))
+            topology = self._topology_in_box(state)
             if pdb:
                 mmapp.PDBFile.writeFile(
-                    self.topology,
+                    topology,
                     positions,
                     open(self.run_folder / f"{name}.pdb", "w"),
                 )
             if cif:
                 mmapp.PDBxFile.writeFile(
-                    self.topology,
+                    topology,
                     positions,
                     open(self.run_folder / f"{name}.cif", "w"),
                 )
@@ -2187,7 +2270,7 @@ class EvbFepDriver:
                                           neginf=-9999998)
 
                 mmapp.PDBFile.writeFile(
-                    self.topology,
+                    self._topology_in_box(state),
                     positions,
                     open(self.run_folder / f"{pdb_name}.pdb", "w"),
                 )
