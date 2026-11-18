@@ -144,6 +144,18 @@ def _get_smallest_room(comm):
 # with 8 threads.
 _FOUR_CENTER_ERI_MATRICES_PER_THREAD = 3
 
+# NOTE: the matrices of 8 x n_ao^2 bytes that each density of a four-center
+# response Fock build takes on the master rank at least, whatever the number
+# of threads; with more threads than this, a density is charged one matrix for
+# each thread, as get_batch_size does. Measured on the master rank, the peak of
+# an RPA initial guess (21 Fock builds, def2-SVPD) at batch sizes 1 to 16 grew
+# by 6 to 7 such matrices for each density at 1, 4 and 8 threads (a 43-atom
+# molecule with 689 basis functions on 8 ranks, a 76-atom one with 1196 on 16
+# ranks, and with 8 threads a 248-atom one with 3860 on 64 ranks) and at 16
+# threads for the 3860 basis functions; at 16 threads the 689 and 1196 basis
+# functions took 10 to 13 for each density over 16 densities.
+_FOUR_CENTER_DENSITY_MATRICES_FLOOR = 7
+
 
 def get_four_center_batch_size(input_batch_size,
                                n_total,
@@ -181,8 +193,8 @@ def get_four_center_batch_size(input_batch_size,
     .. note::
         The ERI integration's memory, _FOUR_CENTER_ERI_MATRICES_PER_THREAD
         matrices of 8 x n_ao^2 bytes for each thread, is held once, as
-        call_memory is. Each density of the batch takes 8 x n_ao^2 bytes for
-        each thread, as get_batch_size takes it.
+        call_memory is. Each density of the batch takes one such matrix for
+        each thread, and no fewer than _FOUR_CENTER_DENSITY_MATRICES_FLOOR.
     """
 
     if input_batch_size is not None:
@@ -193,12 +205,15 @@ def get_four_center_batch_size(input_batch_size,
     batch_size = None
 
     if comm.Get_rank() == mpi_master():
-        matrix_memory = n_ao * n_ao * 8 * get_number_of_threads()
+        matrix_memory = n_ao * n_ao * 8
+        n_threads = get_number_of_threads()
 
         # NOTE: what the build holds once, and what each density of the batch
         # adds.
-        eri_memory = _FOUR_CENTER_ERI_MATRICES_PER_THREAD * matrix_memory
-        per_density = matrix_memory
+        eri_memory = (_FOUR_CENTER_ERI_MATRICES_PER_THREAD * n_threads *
+                      matrix_memory)
+        per_density = (max(_FOUR_CENTER_DENSITY_MATRICES_FLOOR, n_threads) *
+                       matrix_memory)
 
         # NOTE: batch_size is zero where n_total is zero.
         batch_size = min(

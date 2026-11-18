@@ -49,9 +49,11 @@ class TestFourCenterBatchSize:
         return available // self.comm.allgather(here).count(here)
 
     def per_density(self):
-        """The memory of a density, 8 x nao^2 bytes for each thread."""
+        """The memory of a density, 8 x nao^2 bytes for each thread and no
+        fewer than _FOUR_CENTER_DENSITY_MATRICES_FLOOR such matrices."""
 
-        return self.nao**2 * 8 * self.nthreads
+        return (max(batchsize._FOUR_CENTER_DENSITY_MATRICES_FLOOR,
+                    self.nthreads) * self.nao**2 * 8)
 
     def eri_memory(self):
         """The memory of the ERI integration, held once by a build."""
@@ -75,6 +77,25 @@ class TestFourCenterBatchSize:
             None, 10**9, self.nao, self.comm,
             call_memory) == ((room - call_memory - reserve) //
                              self.per_density())
+
+    def test_a_density_takes_the_floor_or_a_matrix_for_each_thread(
+            self, monkeypatch):
+        """With fewer threads than _FOUR_CENTER_DENSITY_MATRICES_FLOOR a
+        density is charged that many matrices, with more one matrix for each
+        thread; the ERI memory is three matrices for each thread either way."""
+
+        floor = batchsize._FOUR_CENTER_DENSITY_MATRICES_FLOOR
+        matrix = self.nao**2 * 8
+
+        for threads, per_density in [(1, floor * matrix),
+                                     (2 * floor, 2 * floor * matrix)]:
+            self.nthreads = threads
+
+            room = self.set_memory(monkeypatch, 8 * 1024**3)
+
+            assert get_four_center_batch_size(
+                None, 10**9, self.nao,
+                self.comm) == (room - self.eri_memory()) // per_density
 
     def test_the_input_batch_size_and_the_items_bound_the_count(
             self, monkeypatch):
