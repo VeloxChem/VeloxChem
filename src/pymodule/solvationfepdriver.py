@@ -45,6 +45,8 @@ from .mmforcefieldgenerator import MMForceFieldGenerator
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
+from .solvationfeputils import (compare_solute, classify_forces, extract_solute_system,
+                                scale_charge_coupled_force)
 
 with redirect_stderr(StringIO()) as fg_err:
     try:
@@ -87,6 +89,7 @@ class SolvationFepDriver:
         - save_system_xml: If True, save the system in XML format.
         - save_energies_txt: If True, save the energies from each simulation in txt format.
         - alpha: The alpha parameter for the Gaussian softcore potential.
+        - gsc_placeholder_sigma: The sigma used in the Gaussian softcore potential for particles without Lennard-Jones interaction (epsilon = 0).
         - beta: The beta parameter for the Gaussian softcore potential.
         - x: The x parameter for the Gaussian softcore potential.
         - lambdas_stage1: The lambdas for stage 1.
@@ -158,6 +161,10 @@ class SolvationFepDriver:
 
         # Alchemical parameters
         self.alpha = 5 * unit.kilocalories_per_mole
+        # Particles with epsilon = 0 have an arbitrary placeholder sigma in the force field
+        # (0.1 nm in VeloxChem, 1 nm in OpenMM water XML files, often 0 in GROMACS topologies);
+        # the GSC term uses this sigma for all of them.
+        self.gsc_placeholder_sigma = 0.1 * unit.nanometers
         self.beta = 5
         self.x = 4
         # Single parameter for lambdas for stage 1
@@ -166,13 +173,16 @@ class SolvationFepDriver:
         self.lambdas_stage2 = [1.0, 0.8, 0.6, 0.4, 0.3, 0.2, 0.15, 0.10, 0.05, 0.03, 0.0]
         # Fixed lambda vector for stage 3 with 6 lambdas
         self.lambdas_stage3 = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
-        # Fixed lambda vector for stage 4 with 3 lambdas
-        self.lambdas_stage4 = [1.0, 0.5, 0.0]
+        # Lambda vector for stage 4, denser near the end for large flexible solutes
+        self.lambdas_stage4 = [1.0, 0.5, 0.25, 0.1, 0.05, 0.0]
 
         # Overlap diagnostics
         self.overlap_threshold = 0.03
         self.save_overlap_txt = False
         self.overlap_diagnostics = []
+
+        # Applied-field forces of a pre-built system: (force index, charge parameter index)
+        self._charge_coupled_forces = []
 
         # Storage for potential energies across stages
         self.u_kn_matrices = []
@@ -239,13 +249,17 @@ class SolvationFepDriver:
 
         return self.compute_solvation_from_gromacs_files("system.gro", "system.top", solute_gro, solute_top)
 
-    def compute_solvation_from_openmm_files(self, solute_pdb, solute_xml, solvent='spce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None, other_xml_files=None, system_xml=None):
+    def compute_solvation_from_openmm_files(self, solute_pdb=None, solute_xml=None, solvent='spce', solvent_molecule=None, ff_gen_solvent=None, target_density=None, system_pdb=None, other_xml_files=None, system_xml=None):
         """
         Run the solvation free energy calculation using OpenMM.
         :param solute_pdb:
-            The PDB file with the solute coordinates.
+            The PDB file with the solute coordinates. Not needed with system_xml.
         :param solute_xml:
-            The XML file with the solute force field.
+            The XML file with the solute force field. Not needed with system_xml: the vacuum leg is then
+            cut out of the solvated system; if given, it is only compared with the solute in system_xml.
+        :param system_xml:
+            The XML file with a pre-built solvated OpenMM system (used with system_pdb). The solute is
+            residue 0 of system_pdb, or the residue named resname.
         :param other_xml_files:
             A list with the XML files needed for the rest of the system.
         :param system_pdb:
@@ -267,6 +281,7 @@ class SolvationFepDriver:
 
         self.solute_pdb = solute_pdb
         self.solute_xml = solute_xml
+        self._charge_coupled_forces = []
 
         # To run with pre-built OMM system objects
         if system_xml is not None and system_pdb is not None:
@@ -275,8 +290,11 @@ class SolvationFepDriver:
             self.solute_pdb = solute_pdb
             self.solute_xml = solute_xml
             self.solvent_name = 'omm_system_xml'
+            self._check_system_xml()
 
         elif system_pdb is None:
+            assert_msg_critical(solute_pdb is not None,
+                                "SolvationFepDriver: solute_pdb must be provided if system_pdb is not provided")
             self.ostream.print_info(f"No system_pdb provided, using SolvationBuilder to solvate the system with {solvent} solvent")
             self.ostream.flush()
             molecule = Molecule.read_pdb_file(solute_pdb)
@@ -307,6 +325,8 @@ class SolvationFepDriver:
             self.system_pdb = system_pdb
             assert_msg_critical(other_xml_files is not None,
                                 "SolvationFepDriver: other_xml_files must be provided if system_pdb is provided")
+            assert_msg_critical(solute_pdb is not None and solute_xml is not None,
+                                "SolvationFepDriver: solute_pdb and solute_xml must be provided with other_xml_files")
             self.other_xml_files = other_xml_files
             self.solvent_name = 'omm_files'
 
@@ -569,7 +589,7 @@ class SolvationFepDriver:
 
                     for i in range(force.getNumParticles()):
                         charge, sigma, epsilon = force.getParticleParameters(i)
-                        gsc_force.addParticle([sigma])
+                        gsc_force.addParticle([self._gsc_sigma(sigma, epsilon)])
 
                         if i in alchemical_region:
                             if self.stage == 1:
@@ -581,6 +601,11 @@ class SolvationFepDriver:
                     for i in range(force.getNumExceptions()):
                         p1, p2, ch, si, ep = force.getExceptionParameters(i)
                         gsc_force.addExclusion(p1, p2)
+
+            # Applied fields act on the solute charges and are scaled like them
+            for force_index, parameter_index in self._charge_coupled_forces:
+                factor = (1 - lambda_val) if self.stage == 1 else 0.0
+                scale_charge_coupled_force(solvated_system, alchemical_region, force_index, parameter_index, factor)
 
             # Add interaction group for GSC potential
             gsc_force.addInteractionGroup(alchemical_region, chemical_region)
@@ -594,8 +619,12 @@ class SolvationFepDriver:
         """
         Create vacuum system with alchemical scaling.
         """
+        # Solute cut out of the pre-built solvated system: the same solute terms in both legs
+        if self.solvent_name == 'omm_system_xml':
+            template_system, topology, positions = self._extract_vacuum_system()
+
         # Reading the system from files
-        if self.solvent_name == 'omm_files' or self.solvent_name == 'omm_system_xml':
+        elif self.solvent_name == 'omm_files':
             pdb = app.PDBFile(self.solute_pdb)
             forcefield_solute = app.ForceField(self.solute_xml)
             topology = pdb.topology
@@ -619,6 +648,8 @@ class SolvationFepDriver:
         for lambda_val in lambdas:
             if self.solvent_name == 'gro_files':
                 vacuum_system = forcefield_solute.createSystem(nonbondedMethod=app.NoCutoff, constraints=self.constraints)
+            elif self.solvent_name == 'omm_system_xml':
+                vacuum_system = copy.deepcopy(template_system)
             else:
                 vacuum_system = forcefield_solute.createSystem(topology, nonbondedMethod=app.NoCutoff, constraints=self.constraints)
 
@@ -628,7 +659,7 @@ class SolvationFepDriver:
                 if isinstance(force, mm.NonbondedForce):
                     for i in range(force.getNumParticles()):
                         charge, sigma, epsilon = force.getParticleParameters(i)
-                        gsc_force.addParticle([sigma])
+                        gsc_force.addParticle([self._gsc_sigma(sigma, epsilon)])
 
                         if self.stage == 3:
                             force.setParticleParameters(i, charge * (1 - lambda_val), sigma, epsilon * (1 - lambda_val))
@@ -644,6 +675,105 @@ class SolvationFepDriver:
             vacuum_systems.append(vacuum_system)
 
         return vacuum_systems, topology, positions
+
+    def _gsc_sigma(self, sigma, epsilon):
+        """
+        Returns the sigma of a particle in the Gaussian softcore potential.
+        """
+
+        if epsilon.value_in_unit(unit.kilojoule_per_mole) == 0.0:
+            return self.gsc_placeholder_sigma
+        return sigma
+
+    def _read_system_xml(self):
+        """
+        Reads the pre-built solvated system: system, topology, positions and solute indices.
+        """
+
+        pdb = app.PDBFile(self.system_pdb)
+        with open(self.system_xml, 'r') as f:
+            system = mm.XmlSerializer.deserialize(f.read())
+        assert_msg_critical(system.getNumParticles() == pdb.topology.getNumAtoms(),
+                            'SolvationFepDriver: system_xml and system_pdb have different numbers of atoms')
+        alchemical_region, _ = self._get_alchemical_region(pdb.topology)
+
+        return system, pdb.topology, pdb.positions, alchemical_region
+
+    def _extract_vacuum_system(self, system_data=None):
+        """
+        Returns the vacuum-leg system, topology and positions: the solute cut out of system_xml.
+
+        :param system_data:
+            The output of _read_system_xml, if already read.
+        """
+
+        system, topology, positions, alchemical_region = system_data or self._read_system_xml()
+        try:
+            return extract_solute_system(system, topology, positions, alchemical_region)
+        except ValueError as error:
+            assert_msg_critical(False, f'SolvationFepDriver: cannot cut the solute out of system_xml: {error}')
+
+    def _check_system_xml(self):
+        """
+        Checks a pre-built solvated system (system_xml) before the simulations: the solute must be
+        extractable for the vacuum leg, every force acting on the solute must be one the alchemical
+        scaling handles, and a solute_xml, if given, is compared with the solute in system_xml.
+        Applied fields (forces with a per-particle parameter equal to the solute charges) are recorded
+        and scaled with the charges.
+        """
+
+        system_data = self._read_system_xml()
+        system, topology, positions, alchemical_region = system_data
+        coordinates = np.array(positions.value_in_unit(unit.nanometer))
+        vacuum_system, vacuum_topology, _ = self._extract_vacuum_system(system_data)
+
+        self.ostream.print_info(f"Vacuum leg: solute ({vacuum_system.getNumParticles()} atoms) taken from system_xml.")
+
+        if self.solute_xml is not None:
+            assert_msg_critical(self.solute_pdb is not None,
+                                'SolvationFepDriver: solute_xml needs solute_pdb')
+            solute_pdb = app.PDBFile(self.solute_pdb)
+            elements_system = [atom.element.symbol if atom.element else None for atom in vacuum_topology.atoms()]
+            elements_solute = [atom.element.symbol if atom.element else None for atom in solute_pdb.topology.atoms()]
+            if elements_system != elements_solute:
+                errors = ['the solute atoms (elements and order) differ between system_pdb and solute_pdb']
+            else:
+                solute_system = app.ForceField(self.solute_xml).createSystem(solute_pdb.topology,
+                                                                             nonbondedMethod=app.NoCutoff,
+                                                                             constraints=self.constraints)
+                errors, notes = compare_solute(vacuum_system, solute_system, list(range(vacuum_system.getNumParticles())),
+                                               coordinates[alchemical_region])
+                for note in notes:
+                    self.ostream.print_info(f'solute_xml: {note}')
+            for error in errors:
+                self.ostream.print_warning(f'solute_xml: {error}')
+            if errors:
+                self.ostream.print_warning('solute_xml differs from the solute in system_xml and is not used: ' +
+                                           'both legs use the solute of system_xml.')
+
+        unsupported = []
+        self._charge_coupled_forces = []
+        for row in classify_forces(system, alchemical_region, coordinates):
+            label = f"Force {row['index']} ({row['name']})"
+            if row['category'] == 'charge-coupled':
+                self._charge_coupled_forces.append((row['index'], row['parameter']))
+                self.ostream.print_info(f"{label}: {row['detail']}.")
+            elif row['category'] == 'intramolecular':
+                self.ostream.print_info(f"{label}: {row['detail']}.")
+            elif row['category'] == 'restraint':
+                message = (f"{label}: {row['detail']} of the solvated leg; it is not in the vacuum leg")
+                if row.get('translation_only', False):
+                    self.ostream.print_info(message + '; it only acts on the solute centroid, so it cancels.')
+                else:
+                    self.ostream.print_warning(message + ', so its contribution in the decoupled state ' +
+                                               'is part of the result.')
+            elif row['category'] == 'unsupported':
+                unsupported.append(label)
+                self.ostream.print_warning(f"{label}: {row['detail']}.")
+        self.ostream.flush()
+        assert_msg_critical(not unsupported,
+                            'SolvationFepDriver: system_xml contains forces acting on the solute that the ' +
+                            'alchemical scaling does not handle: ' + ', '.join(unsupported))
 
     def _get_gaussian_softcore_force(self, lambda_val):
         """
