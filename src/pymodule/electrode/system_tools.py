@@ -589,6 +589,30 @@ def window_length(lo, hi, k, temperature=298.15):
 
 
 _MISSING = object()
+FF_FILE_ROLES = ('solute.xml', 'graphite.xml')     # every leg needs these; ion XMLs by species
+
+
+def fep_temperature(meta, folder=None):
+    """Target temperature of a leg's FEP (K): fep_results.json (fep_target_temperature_K, or the
+    driver's md_protocol.temperature_K), else metadata; None if nothing records it."""
+    if folder is not None and (Path(folder) / 'fep_results.json').exists():
+        r = json.loads((Path(folder) / 'fep_results.json').read_text())
+        t = r.get('fep_target_temperature_K', (r.get('md_protocol') or {}).get('temperature_K'))
+        if t is not None:
+            return float(t)
+    t = (meta.get('pre_fep_md') or {}).get('temperature_K', meta.get('temperature_K'))
+    return None if t is None else float(t)
+
+
+def expected_ff_files(ms, mm_, folders):
+    """Force-field XML roles a pair must have: solute and graphite, plus one file per liquid
+    species that either leg keeps as <species>.xml (built-in water/ion force fields have none)."""
+    roles = set(FF_FILE_ROLES)
+    for meta in (ms, mm_):
+        for key in ((meta.get('liquid') or {}).get('species_counts') or {}):
+            if any((Path(f) / f'{key}.xml').exists() for f in folders):
+                roles.add(f'{key}.xml')
+    return sorted(roles)
 
 
 def physical_fingerprint(meta, folder=None):
@@ -596,7 +620,8 @@ def physical_fingerprint(meta, folder=None):
     Metadata: field, liquid composition, nonbonded settings, cation-anion sigma scale, the
     graphite builder record (carbon set and parameters, layers, mobility, face charges,
     surface features/groups), ghost particles, solute size, restraint strength (not its
-    window), temperature if recorded. Files: SHA-256 of every force-field XML kept in the leg
+    window), the FEP target temperature (from fep_results.json, else metadata; absent ->
+    no key, reported unverified). Files: SHA-256 of every force-field XML kept in the leg
     folder (solute, graphite, ions), so the same path with different content is caught."""
     import hashlib
     g = meta.get('graphite') or {}
@@ -615,9 +640,11 @@ def physical_fingerprint(meta, folder=None):
         'ghost solute': meta.get('ghost_solute'),
         'solute atoms': (meta.get('solute') or {}).get('n_atoms'),
         'restraint strength k': (meta.get('restraint') or {}).get('k_kj_mol_nm2'),
-        'temperature K': (meta.get('pre_fep_md') or {}).get('temperature_K', meta.get('temperature_K')),
     }
     fp = {k: json.loads(json.dumps(v, sort_keys=True, default=str)) for k, v in fp.items()}
+    t = fep_temperature(meta, folder)
+    if t is not None:                    # absent -> no key: reported as unverified, never 'checked'
+        fp['temperature K'] = round(t, 6)
     if folder is not None:
         for f in sorted(Path(folder).glob('*.xml')):
             if f.name.startswith('system'):          # system.xml holds the leg's own restraint
@@ -663,13 +690,23 @@ def adsorption_free_energy(surface_dir, mid_dir, temperature=298.15, delta_nm=1.
             continue
         if a is _MISSING or b is _MISSING:
             if key.startswith('file:'):          # a force-field file only one leg kept
-                unverified.append(key); continue
+                unverified.append(f'{key} (only one leg kept it)'); continue
+            if key == 'temperature K':           # recorded in one leg only: cannot be compared
+                unverified.append('temperature K (recorded in one leg only)'); continue
             raise ValueError(f'legs differ in {key}: only one leg records it')
         if a != b:
             raise ValueError(f'legs differ in {key}: {a} vs {b}')
-    files = [k for k in fp_s if k.startswith('file:') and k in fp_m]
-    if not files:
-        unverified.append('force-field files (none kept in both folders)')
+    # provenance that neither leg records is unverified, never 'checked' (review v3)
+    if 'temperature K' not in fp_s and 'temperature K' not in fp_m:
+        unverified.append('temperature K (not recorded in either leg)')
+    for role in expected_ff_files(ms, mm_, (surface_dir, mid_dir)):
+        k = f'file:{role}'
+        if k not in fp_s and k not in fp_m:
+            unverified.append(f'{k} (missing in both legs)')
+    # the temperature used for K_ads must be the legs' FEP temperature
+    t_rec = fp_s.get('temperature K', fp_m.get('temperature K'))
+    if t_rec is not None and abs(t_rec - temperature) > 1e-6:
+        raise ValueError(f'adsorption conversion at {temperature} K but the legs ran at {t_rec} K')
     # each z-NPT leg runs its FEP windows at its own last MD box (fep_windows 'fixed'); the
     # final heights differ by barostat noise (SD ~0.04 nm in the campaign; no measurable effect
     # on F, review 2026-11-18). Record the difference; refuse a pair beyond max_dlz_nm.
@@ -1368,6 +1405,7 @@ def run_fep(folder, **settings):
         os.chdir(cwd)
     results['electrode_ion_corrections'] = applied
     results['fep_driver'] = getattr(driver, 'electrode_driver_info', None)    # source file + SHA-256
+    results['fep_target_temperature_K'] = float(getattr(driver, 'temperature', float('nan')))
     (folder / 'fep_results.json').write_text(json.dumps(results, indent=2, default=float))
     return results
 
