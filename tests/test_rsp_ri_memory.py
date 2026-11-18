@@ -13,6 +13,8 @@ from veloxchem.lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.thgdriver import ThgDriver
+from veloxchem.cppsolver import ComplexResponseSolver
+from veloxchem.profiler import Profiler
 from veloxchem.nonlinearsolver import NonlinearSolver
 from veloxchem.outputstream import OutputStream
 from veloxchem import rijkresponse
@@ -472,3 +474,42 @@ class TestResponseRiMemory:
             assert drv._ri_batch_memory >= 3 * nao * nao * 8
         else:
             assert drv._ri_batch_memory == 0
+
+    def test_ri_j_check_of_a_driver_leaves_out_its_solvers(self, monkeypatch):
+        """A THG with RI-J sets up its RI-J driver before the linear solvers it
+        drives, which set up their own and reset the peak. Its memory check
+        leaves out what the solvers reached: 400 MB held and freed inside each
+        solver's compute is not read as growth of the driver."""
+
+        if not Profiler.reset_peak_memory():
+            pytest.skip('the peak memory cannot be reset on this system')
+
+        molecule, basis = self.get_water()
+        scf_results = self.run_scf(molecule, basis, 'blyp')
+
+        held = 400 * 1024**2
+        compute = ComplexResponseSolver.compute
+
+        def compute_and_hold(solver, *args, **kwargs):
+            results = compute(solver, *args, **kwargs)
+            block = np.ones(held // 8)
+            del block
+            return results
+
+        monkeypatch.setattr(ComplexResponseSolver, 'compute', compute_and_hold)
+
+        drv = ThgDriver(MPI.COMM_WORLD, OutputStream(None))
+        drv.update_settings(
+            {
+                'frequencies': [0.05],
+                'damping': 0.1,
+                'conv_thresh': 1.0e-6,
+                'memory_profiling': 'yes',
+            }, {'xcfun': 'blyp'})
+        drv.compute(molecule, basis, scf_results)
+
+        assert drv._uses_ri_coulomb()
+
+        grown = max(Profiler.get_peak_memory() - drv._ri_rss_at_setup,
+                    getattr(drv, '_ri_peak_grown', 0))
+        assert grown < held / 2

@@ -208,6 +208,10 @@ def mark_setup(solver):
 
     solver._ri_rss_at_setup = psutil.Process().memory_info().rss
 
+    # NOTE: the largest growth of the peak reached before a solver this one
+    # drives reset the peak (see lend).
+    solver._ri_peak_grown = 0
+
 
 def print_memory_check(solver):
     """
@@ -245,7 +249,8 @@ def print_memory_check(solver):
     # NOTE: at least zero. The start is the resident memory read at the setup
     # and the end the kernel's high-water mark, and the two counters can differ
     # by a few hundred kB, which turns a growth near zero negative.
-    grown = max(Profiler.get_peak_memory() - solver._ri_rss_at_setup, 0)
+    grown = max(Profiler.get_peak_memory() - solver._ri_rss_at_setup, 0,
+                getattr(solver, '_ri_peak_grown', 0))
     grown_all = solver.comm.allgather(grown)
     largest = max(grown_all)
 
@@ -884,6 +889,39 @@ def _check_not_lent(solver):
         'it drives and cannot be used or formed again until they are returned')
 
 
+def _measures_own_window(driver):
+    """
+    Checks whether a driver which lends no B vectors holds the memory check of
+    a simd RI-J driver it set up, which is what memory profiling prints at the
+    end of its calculation (print_memory_check).
+
+    :param driver:
+        The driver.
+
+    :return:
+        True if the driver measures the growth of the peak after its RI-J
+        setup.
+    """
+
+    return (getattr(driver, 'memory_profiling', False) and
+            getattr(driver, '_ri_rss_at_setup', None) is not None and
+            driver._uses_ri_coulomb() and driver._ri_j_memory is not None)
+
+
+def _keep_peak_growth(driver):
+    """
+    Keeps the largest growth of the peak after the driver's RI setup reached
+    so far, before a solver it drives resets the peak.
+
+    :param driver:
+        The driver.
+    """
+
+    grown = max(Profiler.get_peak_memory() - driver._ri_rss_at_setup, 0)
+
+    driver._ri_peak_grown = max(getattr(driver, '_ri_peak_grown', 0), grown)
+
+
 @contextmanager
 def lend(driver, solver):
     """Lends the B vectors of a driver to a solver it drives, for one call.
@@ -902,6 +940,8 @@ def lend(driver, solver):
     A driver which fell back to the four-center integrals lends that, so its
     solvers do not form the B vectors it could not hold or warn again. A
     driver which holds neither lends nothing, and the solver sets itself up.
+    Where that driver set up the simd RI-J driver and profiles its memory, its
+    memory check leaves out the solver, which checks its own builds.
 
     :param driver:
         The driver which formed the B vectors.
@@ -922,7 +962,17 @@ def lend(driver, solver):
         'its own and cannot borrow those of the driver')
 
     if not driver._ri_jk_fallback and driver._ri_jk_drv is None:
+        measures = _measures_own_window(driver)
+        if measures:
+            _keep_peak_growth(driver)
         yield
+        # NOTE: a solver which sets itself up resets the peak (mark_setup) and
+        # checks its own builds. The driver's check then reads, beside the
+        # growth it kept before the solver, the peak of what follows the
+        # solver, and not the solver's peak against the driver's setup and
+        # prediction.
+        if measures:
+            Profiler.reset_peak_memory()
         return
 
     solver._ri_jk_fallback = driver._ri_jk_fallback
