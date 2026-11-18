@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import replace
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from ..errorhandler import assert_msg_critical
 from ..outputstream import OutputStream
@@ -227,6 +227,68 @@ class MultiSystemCalculator:
             merged.failed = True
             merged.failure_reason = "; ".join(failures)
         return merged
+
+
+def expand_system_objects(properties, systems, water_model=None,
+                          ostream=None):
+    """Properties whose ``system`` is an object, such as a ``MetalNode``.
+
+    Such an object provides ``name``, ``system(water_model, ostream)`` (the
+    settings of a framework system) and ``targets(name, settings)`` (ordinary
+    target settings that name that system). Each object becomes a named
+    system and its property becomes those targets. Without other systems, the
+    properties that name no system keep the aqueous ion (added as "water"). Other inputs are returned unchanged.
+
+    :return:
+        The (properties, systems) the rest of the study uses.
+    """
+    if not isinstance(properties, Mapping):
+        return properties, systems
+    owners = {
+        name: values["system"]
+        for name, values in properties.items()
+        if isinstance(values, Mapping) and
+        hasattr(values.get("system"), "targets") and
+        hasattr(values.get("system"), "system")
+    }
+    if not owners:
+        return properties, systems
+    given = bool(systems)
+    systems = dict(systems or {})
+    added = {}
+    expanded = {}
+    for name, values in properties.items():
+        owner = owners.get(name)
+        if owner is None:
+            expanded[name] = values
+            continue
+        key = owner.name
+        if key not in added:
+            assert_msg_critical(
+                key not in systems,
+                f"system name {key!r} of property {name!r} is already used; "
+                "give the node another name")
+            systems[key] = owner.system(water_model=water_model,
+                                        ostream=ostream)
+            added[key] = owner
+        assert_msg_critical(
+            added[key] is owner,
+            f"two different systems are named {key!r}; give them distinct names")
+        for target, settings in owner.targets(name, values).items():
+            assert_msg_critical(target not in properties,
+                                f"target name {target!r} is used twice")
+            expanded[target] = settings
+    aqueous = any(
+        isinstance(spec, Mapping) and spec.get("type") == "aqueous"
+        for spec in systems.values())
+    plain = any(
+        not isinstance(values, Mapping) or values.get("system") is None
+        for values in expanded.values())
+    if plain and not aqueous and not given:
+        assert_msg_critical("water" not in systems,
+                            "a framework system is named 'water'; rename it")
+        systems = {"water": {"type": "aqueous"}, **systems}
+    return expanded, systems
 
 
 def build_systems(systems, targets, calculator,

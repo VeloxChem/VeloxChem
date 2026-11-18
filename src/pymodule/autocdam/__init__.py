@@ -44,6 +44,7 @@ from .evaluator import Evaluator
 from .candidate import CDAMCandidate
 from .generator import CoordinateGenerator
 from .framework import FrameworkSystem, FrameworkBaseline
+from .metalnode import MetalNode, Residue
 from .geometry import atom_labels
 from .bayesian import BayesianFittingDriver
 from .search import ParameterPropertyTable, FittingDriver, SklearnGaussianProcessSurrogate

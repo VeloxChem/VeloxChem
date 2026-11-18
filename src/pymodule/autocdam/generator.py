@@ -241,6 +241,7 @@ def _site_forces_openmm_units(data):
     nb, bonded = data.nonbonded_parameters, data.bonded_parameters
     return {
         "potential_form": nb["potential_form"],
+        "metal_dummy_bond": bonded.get("metal_dummy_bond", "constraint"),
         **site_parameters_openmm(sigma=nb["metal_lj_sigma_angstrom"],
                                  epsilon=nb["metal_lj_epsilon_kcal_per_mol"],
                                  c4=nb["c4_metal_water_kcal_angstrom4_per_mol"],
@@ -328,12 +329,22 @@ def _set_site_nonbonded(force, indices, charges, forces):
 
 
 def _set_site_restraints(system, metal, dummies, forces):
-    """Metal-dummy constraints at the candidate distance; bond and D-M-D angle constants."""
+    """Metal-dummy constraints at the candidate distance; bond and D-M-D angle constants.
+
+    With ``metal_dummy_bond`` "harmonic" the M-D distance is held by the
+    harmonic bonds only: no constraint is added and any existing one is removed.
+    """
     existing = {}
     for i in range(system.getNumConstraints()):
         left, right, _ = system.getConstraintParameters(i)
         existing[frozenset((left, right))] = i
-    for dummy in dummies:
+    harmonic = forces.get("metal_dummy_bond") == "harmonic"
+    if harmonic:
+        site = [frozenset((metal, dummy)) for dummy in dummies]
+        for index in sorted((existing[k] for k in site if k in existing),
+                            reverse=True):
+            system.removeConstraint(index)
+    for dummy in ([] if harmonic else dummies):
         index = existing.get(frozenset((metal, dummy)))
         if index is None:
             system.addConstraint(metal, dummy, forces["distance"])

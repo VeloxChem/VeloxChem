@@ -349,6 +349,7 @@ class CDAMCandidate:
             dummy_mass=3.0,
             bond_force_constant=800.0,  # TODO: check against VeloxChem defaults
             angle_force_constant=250.0,  # TODO: check against VeloxChem defaults
+            metal_dummy_bond="constraint",
     ):
         """
         Stores the template settings and validates them.
@@ -356,7 +357,9 @@ class CDAMCandidate:
         Distances and sigma are in angstrom, epsilon in kcal/mol, C4 in
         kcal/mol*angstrom^4, charges in e and masses in amu. The bond force
         constant is in kcal/mol/angstrom^2 and the angle constant in
-        kcal/mol/rad^2. ``coordination_number`` defaults to the number of
+        kcal/mol/rad^2. ``metal_dummy_bond`` is "constraint" (fixed M-D
+        distance) or "harmonic" (M-D bonds with ``bond_force_constant`` only,
+        as in Golo et al., ACS Omega 2025). ``coordination_number`` defaults to the number of
         directions of ``geometry``; ``metal_mass`` defaults to the VeloxChem
         element mass (``chemical_element_mass``) and is the mass of the whole ion (dummy masses
         are subtracted from the central site). ``metal_lj_sigma`` and
@@ -382,6 +385,7 @@ class CDAMCandidate:
         self.dummy_mass = dummy_mass
         self.bond_force_constant = bond_force_constant
         self.angle_force_constant = angle_force_constant
+        self.metal_dummy_bond = metal_dummy_bond
         self._validate()
 
     # ------------------------------------------------------------ derived values
@@ -569,7 +573,8 @@ class CDAMCandidate:
                           metal_mass=self.metal_mass,
                           dummy_mass=self.dummy_mass,
                           bond_force_constant=self.bond_force_constant,
-                          angle_force_constant=self.angle_force_constant)
+                          angle_force_constant=self.angle_force_constant,
+                          metal_dummy_bond=self.metal_dummy_bond)
 
     # ------------------------------------------------------- batch round trip
     @classmethod
@@ -601,7 +606,9 @@ class CDAMCandidate:
                    bond_force_constant=bonded[
                        "bond_force_constant_kcal_per_mol_angstrom2"],
                    angle_force_constant=bonded[
-                       "angle_force_constant_kcal_per_mol_rad2"])
+                       "angle_force_constant_kcal_per_mol_rad2"],
+                   metal_dummy_bond=bonded.get("metal_dummy_bond",
+                                               "constraint"))
 
     def to_generated_batch(self):
         """
@@ -644,6 +651,10 @@ class CDAMCandidate:
                     self.bond_force_constant,
                 "angle_force_constant_kcal_per_mol_rad2":
                     self.angle_force_constant,
+                # only when harmonic, so constrained studies keep their
+                # cache keys and study IDs
+                **({"metal_dummy_bond": "harmonic"}
+                   if self.metal_dummy_bond == "harmonic" else {}),
             },
             nonbonded_parameters={
                 "potential_form": self.potential_form,
@@ -738,6 +749,8 @@ class CDAMCandidate:
                 raise ValueError(f"{name} must be finite")
         if self.geometry not in self.geometries:
             raise ValueError(f"unsupported geometry {self.geometry!r}")
+        if self.metal_dummy_bond not in ("constraint", "harmonic"):
+            raise ValueError("metal_dummy_bond must be 'constraint' or 'harmonic'")
         if self.coordination_number != len(self.geometries[self.geometry]):
             required = len(self.geometries[self.geometry])
             raise ValueError(

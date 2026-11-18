@@ -40,8 +40,10 @@ torsions that VeloxChem infers from distances are removed before the OpenMM
 system is created, so exclusions follow the remaining covalent graph.
 
 Structural properties (``distance``, ``angle``, ``coordination_rmsd``,
-``coordination_number``) are measured on a minimized geometry or averaged over
+``coordination_number``, ``angle_rmsd``) are measured on a minimized geometry or averaged over
 an MD trajectory, using minimum-image vectors in periodic cells (``geometry.py``).
+``distance`` and ``angle`` take one atom set or a group of sets (their mean);
+``angle_rmsd`` is the RMSD of a group of angles from the input structure's.
 
 The baseline section comes first: ``FrameworkBaseline`` is an immutable
 snapshot (serialized OpenMM system, positions, charges, covalent graph) that
@@ -407,6 +409,7 @@ FRAMEWORK_PROPERTIES = {
     "angle": "degree",
     "coordination_rmsd": "angstrom",
     "coordination_number": "count",
+    "angle_rmsd": "degree",
 }
 DEFAULT_PROTOCOL = {
     "method": "minimize",  # or "md": average over a short NVT trajectory
@@ -424,7 +427,24 @@ DEFAULT_PROTOCOL = {
 }
 DEFAULT_CN_CUTOFF_ANGSTROM = 2.5
 DEFAULT_SHELL_SIZE = 6
-_ATOMS_NEEDED = {"distance": 2, "angle": 3}
+_ATOMS_NEEDED = {"distance": 2, "angle": 3, "angle_rmsd": 3}
+
+
+def atom_sets(atoms, needed: int) -> list[list]:
+    """The atom sets of a selection: one set, or a list of sets of ``needed`` atoms.
+
+    ``["Al", "O1"]`` is one set; ``[["Al", "O1"], ["Al", "O2"]]`` a group
+    whose value is the mean (distance, angle) or the RMSD (angle_rmsd).
+    """
+    if atoms is None or len(atoms) == 0:
+        raise ValueError(f"needs {needed} atoms or a list of {needed}-atom sets")
+    if all(isinstance(atom, (list, tuple)) for atom in atoms):
+        sets = [list(atom) for atom in atoms]
+    else:
+        sets = [list(atoms)]
+    if any(len(atom_set) != needed for atom_set in sets):
+        raise ValueError(f"needs {needed} atoms or a list of {needed}-atom sets")
+    return sets
 
 
 @dataclass
@@ -1156,10 +1176,12 @@ class FrameworkSystem:
             atoms = target.metadata.get("atoms")
             needed = _ATOMS_NEEDED.get(prop)
             if needed is not None:
-                if atoms is None or len(atoms) != needed:
-                    raise ValueError(
-                        f"target {target.name!r}: {prop} needs {needed} atoms")
-                [resolve_atom(atom, self.labels) for atom in atoms]
+                try:
+                    sets = atom_sets(atoms, needed)
+                except ValueError as exc:
+                    raise ValueError(f"target {target.name!r}: {prop} {exc}")
+                for atom_set in sets:
+                    [resolve_atom(atom, self.labels) for atom in atom_set]
             method = target.metadata.get(
                 "method", self.protocol.get("method", "minimize"))
             if method not in ("minimize", "md"):
@@ -1305,14 +1327,22 @@ class FrameworkSystem:
         baseline = self.prepare_baseline()
         box = baseline.box_vectors_nm
         prop = target.property_name
-        atoms = [
-            resolve_atom(atom, self.labels)
-            for atom in target.metadata.get("atoms", [])
-        ]
-        if prop == "distance":
-            return distance_angstrom(xyz_nm, atoms, box)
-        if prop == "angle":
-            return angle_degrees(xyz_nm, atoms, box)
+        if prop in _ATOMS_NEEDED:
+            sets = [[resolve_atom(atom, self.labels) for atom in atom_set]
+                    for atom_set in atom_sets(target.metadata.get("atoms"),
+                                              _ATOMS_NEEDED[prop])]
+            if prop == "distance":
+                return float(np.mean(
+                    [distance_angstrom(xyz_nm, s, box) for s in sets]))
+            if prop == "angle":
+                return float(np.mean(
+                    [angle_degrees(xyz_nm, s, box) for s in sets]))
+            # angle_rmsd: against the same angles of the input structure
+            now = np.array([angle_degrees(xyz_nm, s, box) for s in sets])
+            ref = np.array([
+                angle_degrees(baseline.positions_nm, s, box) for s in sets
+            ])
+            return float(np.sqrt(np.mean((now - ref)**2)))
         if prop == "coordination_number":
             metal = baseline.target_index
             cutoff = float(

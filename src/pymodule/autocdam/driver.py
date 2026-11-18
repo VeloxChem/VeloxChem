@@ -78,7 +78,8 @@ from .models import (AQUEOUS_PROPERTIES, print_settings, table_lines, Calculatio
                      coerce_parameter_specs, coerce_targets, h5_filename,
                      parse_parameters,
                      read_h5_group, reference_bounds)
-from .multisystem import MultiSystemCalculator, build_systems
+from .multisystem import (MultiSystemCalculator, build_systems,
+                          expand_system_objects)
 from .search import (CHECKPOINT_GROUP, CalculationInput, FittingDriver,
                      default_quality_check, study_hash)
 
@@ -157,6 +158,9 @@ class AutoCDAM:
         # metal-dummy distance in angstrom: None keeps 0.90, a number fixes
         # it, a (lower, upper) pair fits it within these bounds
         self.metal_dummy_distance = None
+        # "constraint" fixes the metal-dummy distance; "harmonic" holds it by
+        # the M-D bonds only (bond_force_constant, 1 fs MD/FEP time step)
+        self.metal_dummy_bond = 'constraint'
         self._fit_result = None
         self.study_id = None
 
@@ -226,6 +230,8 @@ class AutoCDAM:
                     ('raw', 'fixed dummy charge in e, or None to fit it'),
                 'metal_dummy_distance':
                     ('raw', 'angstrom: fixed value, or (lower, upper) to fit'),
+                'metal_dummy_bond':
+                    ('str_lower', 'constraint, or harmonic (M-D bonds only)'),
                 'potential_form': ('str_lower', 'lj12_6 or lj12_6_4'),
                 'search_method': ('str_lower', 'staged or bayesian search'),
                 'geometries': ('raw', 'dummy geometries searched one by one'),
@@ -388,6 +394,17 @@ class AutoCDAM:
                     mode: True,
                     **options.get('md_options', {})
                 }
+        if self.metal_dummy_bond == 'harmonic':
+            # the M-D vibration (about 10 fs) needs 1 fs, as in Golo et al.
+            if not self.pilot:
+                options['md_options'] = {
+                    'timestep_fs': 1.0,
+                    **options.get('md_options', {})
+                }
+            options['fep_options'] = {
+                'timestep_fs': 1.0,
+                **options.get('fep_options', {})
+            }
         if self.quick_dirty_hfe:
             assert_msg_critical(
                 self.pilot,
@@ -426,12 +443,37 @@ class AutoCDAM:
 
         # Calculation details (plans, MD and FEP setups) only at print level 2
         ostream = (self.ostream if self.print_level > 1 else OutputStream(None))
+        # A property whose system is an object (a MetalNode) brings its own
+        # framework system and expands into ordinary targets.
+        fit_targets, systems = expand_system_objects(fit_targets, systems,
+                                                     candidate.water_model,
+                                                     self.ostream)
         if self.dummy_atom_charge is not None:
             candidate = candidate.with_parameters(
                 {'dummy_charge': float(self.dummy_atom_charge)})
         if self._distance_bounds() is None and self.metal_dummy_distance is not None:
             candidate = candidate.with_parameters(
                 {'metal_dummy_distance': float(self.metal_dummy_distance)})
+        assert_msg_critical(
+            self.metal_dummy_bond in ('constraint', 'harmonic'),
+            "AutoCDAM: metal_dummy_bond must be 'constraint' or 'harmonic'")
+        if candidate.metal_dummy_bond != self.metal_dummy_bond:
+            candidate = deepcopy(candidate)
+            candidate.metal_dummy_bond = self.metal_dummy_bond
+        # framework systems follow the same metal-dummy bond unless set
+        if systems:
+            systems = {
+                name: ({'metal_dummy_bond': self.metal_dummy_bond, **spec}
+                       if isinstance(spec, Mapping) and
+                       spec.get('type', 'framework') != 'aqueous' else spec)
+                for name, spec in systems.items()
+            }
+        if self.metal_dummy_bond == 'harmonic':
+            self.ostream.print_info(
+                'Metal-dummy bonds: harmonic, '
+                f'{candidate.bond_force_constant:g} kcal/mol/A^2, no '
+                'constraint; MD and FEP time step 1 fs unless set')
+            self.ostream.flush()
         self.candidate = candidate
         self.calculator_options = self._calculator_options()
         self.fitting_options = {
