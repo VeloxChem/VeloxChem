@@ -1,6 +1,4 @@
-from collections import namedtuple
 from pathlib import Path
-from types import SimpleNamespace
 import numpy as np
 import h5py
 import pytest
@@ -200,13 +198,10 @@ class TestCphfSolver:
 
         whole = run()
 
-        # NOTE: only the name psutil in batchsize is replaced, so the RI
-        # memory budgets, which read the free memory elsewhere, are not
-        # touched.
-        memory = namedtuple('memory', ['total', 'available'])
-        monkeypatch.setattr(
-            batchsize, 'psutil',
-            SimpleNamespace(virtual_memory=lambda: memory(64 * 1024**3, 1)))
+        # NOTE: only the name get_available_memory in batchsize is replaced:
+        # the batch sizes follow it, the RI memory budgets, which read the
+        # free memory in environment, do not.
+        monkeypatch.setattr(batchsize, 'get_available_memory', lambda: 1)
 
         little = run()
 

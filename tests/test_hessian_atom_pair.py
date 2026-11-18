@@ -1,6 +1,4 @@
-from collections import namedtuple
 from pathlib import Path
-from types import SimpleNamespace
 import numpy as np
 import pytest
 
@@ -251,15 +249,12 @@ class TestHessianAtomPair:
         # NOTE: get_batch_size gives 6 Fock matrices for the 9 of the three
         # atoms in pairs (an estimate of nao^2 doubles a thread for each, with
         # four threads, and 6.5 of them free to the one rank on the node), so
-        # two atoms to a batch. Only the name psutil in batchsize is replaced,
-        # so the RI memory budgets, which read the free memory elsewhere, are
-        # not touched.
-        memory = namedtuple('memory', ['total', 'available'])
+        # two atoms to a batch. Only the name get_available_memory in
+        # batchsize is replaced: the batch sizes follow it, the RI memory
+        # budgets, which read the free memory in environment, do not.
         available = int(6.5 * nao * nao * 8 * 4)
-        monkeypatch.setattr(
-            batchsize, 'psutil',
-            SimpleNamespace(
-                virtual_memory=lambda: memory(64 * 1024**3, available)))
+        monkeypatch.setattr(batchsize, 'get_available_memory',
+                            lambda: available)
         monkeypatch.setenv('OMP_NUM_THREADS', '4')
         monkeypatch.setenv('SLURM_NTASKS_PER_NODE', '1')
 
