@@ -1,0 +1,36 @@
+{
+ "smiles": "S(=O)(=O)([O-])O",
+ "charge": -1,
+ "multiplicity": 1,
+ "optimisation": "B3LYP-D3/def2-SVP, VeloxChem OptimizationDriver",
+ "charges": "RESP HF/6-31G* (MMForceFieldGenerator.create_topology default)",
+ "force_field": "GAFF2",
+ "labels": [
+  "S",
+  "O",
+  "O",
+  "O",
+  "O",
+  "H"
+ ],
+ "resp_charges": [
+  1.237729,
+  -0.660799,
+  -0.660799,
+  -0.660799,
+  -0.626818,
+  0.371486
+ ],
+ "gaff_types": [
+  "s6",
+  "o",
+  "o",
+  "o",
+  "oh",
+  "ho"
+ ],
+ "total_charge": -1.0,
+ "veloxchem": "1.0rc4",
+ "optimisation_s": 826.7725923061371,
+ "parametrisation_s": 132.85864877700806
+}

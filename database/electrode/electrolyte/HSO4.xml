@@ -1,0 +1,55 @@
+<?xml version="1.0" ?>
+<ForceField>
+    <AtomTypes>
+        <Type name="S_HSO" class="1_HSO" element="S" mass="31.972071"/>
+        <Type name="O1_HSO" class="2_HSO" element="O" mass="15.994915"/>
+        <Type name="O2_HSO" class="3_HSO" element="O" mass="15.994915"/>
+        <Type name="O3_HSO" class="4_HSO" element="O" mass="15.994915"/>
+        <Type name="O4_HSO" class="5_HSO" element="O" mass="15.994915"/>
+        <Type name="H_HSO" class="6_HSO" element="H" mass="1.007825"/>
+    </AtomTypes>
+    <Residues>
+        <Residue name="HSO">
+            <Atom name="S" type="S_HSO" charge="1.237729"/>
+            <Atom name="O1" type="O1_HSO" charge="-0.660799"/>
+            <Atom name="O2" type="O2_HSO" charge="-0.660799"/>
+            <Atom name="O3" type="O3_HSO" charge="-0.660799"/>
+            <Atom name="O4" type="O4_HSO" charge="-0.626818"/>
+            <Atom name="H" type="H_HSO" charge="0.371486"/>
+            <Bond atomName1="S" atomName2="O1"/>
+            <Bond atomName1="S" atomName2="O2"/>
+            <Bond atomName1="S" atomName2="O3"/>
+            <Bond atomName1="S" atomName2="O4"/>
+            <Bond atomName1="O4" atomName2="H"/>
+        </Residue>
+    </Residues>
+    <HarmonicBondForce>
+        <Bond class1="1_HSO" class2="2_HSO" length="0.14804169324055957" k="571534.3999999999"/>
+        <Bond class1="1_HSO" class2="3_HSO" length="0.14727480890368086" k="571534.3999999999"/>
+        <Bond class1="1_HSO" class2="4_HSO" length="0.14828927937659117" k="571534.3999999999"/>
+        <Bond class1="1_HSO" class2="5_HSO" length="0.17114167703802524" k="312377.43999999994"/>
+        <Bond class1="5_HSO" class2="6_HSO" length="0.0968355072211841" k="471536.79999999993"/>
+    </HarmonicBondForce>
+    <HarmonicAngleForce>
+        <Angle class1="1_HSO" class2="5_HSO" class3="6_HSO" angle="1.7963354464372852" k="384.928"/>
+        <Angle class1="2_HSO" class2="1_HSO" class3="3_HSO" angle="2.018299938412864" k="1072.7776"/>
+        <Angle class1="2_HSO" class2="1_HSO" class3="4_HSO" angle="1.9894954333930706" k="1072.7776"/>
+        <Angle class1="2_HSO" class2="1_HSO" class3="5_HSO" angle="1.8150810466560217" k="1056.8784"/>
+        <Angle class1="3_HSO" class2="1_HSO" class3="4_HSO" angle="2.0240699058740854" k="1072.7776"/>
+        <Angle class1="3_HSO" class2="1_HSO" class3="5_HSO" angle="1.7734825755677899" k="1056.8784"/>
+        <Angle class1="4_HSO" class2="1_HSO" class3="5_HSO" angle="1.7970612088605988" k="1056.8784"/>
+    </HarmonicAngleForce>
+    <PeriodicTorsionForce>
+        <Proper class1="2_HSO" class2="1_HSO" class3="5_HSO" class4="6_HSO" periodicity1="1" phase1="3.141592653589793" k1="39.748000000000005"/>
+        <Proper class1="3_HSO" class2="1_HSO" class3="5_HSO" class4="6_HSO" periodicity1="1" phase1="3.141592653589793" k1="39.748000000000005"/>
+        <Proper class1="4_HSO" class2="1_HSO" class3="5_HSO" class4="6_HSO" periodicity1="1" phase1="3.141592653589793" k1="39.748000000000005"/>
+    </PeriodicTorsionForce>
+    <NonbondedForce coulomb14scale="0.8333333333333334" lj14scale="0.5">
+        <Atom type="S_HSO" charge="1.237729" sigma="0.35324134174264454" epsilon="1.1815616"/>
+        <Atom type="O1_HSO" charge="-0.660799" sigma="0.3048120874245357" epsilon="0.6121192000000001"/>
+        <Atom type="O2_HSO" charge="-0.660799" sigma="0.3048120874245357" epsilon="0.6121192000000001"/>
+        <Atom type="O3_HSO" charge="-0.660799" sigma="0.3048120874245357" epsilon="0.6121192000000001"/>
+        <Atom type="O4_HSO" charge="-0.626818" sigma="0.3242871334030835" epsilon="0.389112"/>
+        <Atom type="H_HSO" charge="0.371486" sigma="0.053792464601313685" epsilon="0.019664800000000003"/>
+    </NonbondedForce>
+</ForceField>

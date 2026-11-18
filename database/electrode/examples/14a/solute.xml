@@ -1,0 +1,520 @@
+<?xml version="1.0" ?>
+<ForceField>
+    <AtomTypes>
+        <Type name="C1_MOL" class="1_MOL" element="C" mass="12.0"/>
+        <Type name="O1_MOL" class="2_MOL" element="O" mass="15.994915"/>
+        <Type name="C2_MOL" class="3_MOL" element="C" mass="12.0"/>
+        <Type name="C3_MOL" class="4_MOL" element="C" mass="12.0"/>
+        <Type name="C4_MOL" class="5_MOL" element="C" mass="12.0"/>
+        <Type name="C5_MOL" class="6_MOL" element="C" mass="12.0"/>
+        <Type name="C6_MOL" class="7_MOL" element="C" mass="12.0"/>
+        <Type name="C7_MOL" class="8_MOL" element="C" mass="12.0"/>
+        <Type name="C8_MOL" class="9_MOL" element="C" mass="12.0"/>
+        <Type name="C9_MOL" class="10_MOL" element="C" mass="12.0"/>
+        <Type name="C10_MOL" class="11_MOL" element="C" mass="12.0"/>
+        <Type name="O2_MOL" class="12_MOL" element="O" mass="15.994915"/>
+        <Type name="C11_MOL" class="13_MOL" element="C" mass="12.0"/>
+        <Type name="C12_MOL" class="14_MOL" element="C" mass="12.0"/>
+        <Type name="C13_MOL" class="15_MOL" element="C" mass="12.0"/>
+        <Type name="C14_MOL" class="16_MOL" element="C" mass="12.0"/>
+        <Type name="C15_MOL" class="17_MOL" element="C" mass="12.0"/>
+        <Type name="N1_MOL" class="18_MOL" element="N" mass="14.003074"/>
+        <Type name="C16_MOL" class="19_MOL" element="C" mass="12.0"/>
+        <Type name="C17_MOL" class="20_MOL" element="C" mass="12.0"/>
+        <Type name="C18_MOL" class="21_MOL" element="C" mass="12.0"/>
+        <Type name="C19_MOL" class="22_MOL" element="C" mass="12.0"/>
+        <Type name="C20_MOL" class="23_MOL" element="C" mass="12.0"/>
+        <Type name="C21_MOL" class="24_MOL" element="C" mass="12.0"/>
+        <Type name="O3_MOL" class="25_MOL" element="O" mass="15.994915"/>
+        <Type name="O4_MOL" class="26_MOL" element="O" mass="15.994915"/>
+        <Type name="C22_MOL" class="27_MOL" element="C" mass="12.0"/>
+        <Type name="C23_MOL" class="28_MOL" element="C" mass="12.0"/>
+        <Type name="C24_MOL" class="29_MOL" element="C" mass="12.0"/>
+        <Type name="O5_MOL" class="30_MOL" element="O" mass="15.994915"/>
+        <Type name="O6_MOL" class="31_MOL" element="O" mass="15.994915"/>
+        <Type name="C25_MOL" class="32_MOL" element="C" mass="12.0"/>
+        <Type name="N2_MOL" class="33_MOL" element="N" mass="14.003074"/>
+        <Type name="C26_MOL" class="34_MOL" element="C" mass="12.0"/>
+        <Type name="H1_MOL" class="35_MOL" element="H" mass="1.007825"/>
+        <Type name="H2_MOL" class="36_MOL" element="H" mass="1.007825"/>
+        <Type name="H3_MOL" class="37_MOL" element="H" mass="1.007825"/>
+        <Type name="H4_MOL" class="38_MOL" element="H" mass="1.007825"/>
+        <Type name="H5_MOL" class="39_MOL" element="H" mass="1.007825"/>
+        <Type name="H6_MOL" class="40_MOL" element="H" mass="1.007825"/>
+        <Type name="H7_MOL" class="41_MOL" element="H" mass="1.007825"/>
+        <Type name="H8_MOL" class="42_MOL" element="H" mass="1.007825"/>
+        <Type name="H9_MOL" class="43_MOL" element="H" mass="1.007825"/>
+        <Type name="H10_MOL" class="44_MOL" element="H" mass="1.007825"/>
+        <Type name="H11_MOL" class="45_MOL" element="H" mass="1.007825"/>
+        <Type name="H12_MOL" class="46_MOL" element="H" mass="1.007825"/>
+        <Type name="H13_MOL" class="47_MOL" element="H" mass="1.007825"/>
+        <Type name="H14_MOL" class="48_MOL" element="H" mass="1.007825"/>
+        <Type name="H15_MOL" class="49_MOL" element="H" mass="1.007825"/>
+        <Type name="H16_MOL" class="50_MOL" element="H" mass="1.007825"/>
+        <Type name="H17_MOL" class="51_MOL" element="H" mass="1.007825"/>
+    </AtomTypes>
+    <Residues>
+        <Residue name="MOL">
+            <Atom name="C1" type="C1_MOL" charge="0.044011"/>
+            <Atom name="O1" type="O1_MOL" charge="-0.368006"/>
+            <Atom name="C2" type="C2_MOL" charge="0.237729"/>
+            <Atom name="C3" type="C3_MOL" charge="-0.23816"/>
+            <Atom name="C4" type="C4_MOL" charge="-0.158918"/>
+            <Atom name="C5" type="C5_MOL" charge="-0.001294"/>
+            <Atom name="C6" type="C6_MOL" charge="-0.017691"/>
+            <Atom name="C7" type="C7_MOL" charge="-0.256736"/>
+            <Atom name="C8" type="C8_MOL" charge="-0.017691"/>
+            <Atom name="C9" type="C9_MOL" charge="-0.256736"/>
+            <Atom name="C10" type="C10_MOL" charge="0.237729"/>
+            <Atom name="O2" type="O2_MOL" charge="-0.368006"/>
+            <Atom name="C11" type="C11_MOL" charge="0.044011"/>
+            <Atom name="C12" type="C12_MOL" charge="-0.23816"/>
+            <Atom name="C13" type="C13_MOL" charge="-0.158918"/>
+            <Atom name="C14" type="C14_MOL" charge="-0.001294"/>
+            <Atom name="C15" type="C15_MOL" charge="0.155629"/>
+            <Atom name="N1" type="N1_MOL" charge="-0.683831"/>
+            <Atom name="C16" type="C16_MOL" charge="0.687263"/>
+            <Atom name="C17" type="C17_MOL" charge="-0.233124"/>
+            <Atom name="C18" type="C18_MOL" charge="-0.077604"/>
+            <Atom name="C19" type="C19_MOL" charge="-0.237009"/>
+            <Atom name="C20" type="C20_MOL" charge="-0.104347"/>
+            <Atom name="C21" type="C21_MOL" charge="0.9054039999999981"/>
+            <Atom name="O3" type="O3_MOL" charge="-0.852366"/>
+            <Atom name="O4" type="O4_MOL" charge="-0.852366"/>
+            <Atom name="C22" type="C22_MOL" charge="0.033643"/>
+            <Atom name="C23" type="C23_MOL" charge="-0.064798"/>
+            <Atom name="C24" type="C24_MOL" charge="0.763789"/>
+            <Atom name="O5" type="O5_MOL" charge="-0.831807"/>
+            <Atom name="O6" type="O6_MOL" charge="-0.831807"/>
+            <Atom name="C25" type="C25_MOL" charge="-0.140557"/>
+            <Atom name="N2" type="N2_MOL" charge="-0.683831"/>
+            <Atom name="C26" type="C26_MOL" charge="0.155629"/>
+            <Atom name="H1" type="H1_MOL" charge="0.038"/>
+            <Atom name="H2" type="H2_MOL" charge="0.038"/>
+            <Atom name="H3" type="H3_MOL" charge="0.038"/>
+            <Atom name="H4" type="H4_MOL" charge="0.112756"/>
+            <Atom name="H5" type="H5_MOL" charge="0.159467"/>
+            <Atom name="H6" type="H6_MOL" charge="0.123021"/>
+            <Atom name="H7" type="H7_MOL" charge="0.123021"/>
+            <Atom name="H8" type="H8_MOL" charge="0.038"/>
+            <Atom name="H9" type="H9_MOL" charge="0.038"/>
+            <Atom name="H10" type="H10_MOL" charge="0.038"/>
+            <Atom name="H11" type="H11_MOL" charge="0.112756"/>
+            <Atom name="H12" type="H12_MOL" charge="0.159467"/>
+            <Atom name="H13" type="H13_MOL" charge="0.036947"/>
+            <Atom name="H14" type="H14_MOL" charge="0.121036"/>
+            <Atom name="H15" type="H15_MOL" charge="0.026644"/>
+            <Atom name="H16" type="H16_MOL" charge="0.026644"/>
+            <Atom name="H17" type="H17_MOL" charge="0.180461"/>
+            <Bond atomName1="C1" atomName2="O1"/>
+            <Bond atomName1="C1" atomName2="H1"/>
+            <Bond atomName1="C1" atomName2="H2"/>
+            <Bond atomName1="C1" atomName2="H3"/>
+            <Bond atomName1="O1" atomName2="C2"/>
+            <Bond atomName1="C2" atomName2="C3"/>
+            <Bond atomName1="C2" atomName2="C7"/>
+            <Bond atomName1="C3" atomName2="C4"/>
+            <Bond atomName1="C3" atomName2="H4"/>
+            <Bond atomName1="C4" atomName2="C5"/>
+            <Bond atomName1="C4" atomName2="H5"/>
+            <Bond atomName1="C5" atomName2="C6"/>
+            <Bond atomName1="C5" atomName2="C26"/>
+            <Bond atomName1="C6" atomName2="C7"/>
+            <Bond atomName1="C6" atomName2="C8"/>
+            <Bond atomName1="C7" atomName2="H6"/>
+            <Bond atomName1="C8" atomName2="C9"/>
+            <Bond atomName1="C8" atomName2="C14"/>
+            <Bond atomName1="C9" atomName2="C10"/>
+            <Bond atomName1="C9" atomName2="H7"/>
+            <Bond atomName1="C10" atomName2="O2"/>
+            <Bond atomName1="C10" atomName2="C12"/>
+            <Bond atomName1="O2" atomName2="C11"/>
+            <Bond atomName1="C11" atomName2="H8"/>
+            <Bond atomName1="C11" atomName2="H9"/>
+            <Bond atomName1="C11" atomName2="H10"/>
+            <Bond atomName1="C12" atomName2="C13"/>
+            <Bond atomName1="C12" atomName2="H11"/>
+            <Bond atomName1="C13" atomName2="C14"/>
+            <Bond atomName1="C13" atomName2="H12"/>
+            <Bond atomName1="C14" atomName2="C15"/>
+            <Bond atomName1="C15" atomName2="N1"/>
+            <Bond atomName1="C15" atomName2="C26"/>
+            <Bond atomName1="N1" atomName2="C16"/>
+            <Bond atomName1="C16" atomName2="C17"/>
+            <Bond atomName1="C16" atomName2="N2"/>
+            <Bond atomName1="C17" atomName2="C18"/>
+            <Bond atomName1="C17" atomName2="C25"/>
+            <Bond atomName1="C18" atomName2="C19"/>
+            <Bond atomName1="C18" atomName2="H13"/>
+            <Bond atomName1="C19" atomName2="C20"/>
+            <Bond atomName1="C19" atomName2="H14"/>
+            <Bond atomName1="C20" atomName2="C21"/>
+            <Bond atomName1="C20" atomName2="C22"/>
+            <Bond atomName1="C21" atomName2="O3"/>
+            <Bond atomName1="C21" atomName2="O4"/>
+            <Bond atomName1="C22" atomName2="C23"/>
+            <Bond atomName1="C22" atomName2="C25"/>
+            <Bond atomName1="C23" atomName2="C24"/>
+            <Bond atomName1="C23" atomName2="H15"/>
+            <Bond atomName1="C23" atomName2="H16"/>
+            <Bond atomName1="C24" atomName2="O5"/>
+            <Bond atomName1="C24" atomName2="O6"/>
+            <Bond atomName1="C25" atomName2="H17"/>
+            <Bond atomName1="N2" atomName2="C26"/>
+        </Residue>
+    </Residues>
+    <HarmonicBondForce>
+        <Bond class1="1_MOL" class2="2_MOL" length="0.13840903808535207" k="238320.63999999996"/>
+        <Bond class1="1_MOL" class2="35_MOL" length="0.11084986214028195" k="314553.11999999994"/>
+        <Bond class1="1_MOL" class2="36_MOL" length="0.11084470940410691" k="314553.11999999994"/>
+        <Bond class1="1_MOL" class2="37_MOL" length="0.11017296620886555" k="314553.11999999994"/>
+        <Bond class1="2_MOL" class2="3_MOL" length="0.13807439044588718" k="299155.99999999994"/>
+        <Bond class1="3_MOL" class2="4_MOL" length="0.14103840502361378" k="316812.48"/>
+        <Bond class1="3_MOL" class2="8_MOL" length="0.13843321811168086" k="316812.48"/>
+        <Bond class1="4_MOL" class2="5_MOL" length="0.13825971742861928" k="316812.48"/>
+        <Bond class1="4_MOL" class2="38_MOL" length="0.1091873805514755" k="331121.75999999995"/>
+        <Bond class1="5_MOL" class2="6_MOL" length="0.14108727857697886" k="316812.48"/>
+        <Bond class1="5_MOL" class2="39_MOL" length="0.1093079472573541" k="331121.75999999995"/>
+        <Bond class1="6_MOL" class2="7_MOL" length="0.14364473235571348" k="316812.48"/>
+        <Bond class1="6_MOL" class2="34_MOL" length="0.1424568284879407" k="316812.48"/>
+        <Bond class1="7_MOL" class2="8_MOL" length="0.14102164737653872" k="316812.48"/>
+        <Bond class1="7_MOL" class2="9_MOL" length="0.1457075816884668" k="316812.48"/>
+        <Bond class1="8_MOL" class2="40_MOL" length="0.10918538013020077" k="331121.75999999995"/>
+        <Bond class1="9_MOL" class2="10_MOL" length="0.14093958935381104" k="316812.48"/>
+        <Bond class1="9_MOL" class2="16_MOL" length="0.1438073703612687" k="316812.48"/>
+        <Bond class1="10_MOL" class2="11_MOL" length="0.13850138625803274" k="316812.48"/>
+        <Bond class1="10_MOL" class2="41_MOL" length="0.10918227961225353" k="331121.75999999995"/>
+        <Bond class1="11_MOL" class2="12_MOL" length="0.1381777101025332" k="299155.99999999994"/>
+        <Bond class1="11_MOL" class2="14_MOL" length="0.14099520227710166" k="316812.48"/>
+        <Bond class1="12_MOL" class2="13_MOL" length="0.1382787794759516" k="238320.63999999996"/>
+        <Bond class1="13_MOL" class2="42_MOL" length="0.11017384344551767" k="314553.11999999994"/>
+        <Bond class1="13_MOL" class2="43_MOL" length="0.1108990921586534" k="314553.11999999994"/>
+        <Bond class1="13_MOL" class2="44_MOL" length="0.11089806959237308" k="314553.11999999994"/>
+        <Bond class1="14_MOL" class2="15_MOL" length="0.13832562427678213" k="316812.48"/>
+        <Bond class1="14_MOL" class2="45_MOL" length="0.1092196157829049" k="331121.75999999995"/>
+        <Bond class1="15_MOL" class2="16_MOL" length="0.14109027990930098" k="316812.48"/>
+        <Bond class1="15_MOL" class2="46_MOL" length="0.10928710921725043" k="331121.75999999995"/>
+        <Bond class1="16_MOL" class2="17_MOL" length="0.1423417048558726" k="316812.48"/>
+        <Bond class1="17_MOL" class2="18_MOL" length="0.1345184508248963" k="330201.27999999997"/>
+        <Bond class1="17_MOL" class2="34_MOL" length="0.14173486232201" k="316812.48"/>
+        <Bond class1="18_MOL" class2="19_MOL" length="0.13621475078132642" k="308862.87999999995"/>
+        <Bond class1="19_MOL" class2="20_MOL" length="0.14723381068117655" k="257901.75999999995"/>
+        <Bond class1="19_MOL" class2="33_MOL" length="0.13559901765240623" k="308862.87999999995"/>
+        <Bond class1="20_MOL" class2="21_MOL" length="0.14040984826444078" k="316812.48"/>
+        <Bond class1="20_MOL" class2="32_MOL" length="0.1406735537168455" k="316812.48"/>
+        <Bond class1="21_MOL" class2="22_MOL" length="0.13869848998195725" k="316812.48"/>
+        <Bond class1="21_MOL" class2="47_MOL" length="0.10933388329640166" k="331121.75999999995"/>
+        <Bond class1="22_MOL" class2="23_MOL" length="0.14027954696207465" k="316812.48"/>
+        <Bond class1="22_MOL" class2="48_MOL" length="0.1094097493764124" k="331121.75999999995"/>
+        <Bond class1="23_MOL" class2="24_MOL" length="0.15527556799326592" k="228195.35999999996"/>
+        <Bond class1="23_MOL" class2="27_MOL" length="0.1421298995209867" k="316812.48"/>
+        <Bond class1="24_MOL" class2="25_MOL" length="0.12486822579459114" k="546095.6799999999"/>
+        <Bond class1="24_MOL" class2="26_MOL" length="0.12537946378607123" k="546095.6799999999"/>
+        <Bond class1="27_MOL" class2="28_MOL" length="0.1513780030206002" k="209451.03999999998"/>
+        <Bond class1="27_MOL" class2="32_MOL" length="0.14067197768116396" k="316812.48"/>
+        <Bond class1="28_MOL" class2="29_MOL" length="0.15595304231839258" k="203509.75999999995"/>
+        <Bond class1="28_MOL" class2="49_MOL" length="0.11042034304245232" k="314553.11999999994"/>
+        <Bond class1="28_MOL" class2="50_MOL" length="0.11030269600147731" k="314553.11999999994"/>
+        <Bond class1="29_MOL" class2="30_MOL" length="0.12508037663630744" k="546095.6799999999"/>
+        <Bond class1="29_MOL" class2="31_MOL" length="0.12538350720128205" k="546095.6799999999"/>
+        <Bond class1="32_MOL" class2="51_MOL" length="0.10922664380820675" k="331121.75999999995"/>
+        <Bond class1="33_MOL" class2="34_MOL" length="0.1344870304086399" k="330201.27999999997"/>
+    </HarmonicBondForce>
+    <HarmonicAngleForce>
+        <Angle class1="1_MOL" class2="2_MOL" class3="3_MOL" angle="2.0549766057443355" k="553.1247999999999"/>
+        <Angle class1="2_MOL" class2="1_MOL" class3="35_MOL" angle="1.9685904266545624" k="522.1632"/>
+        <Angle class1="2_MOL" class2="1_MOL" class3="36_MOL" angle="1.9682817418511354" k="522.1632"/>
+        <Angle class1="2_MOL" class2="1_MOL" class3="37_MOL" angle="1.8710117051528354" k="522.1632"/>
+        <Angle class1="2_MOL" class2="3_MOL" class3="4_MOL" angle="2.1554370749296154" k="730.5264"/>
+        <Angle class1="2_MOL" class2="3_MOL" class3="8_MOL" angle="2.0317657663408077" k="730.5264"/>
+        <Angle class1="3_MOL" class2="4_MOL" class3="5_MOL" angle="2.0798847435417747" k="575.7184"/>
+        <Angle class1="3_MOL" class2="4_MOL" class3="38_MOL" angle="2.11873710862127" k="407.52160000000003"/>
+        <Angle class1="3_MOL" class2="8_MOL" class3="7_MOL" angle="2.1294987398500504" k="575.7184"/>
+        <Angle class1="3_MOL" class2="8_MOL" class3="40_MOL" angle="2.0412115089663265" k="407.52160000000003"/>
+        <Angle class1="4_MOL" class2="3_MOL" class3="8_MOL" angle="2.0959823238387676" k="575.7184"/>
+        <Angle class1="4_MOL" class2="5_MOL" class3="6_MOL" angle="2.1279627362576963" k="575.7184"/>
+        <Angle class1="4_MOL" class2="5_MOL" class3="39_MOL" angle="2.119154675075477" k="407.52160000000003"/>
+        <Angle class1="5_MOL" class2="4_MOL" class3="38_MOL" angle="2.0845622624532374" k="407.52160000000003"/>
+        <Angle class1="5_MOL" class2="6_MOL" class3="7_MOL" angle="2.0765570629433885" k="575.7184"/>
+        <Angle class1="5_MOL" class2="6_MOL" class3="34_MOL" angle="2.122604233484041" k="575.7184"/>
+        <Angle class1="6_MOL" class2="5_MOL" class3="39_MOL" angle="2.0360658065133315" k="407.52160000000003"/>
+        <Angle class1="6_MOL" class2="7_MOL" class3="8_MOL" angle="2.0564846328546302" k="575.7184"/>
+        <Angle class1="6_MOL" class2="7_MOL" class3="9_MOL" angle="2.0894444051710663" k="575.7184"/>
+        <Angle class1="6_MOL" class2="34_MOL" class3="17_MOL" angle="2.1095062456347464" k="575.7184"/>
+        <Angle class1="6_MOL" class2="34_MOL" class3="33_MOL" angle="2.2691631218033588" k="733.0368"/>
+        <Angle class1="7_MOL" class2="6_MOL" class3="34_MOL" angle="2.0840226631340713" k="575.7184"/>
+        <Angle class1="7_MOL" class2="8_MOL" class3="40_MOL" angle="2.1124743917687137" k="407.52160000000003"/>
+        <Angle class1="7_MOL" class2="9_MOL" class3="10_MOL" angle="2.1386314091393546" k="575.7184"/>
+        <Angle class1="7_MOL" class2="9_MOL" class3="16_MOL" angle="2.088686474688842" k="575.7184"/>
+        <Angle class1="8_MOL" class2="7_MOL" class3="9_MOL" angle="2.137255855148254" k="575.7184"/>
+        <Angle class1="9_MOL" class2="10_MOL" class3="11_MOL" angle="2.1322165809916473" k="575.7184"/>
+        <Angle class1="9_MOL" class2="10_MOL" class3="41_MOL" angle="2.110357798386664" k="407.52160000000003"/>
+        <Angle class1="9_MOL" class2="16_MOL" class3="15_MOL" angle="2.0733917808606437" k="575.7184"/>
+        <Angle class1="9_MOL" class2="16_MOL" class3="17_MOL" angle="2.083066792728092" k="575.7184"/>
+        <Angle class1="10_MOL" class2="9_MOL" class3="16_MOL" angle="2.055867350709134" k="575.7184"/>
+        <Angle class1="10_MOL" class2="11_MOL" class3="12_MOL" angle="2.032542487073714" k="730.5264"/>
+        <Angle class1="10_MOL" class2="11_MOL" class3="14_MOL" angle="2.0950611038033062" k="575.7184"/>
+        <Angle class1="11_MOL" class2="10_MOL" class3="41_MOL" angle="2.04061069642095" k="407.52160000000003"/>
+        <Angle class1="11_MOL" class2="12_MOL" class3="13_MOL" angle="2.054792956353253" k="553.1247999999999"/>
+        <Angle class1="11_MOL" class2="14_MOL" class3="15_MOL" angle="2.0777648205291146" k="575.7184"/>
+        <Angle class1="11_MOL" class2="14_MOL" class3="45_MOL" angle="2.1181849014119587" k="407.52160000000003"/>
+        <Angle class1="12_MOL" class2="11_MOL" class3="14_MOL" angle="2.1555816851787446" k="730.5264"/>
+        <Angle class1="12_MOL" class2="13_MOL" class3="42_MOL" angle="1.872118294271785" k="522.1632"/>
+        <Angle class1="12_MOL" class2="13_MOL" class3="43_MOL" angle="1.9689580638247606" k="522.1632"/>
+        <Angle class1="12_MOL" class2="13_MOL" class3="44_MOL" angle="1.9690165905571748" k="522.1632"/>
+        <Angle class1="14_MOL" class2="15_MOL" class3="16_MOL" angle="2.1320688088330355" k="575.7184"/>
+        <Angle class1="14_MOL" class2="15_MOL" class3="46_MOL" angle="2.117297548623411" k="407.52160000000003"/>
+        <Angle class1="15_MOL" class2="14_MOL" class3="45_MOL" angle="2.0872355515339005" k="407.52160000000003"/>
+        <Angle class1="15_MOL" class2="16_MOL" class3="17_MOL" angle="2.126725059228952" k="575.7184"/>
+        <Angle class1="16_MOL" class2="15_MOL" class3="46_MOL" angle="2.033818650063081" k="407.52160000000003"/>
+        <Angle class1="16_MOL" class2="17_MOL" class3="18_MOL" angle="2.270711664565056" k="733.0368"/>
+        <Angle class1="16_MOL" class2="17_MOL" class3="34_MOL" angle="2.1116305761524927" k="575.7184"/>
+        <Angle class1="17_MOL" class2="18_MOL" class3="19_MOL" angle="1.8047752104357213" k="614.2112000000001"/>
+        <Angle class1="17_MOL" class2="34_MOL" class3="33_MOL" angle="1.9045158460568867" k="733.0368"/>
+        <Angle class1="18_MOL" class2="17_MOL" class3="34_MOL" angle="1.9008377208702014" k="733.0368"/>
+        <Angle class1="18_MOL" class2="19_MOL" class3="20_MOL" angle="2.1180386027921405" k="710.4432"/>
+        <Angle class1="18_MOL" class2="19_MOL" class3="33_MOL" angle="2.009005765009594" k="900.3968"/>
+        <Angle class1="19_MOL" class2="20_MOL" class3="21_MOL" angle="2.0755277349295604" k="561.4928"/>
+        <Angle class1="19_MOL" class2="20_MOL" class3="32_MOL" angle="2.1428186039497232" k="561.4928"/>
+        <Angle class1="19_MOL" class2="33_MOL" class3="34_MOL" angle="1.8056413118294594" k="614.2112000000001"/>
+        <Angle class1="20_MOL" class2="19_MOL" class3="33_MOL" angle="2.156112141021752" k="710.4432"/>
+        <Angle class1="20_MOL" class2="21_MOL" class3="22_MOL" angle="2.0912018369886773" k="575.7184"/>
+        <Angle class1="20_MOL" class2="21_MOL" class3="47_MOL" angle="2.0655728551292216" k="407.52160000000003"/>
+        <Angle class1="20_MOL" class2="32_MOL" class3="27_MOL" angle="2.135728522839031" k="575.7184"/>
+        <Angle class1="20_MOL" class2="32_MOL" class3="51_MOL" angle="2.0962885191395673" k="407.52160000000003"/>
+        <Angle class1="21_MOL" class2="20_MOL" class3="32_MOL" angle="2.064738295600943" k="575.7184"/>
+        <Angle class1="21_MOL" class2="22_MOL" class3="23_MOL" angle="2.1388334529467117" k="575.7184"/>
+        <Angle class1="21_MOL" class2="22_MOL" class3="48_MOL" angle="2.120493260767" k="407.52160000000003"/>
+        <Angle class1="22_MOL" class2="21_MOL" class3="47_MOL" angle="2.126374271882238" k="407.52160000000003"/>
+        <Angle class1="22_MOL" class2="23_MOL" class3="24_MOL" angle="2.010687224594254" k="555.6352"/>
+        <Angle class1="22_MOL" class2="23_MOL" class3="27_MOL" angle="2.0660910787051585" k="575.7184"/>
+        <Angle class1="23_MOL" class2="22_MOL" class3="48_MOL" angle="2.023650007795859" k="407.52160000000003"/>
+        <Angle class1="23_MOL" class2="24_MOL" class3="25_MOL" angle="2.05195387752003" k="721.3216000000001"/>
+        <Angle class1="23_MOL" class2="24_MOL" class3="26_MOL" angle="2.0102116099708724" k="721.3216000000001"/>
+        <Angle class1="23_MOL" class2="27_MOL" class3="28_MOL" angle="2.0962899349356032" k="548.9408"/>
+        <Angle class1="23_MOL" class2="27_MOL" class3="32_MOL" angle="2.0693406923006745" k="575.7184"/>
+        <Angle class1="24_MOL" class2="23_MOL" class3="27_MOL" angle="2.2062617736190684" k="555.6352"/>
+        <Angle class1="25_MOL" class2="24_MOL" class3="26_MOL" angle="2.2196343099131295" k="994.1184000000001"/>
+        <Angle class1="27_MOL" class2="28_MOL" class3="29_MOL" angle="2.140009889676083" k="550.6144"/>
+        <Angle class1="27_MOL" class2="28_MOL" class3="49_MOL" angle="1.8904884801248067" k="395.8064"/>
+        <Angle class1="27_MOL" class2="28_MOL" class3="50_MOL" angle="1.857060741137563" k="395.8064"/>
+        <Angle class1="27_MOL" class2="32_MOL" class3="51_MOL" angle="2.050691947558295" k="407.52160000000003"/>
+        <Angle class1="28_MOL" class2="27_MOL" class3="32_MOL" angle="2.115995015863261" k="548.9408"/>
+        <Angle class1="28_MOL" class2="29_MOL" class3="30_MOL" angle="2.064598781340994" k="707.9327999999999"/>
+        <Angle class1="28_MOL" class2="29_MOL" class3="31_MOL" angle="1.993050249603552" k="707.9327999999999"/>
+        <Angle class1="29_MOL" class2="28_MOL" class3="49_MOL" angle="1.8644918938540154" k="396.6432"/>
+        <Angle class1="29_MOL" class2="28_MOL" class3="50_MOL" angle="1.8891560215394052" k="396.6432"/>
+        <Angle class1="30_MOL" class2="29_MOL" class3="31_MOL" angle="2.2236229877641986" k="994.1184000000001"/>
+        <Angle class1="35_MOL" class2="1_MOL" class3="36_MOL" angle="1.8734749585263766" k="324.6784"/>
+        <Angle class1="35_MOL" class2="1_MOL" class3="37_MOL" angle="1.8897525582496422" k="324.6784"/>
+        <Angle class1="36_MOL" class2="1_MOL" class3="37_MOL" angle="1.8901484352457563" k="324.6784"/>
+        <Angle class1="42_MOL" class2="13_MOL" class3="43_MOL" angle="1.88926237093961" k="324.6784"/>
+        <Angle class1="42_MOL" class2="13_MOL" class3="44_MOL" angle="1.8892665599703042" k="324.6784"/>
+        <Angle class1="43_MOL" class2="13_MOL" class3="44_MOL" angle="1.8725404684565101" k="324.6784"/>
+        <Angle class1="49_MOL" class2="28_MOL" class3="50_MOL" angle="1.7928385975457262" k="326.35200000000003"/>
+    </HarmonicAngleForce>
+    <PeriodicTorsionForce>
+        <Proper class1="1_MOL" class2="2_MOL" class3="3_MOL" class4="4_MOL" periodicity1="2" phase1="3.141592653589793" k1="6.7362400000000004"/>
+        <Proper class1="1_MOL" class2="2_MOL" class3="3_MOL" class4="8_MOL" periodicity1="2" phase1="3.141592653589793" k1="6.7362400000000004"/>
+        <Proper class1="2_MOL" class2="3_MOL" class3="4_MOL" class4="5_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="2_MOL" class2="3_MOL" class3="4_MOL" class4="38_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="2_MOL" class2="3_MOL" class3="8_MOL" class4="7_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="2_MOL" class2="3_MOL" class3="8_MOL" class4="40_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="3_MOL" class2="2_MOL" class3="1_MOL" class4="35_MOL" periodicity1="3" phase1="0.0" k1="1.6038666666666666"/>
+        <Proper class1="3_MOL" class2="2_MOL" class3="1_MOL" class4="36_MOL" periodicity1="3" phase1="0.0" k1="1.6038666666666666"/>
+        <Proper class1="3_MOL" class2="2_MOL" class3="1_MOL" class4="37_MOL" periodicity1="3" phase1="0.0" k1="1.6038666666666666"/>
+        <Proper class1="3_MOL" class2="4_MOL" class3="5_MOL" class4="6_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="3_MOL" class2="4_MOL" class3="5_MOL" class4="39_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="3_MOL" class2="8_MOL" class3="7_MOL" class4="6_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="3_MOL" class2="8_MOL" class3="7_MOL" class4="9_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="4_MOL" class2="3_MOL" class3="8_MOL" class4="7_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="4_MOL" class2="3_MOL" class3="8_MOL" class4="40_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="4_MOL" class2="5_MOL" class3="6_MOL" class4="7_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="4_MOL" class2="5_MOL" class3="6_MOL" class4="34_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="5_MOL" class2="4_MOL" class3="3_MOL" class4="8_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="5_MOL" class2="6_MOL" class3="7_MOL" class4="8_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="5_MOL" class2="6_MOL" class3="7_MOL" class4="9_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="5_MOL" class2="6_MOL" class3="34_MOL" class4="17_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="5_MOL" class2="6_MOL" class3="34_MOL" class4="33_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="6_MOL" class2="5_MOL" class3="4_MOL" class4="38_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="6_MOL" class2="7_MOL" class3="8_MOL" class4="40_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="6_MOL" class2="7_MOL" class3="9_MOL" class4="10_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="6_MOL" class2="7_MOL" class3="9_MOL" class4="16_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="6_MOL" class2="34_MOL" class3="17_MOL" class4="16_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="6_MOL" class2="34_MOL" class3="17_MOL" class4="18_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="6_MOL" class2="34_MOL" class3="33_MOL" class4="19_MOL" periodicity1="2" phase1="3.141592653589793" k1="20.0832"/>
+        <Proper class1="7_MOL" class2="6_MOL" class3="5_MOL" class4="39_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="7_MOL" class2="6_MOL" class3="34_MOL" class4="17_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="7_MOL" class2="6_MOL" class3="34_MOL" class4="33_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="7_MOL" class2="9_MOL" class3="10_MOL" class4="11_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="7_MOL" class2="9_MOL" class3="10_MOL" class4="41_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="7_MOL" class2="9_MOL" class3="16_MOL" class4="15_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="7_MOL" class2="9_MOL" class3="16_MOL" class4="17_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="8_MOL" class2="3_MOL" class3="4_MOL" class4="38_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="8_MOL" class2="7_MOL" class3="6_MOL" class4="34_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="8_MOL" class2="7_MOL" class3="9_MOL" class4="10_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="8_MOL" class2="7_MOL" class3="9_MOL" class4="16_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="9_MOL" class2="7_MOL" class3="6_MOL" class4="34_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="9_MOL" class2="7_MOL" class3="8_MOL" class4="40_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="9_MOL" class2="10_MOL" class3="11_MOL" class4="12_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="9_MOL" class2="10_MOL" class3="11_MOL" class4="14_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="9_MOL" class2="16_MOL" class3="15_MOL" class4="14_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="9_MOL" class2="16_MOL" class3="15_MOL" class4="46_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="9_MOL" class2="16_MOL" class3="17_MOL" class4="18_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="9_MOL" class2="16_MOL" class3="17_MOL" class4="34_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="10_MOL" class2="9_MOL" class3="16_MOL" class4="15_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="10_MOL" class2="9_MOL" class3="16_MOL" class4="17_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="10_MOL" class2="11_MOL" class3="12_MOL" class4="13_MOL" periodicity1="2" phase1="3.141592653589793" k1="6.7362400000000004"/>
+        <Proper class1="10_MOL" class2="11_MOL" class3="14_MOL" class4="15_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="10_MOL" class2="11_MOL" class3="14_MOL" class4="45_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="11_MOL" class2="10_MOL" class3="9_MOL" class4="16_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="11_MOL" class2="12_MOL" class3="13_MOL" class4="42_MOL" periodicity1="3" phase1="0.0" k1="1.6038666666666666"/>
+        <Proper class1="11_MOL" class2="12_MOL" class3="13_MOL" class4="43_MOL" periodicity1="3" phase1="0.0" k1="1.6038666666666666"/>
+        <Proper class1="11_MOL" class2="12_MOL" class3="13_MOL" class4="44_MOL" periodicity1="3" phase1="0.0" k1="1.6038666666666666"/>
+        <Proper class1="11_MOL" class2="14_MOL" class3="15_MOL" class4="16_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="11_MOL" class2="14_MOL" class3="15_MOL" class4="46_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="12_MOL" class2="11_MOL" class3="10_MOL" class4="41_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="12_MOL" class2="11_MOL" class3="14_MOL" class4="15_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="12_MOL" class2="11_MOL" class3="14_MOL" class4="45_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="13_MOL" class2="12_MOL" class3="11_MOL" class4="14_MOL" periodicity1="2" phase1="3.141592653589793" k1="6.7362400000000004"/>
+        <Proper class1="14_MOL" class2="11_MOL" class3="10_MOL" class4="41_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="14_MOL" class2="15_MOL" class3="16_MOL" class4="17_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="15_MOL" class2="16_MOL" class3="17_MOL" class4="18_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="15_MOL" class2="16_MOL" class3="17_MOL" class4="34_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="16_MOL" class2="9_MOL" class3="10_MOL" class4="41_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="16_MOL" class2="15_MOL" class3="14_MOL" class4="45_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="16_MOL" class2="17_MOL" class3="18_MOL" class4="19_MOL" periodicity1="2" phase1="3.141592653589793" k1="20.0832"/>
+        <Proper class1="16_MOL" class2="17_MOL" class3="34_MOL" class4="33_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="17_MOL" class2="16_MOL" class3="15_MOL" class4="46_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="17_MOL" class2="18_MOL" class3="19_MOL" class4="20_MOL" periodicity1="2" phase1="3.141592653589793" k1="19.874000000000002"/>
+        <Proper class1="17_MOL" class2="18_MOL" class3="19_MOL" class4="33_MOL" periodicity1="2" phase1="3.141592653589793" k1="19.874000000000002"/>
+        <Proper class1="17_MOL" class2="34_MOL" class3="33_MOL" class4="19_MOL" periodicity1="2" phase1="3.141592653589793" k1="20.0832"/>
+        <Proper class1="18_MOL" class2="17_MOL" class3="34_MOL" class4="33_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="18_MOL" class2="19_MOL" class3="20_MOL" class4="21_MOL" periodicity1="2" phase1="3.141592653589793" k1="2.9288"/>
+        <Proper class1="18_MOL" class2="19_MOL" class3="20_MOL" class4="32_MOL" periodicity1="2" phase1="3.141592653589793" k1="2.9288"/>
+        <Proper class1="18_MOL" class2="19_MOL" class3="33_MOL" class4="34_MOL" periodicity1="2" phase1="3.141592653589793" k1="19.874000000000002"/>
+        <Proper class1="19_MOL" class2="18_MOL" class3="17_MOL" class4="34_MOL" periodicity1="2" phase1="3.141592653589793" k1="20.0832"/>
+        <Proper class1="19_MOL" class2="20_MOL" class3="21_MOL" class4="22_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="19_MOL" class2="20_MOL" class3="21_MOL" class4="47_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="19_MOL" class2="20_MOL" class3="32_MOL" class4="27_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="19_MOL" class2="20_MOL" class3="32_MOL" class4="51_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="20_MOL" class2="19_MOL" class3="33_MOL" class4="34_MOL" periodicity1="2" phase1="3.141592653589793" k1="19.874000000000002"/>
+        <Proper class1="20_MOL" class2="21_MOL" class3="22_MOL" class4="23_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="20_MOL" class2="21_MOL" class3="22_MOL" class4="48_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="20_MOL" class2="32_MOL" class3="27_MOL" class4="23_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="20_MOL" class2="32_MOL" class3="27_MOL" class4="28_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="21_MOL" class2="20_MOL" class3="19_MOL" class4="33_MOL" periodicity1="2" phase1="3.141592653589793" k1="2.9288"/>
+        <Proper class1="21_MOL" class2="20_MOL" class3="32_MOL" class4="27_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="21_MOL" class2="20_MOL" class3="32_MOL" class4="51_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="21_MOL" class2="22_MOL" class3="23_MOL" class4="24_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="21_MOL" class2="22_MOL" class3="23_MOL" class4="27_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="22_MOL" class2="21_MOL" class3="20_MOL" class4="32_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="22_MOL" class2="23_MOL" class3="24_MOL" class4="25_MOL" periodicity1="2" phase1="3.141592653589793" k1="2.18614"/>
+        <Proper class1="22_MOL" class2="23_MOL" class3="24_MOL" class4="26_MOL" periodicity1="2" phase1="3.141592653589793" k1="2.18614"/>
+        <Proper class1="22_MOL" class2="23_MOL" class3="27_MOL" class4="28_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="22_MOL" class2="23_MOL" class3="27_MOL" class4="32_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="23_MOL" class2="22_MOL" class3="21_MOL" class4="47_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="23_MOL" class2="27_MOL" class3="28_MOL" class4="29_MOL" periodicity1="2" phase1="0.0" k1="0.0"/>
+        <Proper class1="23_MOL" class2="27_MOL" class3="28_MOL" class4="49_MOL" periodicity1="2" phase1="3.141592653589793" k1="0.0"/>
+        <Proper class1="23_MOL" class2="27_MOL" class3="28_MOL" class4="50_MOL" periodicity1="2" phase1="3.141592653589793" k1="0.0"/>
+        <Proper class1="23_MOL" class2="27_MOL" class3="32_MOL" class4="51_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="24_MOL" class2="23_MOL" class3="22_MOL" class4="48_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="24_MOL" class2="23_MOL" class3="27_MOL" class4="28_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="24_MOL" class2="23_MOL" class3="27_MOL" class4="32_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="25_MOL" class2="24_MOL" class3="23_MOL" class4="27_MOL" periodicity1="2" phase1="3.141592653589793" k1="2.18614"/>
+        <Proper class1="26_MOL" class2="24_MOL" class3="23_MOL" class4="27_MOL" periodicity1="2" phase1="3.141592653589793" k1="2.18614"/>
+        <Proper class1="27_MOL" class2="23_MOL" class3="22_MOL" class4="48_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="27_MOL" class2="28_MOL" class3="29_MOL" class4="30_MOL" periodicity1="2" phase1="3.141592653589793" k1="0.0"/>
+        <Proper class1="27_MOL" class2="28_MOL" class3="29_MOL" class4="31_MOL" periodicity1="2" phase1="3.141592653589793" k1="0.0"/>
+        <Proper class1="28_MOL" class2="27_MOL" class3="32_MOL" class4="51_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="29_MOL" class2="28_MOL" class3="27_MOL" class4="32_MOL" periodicity1="2" phase1="0.0" k1="0.0"/>
+        <Proper class1="30_MOL" class2="29_MOL" class3="28_MOL" class4="49_MOL" periodicity1="1" phase1="0.0" k1="3.47272" periodicity2="3" phase2="3.141592653589793" k2="0.16736"/>
+        <Proper class1="30_MOL" class2="29_MOL" class3="28_MOL" class4="50_MOL" periodicity1="1" phase1="0.0" k1="3.47272" periodicity2="3" phase2="3.141592653589793" k2="0.16736"/>
+        <Proper class1="31_MOL" class2="29_MOL" class3="28_MOL" class4="49_MOL" periodicity1="1" phase1="0.0" k1="3.47272" periodicity2="3" phase2="3.141592653589793" k2="0.16736"/>
+        <Proper class1="31_MOL" class2="29_MOL" class3="28_MOL" class4="50_MOL" periodicity1="1" phase1="0.0" k1="3.47272" periodicity2="3" phase2="3.141592653589793" k2="0.16736"/>
+        <Proper class1="32_MOL" class2="20_MOL" class3="19_MOL" class4="33_MOL" periodicity1="2" phase1="3.141592653589793" k1="2.9288"/>
+        <Proper class1="32_MOL" class2="20_MOL" class3="21_MOL" class4="47_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="32_MOL" class2="27_MOL" class3="28_MOL" class4="49_MOL" periodicity1="2" phase1="3.141592653589793" k1="0.0"/>
+        <Proper class1="32_MOL" class2="27_MOL" class3="28_MOL" class4="50_MOL" periodicity1="2" phase1="3.141592653589793" k1="0.0"/>
+        <Proper class1="34_MOL" class2="6_MOL" class3="5_MOL" class4="39_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="38_MOL" class2="4_MOL" class3="5_MOL" class4="39_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="45_MOL" class2="14_MOL" class3="15_MOL" class4="46_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Proper class1="47_MOL" class2="21_MOL" class3="22_MOL" class4="48_MOL" periodicity1="2" phase1="3.141592653589793" k1="15.167"/>
+        <Improper class1="3_MOL" class2="2_MOL" class3="4_MOL" class4="8_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="4_MOL" class2="3_MOL" class3="5_MOL" class4="38_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="8_MOL" class2="3_MOL" class3="7_MOL" class4="40_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="5_MOL" class2="4_MOL" class3="6_MOL" class4="39_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="6_MOL" class2="5_MOL" class3="7_MOL" class4="34_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="7_MOL" class2="6_MOL" class3="8_MOL" class4="9_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="34_MOL" class2="6_MOL" class3="17_MOL" class4="33_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="9_MOL" class2="7_MOL" class3="10_MOL" class4="16_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="10_MOL" class2="9_MOL" class3="11_MOL" class4="41_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="16_MOL" class2="9_MOL" class3="15_MOL" class4="17_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="11_MOL" class2="10_MOL" class3="12_MOL" class4="14_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="14_MOL" class2="11_MOL" class3="15_MOL" class4="45_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="15_MOL" class2="14_MOL" class3="16_MOL" class4="46_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="17_MOL" class2="16_MOL" class3="18_MOL" class4="34_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="19_MOL" class2="18_MOL" class3="20_MOL" class4="33_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="20_MOL" class2="19_MOL" class3="21_MOL" class4="32_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="21_MOL" class2="20_MOL" class3="22_MOL" class4="47_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="32_MOL" class2="20_MOL" class3="27_MOL" class4="51_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="22_MOL" class2="21_MOL" class3="23_MOL" class4="48_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="23_MOL" class2="22_MOL" class3="24_MOL" class4="27_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="24_MOL" class2="26_MOL" class3="23_MOL" class4="25_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="27_MOL" class2="28_MOL" class3="32_MOL" class4="23_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+        <Improper class1="29_MOL" class2="31_MOL" class3="28_MOL" class4="30_MOL" periodicity1="2" phase1="3.141592653589793" k1="4.6024"/>
+    </PeriodicTorsionForce>
+    <NonbondedForce coulomb14scale="0.8333333333333334" lj14scale="0.5">
+        <Atom type="C1_MOL" charge="0.044011" sigma="0.3397709531243626" epsilon="0.4510352"/>
+        <Atom type="O1_MOL" charge="-0.368006" sigma="0.3156097798883966" epsilon="0.3037584"/>
+        <Atom type="C2_MOL" charge="0.237729" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C3_MOL" charge="-0.23816" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C4_MOL" charge="-0.158918" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C5_MOL" charge="-0.001294" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C6_MOL" charge="-0.017691" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C7_MOL" charge="-0.256736" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C8_MOL" charge="-0.017691" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C9_MOL" charge="-0.256736" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C10_MOL" charge="0.237729" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="O2_MOL" charge="-0.368006" sigma="0.3156097798883966" epsilon="0.3037584"/>
+        <Atom type="C11_MOL" charge="0.044011" sigma="0.3397709531243626" epsilon="0.4510352"/>
+        <Atom type="C12_MOL" charge="-0.23816" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C13_MOL" charge="-0.158918" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C14_MOL" charge="-0.001294" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C15_MOL" charge="0.155629" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="N1_MOL" charge="-0.683831" sigma="0.33841678707278927" epsilon="0.3937144"/>
+        <Atom type="C16_MOL" charge="0.687263" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C17_MOL" charge="-0.233124" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C18_MOL" charge="-0.077604" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C19_MOL" charge="-0.237009" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C20_MOL" charge="-0.104347" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C21_MOL" charge="0.9054039999999981" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="O3_MOL" charge="-0.852366" sigma="0.3048120874245357" epsilon="0.6121192000000001"/>
+        <Atom type="O4_MOL" charge="-0.852366" sigma="0.3048120874245357" epsilon="0.6121192000000001"/>
+        <Atom type="C22_MOL" charge="0.033643" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="C23_MOL" charge="-0.064798" sigma="0.3397709531243626" epsilon="0.4510352"/>
+        <Atom type="C24_MOL" charge="0.763789" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="O5_MOL" charge="-0.831807" sigma="0.3048120874245357" epsilon="0.6121192000000001"/>
+        <Atom type="O6_MOL" charge="-0.831807" sigma="0.3048120874245357" epsilon="0.6121192000000001"/>
+        <Atom type="C25_MOL" charge="-0.140557" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="N2_MOL" charge="-0.683831" sigma="0.33841678707278927" epsilon="0.3937144"/>
+        <Atom type="C26_MOL" charge="0.155629" sigma="0.3315212309943831" epsilon="0.4133792"/>
+        <Atom type="H1_MOL" charge="0.038" sigma="0.24219972551363267" epsilon="0.0870272"/>
+        <Atom type="H2_MOL" charge="0.038" sigma="0.24219972551363267" epsilon="0.0870272"/>
+        <Atom type="H3_MOL" charge="0.038" sigma="0.24219972551363267" epsilon="0.0870272"/>
+        <Atom type="H4_MOL" charge="0.112756" sigma="0.262547852235958" epsilon="0.0673624"/>
+        <Atom type="H5_MOL" charge="0.159467" sigma="0.262547852235958" epsilon="0.0673624"/>
+        <Atom type="H6_MOL" charge="0.123021" sigma="0.262547852235958" epsilon="0.0673624"/>
+        <Atom type="H7_MOL" charge="0.123021" sigma="0.262547852235958" epsilon="0.0673624"/>
+        <Atom type="H8_MOL" charge="0.038" sigma="0.24219972551363267" epsilon="0.0870272"/>
+        <Atom type="H9_MOL" charge="0.038" sigma="0.24219972551363267" epsilon="0.0870272"/>
+        <Atom type="H10_MOL" charge="0.038" sigma="0.24219972551363267" epsilon="0.0870272"/>
+        <Atom type="H11_MOL" charge="0.112756" sigma="0.262547852235958" epsilon="0.0673624"/>
+        <Atom type="H12_MOL" charge="0.159467" sigma="0.262547852235958" epsilon="0.0673624"/>
+        <Atom type="H13_MOL" charge="0.036947" sigma="0.262547852235958" epsilon="0.0673624"/>
+        <Atom type="H14_MOL" charge="0.121036" sigma="0.262547852235958" epsilon="0.0673624"/>
+        <Atom type="H15_MOL" charge="0.026644" sigma="0.2600176998764394" epsilon="0.0870272"/>
+        <Atom type="H16_MOL" charge="0.026644" sigma="0.2600176998764394" epsilon="0.0870272"/>
+        <Atom type="H17_MOL" charge="0.180461" sigma="0.262547852235958" epsilon="0.0673624"/>
+    </NonbondedForce>
+</ForceField>

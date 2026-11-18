@@ -1,0 +1,5164 @@
+{
+ "version": 1,
+ "templates": {
+  "epoxide/basal": {
+   "group": "epoxide",
+   "site": "basal",
+   "formal_charge": 0,
+   "skeleton_refs": [
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.021886999999999893,
+     "gaff_type": "ca",
+     "resp_charge": -0.0921,
+     "neighbours": [
+      1,
+      2
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.142,
+      -0.368927,
+      0.0
+     ],
+     "charge": 0.007157999999999998,
+     "gaff_type": "ca",
+     "resp_charge": -0.066802,
+     "neighbours": [
+      0,
+      9
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.355,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.01904399999999999,
+     "gaff_type": "ca",
+     "resp_charge": -0.091206,
+     "neighbours": [
+      0,
+      13
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.284,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.021887000000000004,
+     "gaff_type": "ca",
+     "resp_charge": -0.0921,
+     "neighbours": [
+      4,
+      5
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.355,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.01904399999999999,
+     "gaff_type": "ca",
+     "resp_charge": -0.091206,
+     "neighbours": [
+      3,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.142,
+      -0.368927,
+      0.0
+     ],
+     "charge": 0.007157999999999998,
+     "gaff_type": "ca",
+     "resp_charge": -0.066802,
+     "neighbours": [
+      3,
+      6
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.071,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.009291,
+     "gaff_type": "cp",
+     "resp_charge": -0.009291,
+     "neighbours": [
+      5,
+      7,
+      9
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.142,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.072458,
+     "gaff_type": "ca",
+     "resp_charge": 0.072458,
+     "neighbours": [
+      6,
+      8,
+      12
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.284,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.034962,
+     "gaff_type": "ca",
+     "resp_charge": 0.034962,
+     "neighbours": [
+      4,
+      7,
+      18
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.009291,
+     "gaff_type": "cp",
+     "resp_charge": -0.009291,
+     "neighbours": [
+      1,
+      6,
+      10
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.142,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.072458,
+     "gaff_type": "ca",
+     "resp_charge": 0.072458,
+     "neighbours": [
+      9,
+      11,
+      13
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.0,
+      0.0
+     ],
+     "charge": 0.02172,
+     "gaff_type": "cx",
+     "resp_charge": 0.02172,
+     "neighbours": [
+      10,
+      12,
+      16
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.071,
+      0.0,
+      0.0
+     ],
+     "charge": 0.02172,
+     "gaff_type": "cx",
+     "resp_charge": 0.02172,
+     "neighbours": [
+      7,
+      11,
+      21
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.034962,
+     "gaff_type": "ca",
+     "resp_charge": 0.034962,
+     "neighbours": [
+      2,
+      10,
+      14
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.355,
+      0.0,
+      0.0
+     ],
+     "charge": -0.04544100000000001,
+     "gaff_type": "ce",
+     "resp_charge": -0.124379,
+     "neighbours": [
+      13,
+      15
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.034962,
+     "gaff_type": "ca",
+     "resp_charge": 0.034962,
+     "neighbours": [
+      14,
+      16,
+      17
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.142,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.072458,
+     "gaff_type": "ca",
+     "resp_charge": 0.072458,
+     "neighbours": [
+      11,
+      15,
+      25
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.355,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.01904399999999999,
+     "gaff_type": "ca",
+     "resp_charge": -0.091206,
+     "neighbours": [
+      15,
+      27
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.355,
+      -0.0,
+      0.0
+     ],
+     "charge": -0.04544100000000001,
+     "gaff_type": "ce",
+     "resp_charge": -0.124379,
+     "neighbours": [
+      8,
+      19
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.284,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.034962,
+     "gaff_type": "ca",
+     "resp_charge": 0.034962,
+     "neighbours": [
+      18,
+      20,
+      21
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.355,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.01904399999999999,
+     "gaff_type": "ca",
+     "resp_charge": -0.091206,
+     "neighbours": [
+      19,
+      24
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.142,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.072458,
+     "gaff_type": "ca",
+     "resp_charge": 0.072458,
+     "neighbours": [
+      12,
+      19,
+      22
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.071,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.009291,
+     "gaff_type": "cp",
+     "resp_charge": -0.009291,
+     "neighbours": [
+      21,
+      23,
+      25
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.142,
+      0.368927,
+      0.0
+     ],
+     "charge": 0.007157999999999998,
+     "gaff_type": "ca",
+     "resp_charge": -0.066802,
+     "neighbours": [
+      22,
+      24
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.284,
+      0.368927,
+      0.0
+     ],
+     "charge": -0.021887000000000004,
+     "gaff_type": "ca",
+     "resp_charge": -0.0921,
+     "neighbours": [
+      20,
+      23
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.009291,
+     "gaff_type": "cp",
+     "resp_charge": -0.009291,
+     "neighbours": [
+      16,
+      22,
+      26
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.142,
+      0.368927,
+      0.0
+     ],
+     "charge": 0.007157999999999998,
+     "gaff_type": "ca",
+     "resp_charge": -0.066802,
+     "neighbours": [
+      25,
+      27
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      0.368927,
+      0.0
+     ],
+     "charge": -0.021887000000000004,
+     "gaff_type": "ca",
+     "resp_charge": -0.0921,
+     "neighbours": [
+      17,
+      26
+     ],
+     "n_caps": 1
+    }
+   ],
+   "group_atoms": [
+    {
+     "element": "O",
+     "name": "O1",
+     "pos": [
+      0.0,
+      0.0,
+      0.12511
+     ],
+     "charge": -0.2099820000000001,
+     "sigma": 0.3156097798883966,
+     "epsilon": 0.3037584,
+     "gaff_type": "os"
+    }
+   ],
+   "terms": {
+    "bonds": [
+     [
+      11,
+      28,
+      0.14385214455775266,
+      262420.48
+     ],
+     [
+      12,
+      28,
+      0.14385214455775266,
+      262420.48
+     ]
+    ],
+    "angles": [
+     [
+      7,
+      12,
+      28,
+      1.8201536041465898,
+      692.8704
+     ],
+     [
+      10,
+      11,
+      28,
+      1.8201536041465909,
+      692.8704
+     ],
+     [
+      11,
+      12,
+      28,
+      1.054615313617258,
+      698.7280000000001
+     ],
+     [
+      11,
+      28,
+      12,
+      1.0323620263552769,
+      745.5888
+     ],
+     [
+      12,
+      11,
+      28,
+      1.054615313617258,
+      698.7280000000001
+     ],
+     [
+      16,
+      11,
+      28,
+      1.8201536041465909,
+      692.8704
+     ],
+     [
+      21,
+      12,
+      28,
+      1.8201536041465909,
+      692.8704
+     ]
+    ],
+    "torsions": [
+     [
+      7,
+      12,
+      11,
+      28,
+      3,
+      0.0,
+      0.6508444444444444
+     ],
+     [
+      7,
+      12,
+      28,
+      11,
+      3,
+      0.0,
+      1.6038666666666666
+     ],
+     [
+      10,
+      11,
+      12,
+      28,
+      3,
+      0.0,
+      0.6508444444444444
+     ],
+     [
+      10,
+      11,
+      28,
+      12,
+      3,
+      0.0,
+      1.6038666666666666
+     ],
+     [
+      11,
+      28,
+      12,
+      21,
+      3,
+      0.0,
+      1.6038666666666666
+     ],
+     [
+      12,
+      28,
+      11,
+      16,
+      3,
+      0.0,
+      1.6038666666666666
+     ],
+     [
+      16,
+      11,
+      12,
+      28,
+      3,
+      0.0,
+      0.6508444444444444
+     ],
+     [
+      21,
+      12,
+      11,
+      28,
+      3,
+      0.0,
+      0.6508444444444444
+     ]
+    ],
+    "rb": []
+   },
+   "graph_bonds": [
+    [
+     11,
+     28
+    ],
+    [
+     12,
+     28
+    ]
+   ],
+   "provenance": {
+    "method": "RESP HF/STO-3G + GAFF2 (VeloxChem MMForceFieldGenerator.create_topology), group atoms relaxed with GAFF2 at zero charge, skeleton fixed",
+    "basis": "STO-3G",
+    "test_only": true,
+    "cluster": "C28H14O1",
+    "cluster_atoms": 43,
+    "cluster_charge": 0,
+    "shell_bonds": 3,
+    "n_reference_atoms": 28,
+    "n_cap_h": 14,
+    "cap_h_charge_moved_to_their_carbons": 1.023216,
+    "group_resp_sum": -0.2099820000000001,
+    "relax_max_shift_nm": 0.00040505875441820827,
+    "veloxchem": "1.0rc4",
+    "created": "2026-10-26T09:44:25"
+   }
+  },
+  "hydroxyl_pair/basal": {
+   "group": "hydroxyl_pair",
+   "site": "basal",
+   "formal_charge": 0,
+   "skeleton_refs": [
+    {
+     "element": "C",
+     "pos": [
+      -0.497,
+      -0.122976,
+      0.0
+     ],
+     "charge": -0.009500999999999954,
+     "gaff_type": "ca",
+     "resp_charge": -0.08243,
+     "neighbours": [
+      1,
+      3
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.355,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.008109,
+     "gaff_type": "ca",
+     "resp_charge": 0.008109,
+     "neighbours": [
+      0,
+      2,
+      6
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.05252699999999999,
+     "gaff_type": "ce",
+     "resp_charge": -0.135312,
+     "neighbours": [
+      1,
+      10
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.568,
+      0.0,
+      0.0
+     ],
+     "charge": -0.031542,
+     "gaff_type": "ca",
+     "resp_charge": -0.104055,
+     "neighbours": [
+      0,
+      4
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.497,
+      0.122976,
+      0.0
+     ],
+     "charge": -0.00950100000000001,
+     "gaff_type": "ca",
+     "resp_charge": -0.08243,
+     "neighbours": [
+      3,
+      5
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.355,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.008109,
+     "gaff_type": "ca",
+     "resp_charge": 0.008109,
+     "neighbours": [
+      4,
+      6,
+      7
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      0.0,
+      0.0
+     ],
+     "charge": 0.088751,
+     "gaff_type": "ca",
+     "resp_charge": 0.088751,
+     "neighbours": [
+      1,
+      5,
+      14
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.05252699999999999,
+     "gaff_type": "ce",
+     "resp_charge": -0.135312,
+     "neighbours": [
+      5,
+      18
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.032349,
+     "gaff_type": "ca",
+     "resp_charge": -0.101054,
+     "neighbours": [
+      9,
+      10
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.071,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.032349,
+     "gaff_type": "ca",
+     "resp_charge": -0.101054,
+     "neighbours": [
+      8,
+      13
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.142,
+      -0.245951,
+      0.0
+     ],
+     "charge": 0.051484,
+     "gaff_type": "ca",
+     "resp_charge": 0.051484,
+     "neighbours": [
+      2,
+      8,
+      11
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.042356,
+     "gaff_type": "ca",
+     "resp_charge": 0.042356,
+     "neighbours": [
+      10,
+      12,
+      14
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.071,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.042356,
+     "gaff_type": "ca",
+     "resp_charge": 0.042356,
+     "neighbours": [
+      11,
+      13,
+      17
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.142,
+      -0.245951,
+      0.0
+     ],
+     "charge": 0.051484,
+     "gaff_type": "ca",
+     "resp_charge": 0.051484,
+     "neighbours": [
+      9,
+      12,
+      22
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.142,
+      0.0,
+      0.0
+     ],
+     "charge": 0.024015,
+     "gaff_type": "c3",
+     "resp_charge": 0.024015,
+     "neighbours": [
+      6,
+      11,
+      15
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.042356,
+     "gaff_type": "ca",
+     "resp_charge": 0.042356,
+     "neighbours": [
+      14,
+      16,
+      18
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.071,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.042356,
+     "gaff_type": "ca",
+     "resp_charge": 0.042356,
+     "neighbours": [
+      15,
+      17,
+      21
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.142,
+      0.0,
+      0.0
+     ],
+     "charge": 0.024015,
+     "gaff_type": "c3",
+     "resp_charge": 0.024015,
+     "neighbours": [
+      12,
+      16,
+      25
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.142,
+      0.245951,
+      0.0
+     ],
+     "charge": 0.051484,
+     "gaff_type": "ca",
+     "resp_charge": 0.051484,
+     "neighbours": [
+      7,
+      15,
+      19
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.368927,
+      0.0
+     ],
+     "charge": -0.032349,
+     "gaff_type": "ca",
+     "resp_charge": -0.101054,
+     "neighbours": [
+      18,
+      20
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.071,
+      0.368927,
+      0.0
+     ],
+     "charge": -0.032349,
+     "gaff_type": "ca",
+     "resp_charge": -0.101054,
+     "neighbours": [
+      19,
+      21
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.142,
+      0.245951,
+      0.0
+     ],
+     "charge": 0.051484,
+     "gaff_type": "ca",
+     "resp_charge": 0.051484,
+     "neighbours": [
+      16,
+      20,
+      29
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.284,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.05252699999999999,
+     "gaff_type": "ce",
+     "resp_charge": -0.135312,
+     "neighbours": [
+      13,
+      23
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.355,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.008109,
+     "gaff_type": "ca",
+     "resp_charge": 0.008109,
+     "neighbours": [
+      22,
+      24,
+      25
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.497,
+      -0.122976,
+      0.0
+     ],
+     "charge": -0.00950100000000001,
+     "gaff_type": "ca",
+     "resp_charge": -0.08243,
+     "neighbours": [
+      23,
+      28
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.284,
+      0.0,
+      0.0
+     ],
+     "charge": 0.088751,
+     "gaff_type": "ca",
+     "resp_charge": 0.088751,
+     "neighbours": [
+      17,
+      23,
+      26
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.355,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.008109,
+     "gaff_type": "ca",
+     "resp_charge": 0.008109,
+     "neighbours": [
+      25,
+      27,
+      29
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.497,
+      0.122976,
+      0.0
+     ],
+     "charge": -0.00950100000000001,
+     "gaff_type": "ca",
+     "resp_charge": -0.08243,
+     "neighbours": [
+      26,
+      28
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.568,
+      0.0,
+      0.0
+     ],
+     "charge": -0.031542,
+     "gaff_type": "ca",
+     "resp_charge": -0.104055,
+     "neighbours": [
+      24,
+      27
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.284,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.05252699999999999,
+     "gaff_type": "ce",
+     "resp_charge": -0.135312,
+     "neighbours": [
+      21,
+      26
+     ],
+     "n_caps": 1
+    }
+   ],
+   "group_atoms": [
+    {
+     "element": "O",
+     "name": "O1",
+     "pos": [
+      -0.144591,
+      0.0,
+      0.145017
+     ],
+     "charge": -0.4017630000000001,
+     "sigma": 0.3242871334030835,
+     "epsilon": 0.389112,
+     "gaff_type": "oh"
+    },
+    {
+     "element": "H",
+     "name": "HO1",
+     "pos": [
+      -0.237399,
+      0.0,
+      0.17457
+     ],
+     "charge": 0.305393,
+     "sigma": 0.053792464601313685,
+     "epsilon": 0.019664800000000003,
+     "gaff_type": "ho"
+    },
+    {
+     "element": "O",
+     "name": "O2",
+     "pos": [
+      0.144591,
+      0.0,
+      0.145017
+     ],
+     "charge": -0.401759,
+     "sigma": 0.3242871334030835,
+     "epsilon": 0.389112,
+     "gaff_type": "oh"
+    },
+    {
+     "element": "H",
+     "name": "HO2",
+     "pos": [
+      0.237399,
+      0.0,
+      0.17457
+     ],
+     "charge": 0.305393,
+     "sigma": 0.053792464601313685,
+     "epsilon": 0.019664800000000003,
+     "gaff_type": "ho"
+    }
+   ],
+   "terms": {
+    "bonds": [
+     [
+      14,
+      30,
+      0.14504027994764723,
+      245517.11999999994
+     ],
+     [
+      17,
+      32,
+      0.14504027994764723,
+      245517.11999999994
+     ],
+     [
+      30,
+      31,
+      0.09740042347404479,
+      471536.79999999993
+     ],
+     [
+      32,
+      33,
+      0.09740042347404512,
+      471536.79999999993
+     ]
+    ],
+    "angles": [
+     [
+      6,
+      14,
+      30,
+      1.5529332187759548,
+      712.9536
+     ],
+     [
+      11,
+      14,
+      30,
+      1.5797275245503657,
+      712.9536
+     ],
+     [
+      12,
+      17,
+      32,
+      1.5797275245503657,
+      712.9536
+     ],
+     [
+      14,
+      30,
+      31,
+      1.8969365111014904,
+      410.03200000000004
+     ],
+     [
+      15,
+      14,
+      30,
+      1.5797275245503657,
+      712.9536
+     ],
+     [
+      16,
+      17,
+      32,
+      1.5797275245503657,
+      712.9536
+     ],
+     [
+      17,
+      32,
+      33,
+      1.896936511101489,
+      410.03200000000004
+     ],
+     [
+      25,
+      17,
+      32,
+      1.5529332187759548,
+      712.9536
+     ]
+    ],
+    "torsions": [
+     [
+      6,
+      14,
+      30,
+      31,
+      3,
+      0.0,
+      0.6973333333333334
+     ],
+     [
+      11,
+      14,
+      30,
+      31,
+      3,
+      0.0,
+      0.6973333333333334
+     ],
+     [
+      12,
+      17,
+      32,
+      33,
+      3,
+      0.0,
+      0.6973333333333334
+     ],
+     [
+      15,
+      14,
+      30,
+      31,
+      3,
+      0.0,
+      0.6973333333333334
+     ],
+     [
+      16,
+      17,
+      32,
+      33,
+      3,
+      0.0,
+      0.6973333333333334
+     ],
+     [
+      25,
+      17,
+      32,
+      33,
+      3,
+      0.0,
+      0.6973333333333334
+     ]
+    ],
+    "rb": []
+   },
+   "graph_bonds": [
+    [
+     14,
+     30
+    ],
+    [
+     17,
+     32
+    ],
+    [
+     30,
+     31
+    ],
+    [
+     32,
+     33
+    ]
+   ],
+   "provenance": {
+    "method": "RESP HF/STO-3G + GAFF2 (VeloxChem MMForceFieldGenerator.create_topology), group atoms relaxed with GAFF2 at zero charge, skeleton fixed",
+    "basis": "STO-3G",
+    "test_only": true,
+    "cluster": "C30H16O2",
+    "cluster_atoms": 48,
+    "cluster_charge": 0,
+    "shell_bonds": 3,
+    "n_reference_atoms": 30,
+    "n_cap_h": 14,
+    "cap_h_charge_moved_to_their_carbons": 1.0427020000000002,
+    "group_resp_sum": -0.19273600000000002,
+    "relax_max_shift_nm": 0.0030327566391821215,
+    "veloxchem": "1.0rc4",
+    "created": "2026-10-26T09:44:59"
+   }
+  },
+  "phenol/armchair": {
+   "group": "phenol",
+   "site": "armchair",
+   "formal_charge": 0,
+   "skeleton_refs": [
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      0.0,
+      0.0
+     ],
+     "charge": -0.03569799999999998,
+     "gaff_type": "ca",
+     "resp_charge": -0.110268,
+     "neighbours": [
+      1,
+      3
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.031055,
+     "gaff_type": "ca",
+     "resp_charge": 0.031055,
+     "neighbours": [
+      0,
+      2,
+      6
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.022153000000000006,
+     "gaff_type": "ca",
+     "resp_charge": -0.087147,
+     "neighbours": [
+      1,
+      7
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      0.122976,
+      0.0
+     ],
+     "charge": -0.040796,
+     "gaff_type": "ca",
+     "resp_charge": -0.130695,
+     "neighbours": [
+      0,
+      4
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.122976,
+      0.0
+     ],
+     "charge": -0.112342,
+     "gaff_type": "ca",
+     "resp_charge": -0.112342,
+     "neighbours": [
+      3,
+      5,
+      10
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "charge": 0.213116,
+     "gaff_type": "ca",
+     "resp_charge": 0.213116,
+     "neighbours": [
+      4,
+      6
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.037593,
+     "gaff_type": "ca",
+     "resp_charge": 0.037593,
+     "neighbours": [
+      1,
+      5,
+      9
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.368927,
+      0.0
+     ],
+     "charge": 0.0038499999999999993,
+     "gaff_type": "ca",
+     "resp_charge": -0.061412,
+     "neighbours": [
+      2,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.01879399999999999,
+     "gaff_type": "ca",
+     "resp_charge": -0.084935,
+     "neighbours": [
+      7,
+      9
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.0,
+      -0.245951,
+      0.0
+     ],
+     "charge": 0.006175,
+     "gaff_type": "ca",
+     "resp_charge": -0.057618,
+     "neighbours": [
+      6,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "H",
+     "pos": [
+      -0.0167,
+      0.217026,
+      0.0
+     ],
+     "charge": 0.064779,
+     "gaff_type": "ha",
+     "resp_charge": 0.064779,
+     "neighbours": [
+      4
+     ],
+     "n_caps": 0
+    }
+   ],
+   "group_atoms": [
+    {
+     "element": "O",
+     "name": "O1",
+     "pos": [
+      0.136723,
+      0.00326,
+      0.0
+     ],
+     "charge": -0.44427500000000003,
+     "sigma": 0.3242871334030835,
+     "epsilon": 0.389112,
+     "gaff_type": "oh"
+    },
+    {
+     "element": "H",
+     "name": "HO1",
+     "pos": [
+      0.16539,
+      0.096346,
+      -0.0
+     ],
+     "charge": 0.31749,
+     "sigma": 0.053792464601313685,
+     "epsilon": 0.019664800000000003,
+     "gaff_type": "ho"
+    }
+   ],
+   "terms": {
+    "bonds": [
+     [
+      5,
+      11,
+      0.1367614729556099,
+      305934.07999999996
+     ],
+     [
+      11,
+      12,
+      0.0973994037551441,
+      471536.79999999993
+     ]
+    ],
+    "angles": [
+     [
+      4,
+      5,
+      11,
+      2.070552320103287,
+      729.6896
+     ],
+     [
+      5,
+      11,
+      12,
+      1.8933895603095032,
+      424.2576
+     ],
+     [
+      6,
+      5,
+      11,
+      2.1182378846831034,
+      729.6896
+     ]
+    ],
+    "torsions": [
+     [
+      1,
+      6,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      3,
+      4,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      4,
+      5,
+      11,
+      12,
+      2,
+      3.141592653589793,
+      3.49364
+     ],
+     [
+      6,
+      5,
+      11,
+      12,
+      2,
+      3.141592653589793,
+      3.49364
+     ],
+     [
+      9,
+      6,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      10,
+      4,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      4,
+      6,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      4.6024
+     ]
+    ],
+    "rb": []
+   },
+   "graph_bonds": [
+    [
+     5,
+     11
+    ],
+    [
+     11,
+     12
+    ]
+   ],
+   "provenance": {
+    "method": "RESP HF/STO-3G + GAFF2 (VeloxChem MMForceFieldGenerator.create_topology), group atoms relaxed with GAFF2 at zero charge, skeleton fixed",
+    "basis": "STO-3G",
+    "test_only": true,
+    "cluster": "C10H8O1",
+    "cluster_atoms": 19,
+    "cluster_charge": 0,
+    "shell_bonds": 3,
+    "n_reference_atoms": 11,
+    "n_cap_h": 6,
+    "cap_h_charge_moved_to_their_carbons": 0.424659,
+    "group_resp_sum": -0.12678500000000004,
+    "relax_max_shift_nm": 0.0044036117106411865,
+    "veloxchem": "1.0rc4",
+    "created": "2026-10-26T09:45:01"
+   }
+  },
+  "phenol/zigzag": {
+   "group": "phenol",
+   "site": "zigzag",
+   "formal_charge": 0,
+   "skeleton_refs": [
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.013326000000000122,
+     "gaff_type": "ca",
+     "resp_charge": -0.069836,
+     "neighbours": [
+      1,
+      3
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.368927,
+      0.0
+     ],
+     "charge": 0.004735000000000003,
+     "gaff_type": "ca",
+     "resp_charge": -0.060249,
+     "neighbours": [
+      0,
+      7
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.0,
+      0.0
+     ],
+     "charge": -0.08731,
+     "gaff_type": "ca",
+     "resp_charge": -0.190713,
+     "neighbours": [
+      3,
+      5
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.018894,
+     "gaff_type": "ca",
+     "resp_charge": 0.018894,
+     "neighbours": [
+      0,
+      2,
+      9
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.013325999999999998,
+     "gaff_type": "ca",
+     "resp_charge": -0.069836,
+     "neighbours": [
+      5,
+      6
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.018894,
+     "gaff_type": "ca",
+     "resp_charge": 0.018894,
+     "neighbours": [
+      2,
+      4,
+      11
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      0.368927,
+      0.0
+     ],
+     "charge": 0.004735000000000003,
+     "gaff_type": "ca",
+     "resp_charge": -0.060249,
+     "neighbours": [
+      4,
+      13
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.023190000000000002,
+     "gaff_type": "ca",
+     "resp_charge": -0.088565,
+     "neighbours": [
+      1,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.064076,
+     "gaff_type": "ca",
+     "resp_charge": -0.064076,
+     "neighbours": [
+      7,
+      9,
+      14
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.047151,
+     "gaff_type": "ca",
+     "resp_charge": 0.047151,
+     "neighbours": [
+      3,
+      8,
+      10
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "charge": 0.121006,
+     "gaff_type": "ca",
+     "resp_charge": 0.121006,
+     "neighbours": [
+      9,
+      11
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.047151,
+     "gaff_type": "ca",
+     "resp_charge": 0.047151,
+     "neighbours": [
+      5,
+      10,
+      12
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.0,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.064076,
+     "gaff_type": "ca",
+     "resp_charge": -0.064076,
+     "neighbours": [
+      11,
+      13,
+      15
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.368927,
+      0.0
+     ],
+     "charge": -0.023190000000000002,
+     "gaff_type": "ca",
+     "resp_charge": -0.088565,
+     "neighbours": [
+      6,
+      12
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "H",
+     "pos": [
+      0.1086,
+      -0.245951,
+      0.0
+     ],
+     "charge": 0.060334,
+     "gaff_type": "ha",
+     "resp_charge": 0.060334,
+     "neighbours": [
+      8
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "H",
+     "pos": [
+      0.1086,
+      0.245951,
+      0.0
+     ],
+     "charge": 0.060334,
+     "gaff_type": "ha",
+     "resp_charge": 0.060334,
+     "neighbours": [
+      12
+     ],
+     "n_caps": 0
+    }
+   ],
+   "group_atoms": [
+    {
+     "element": "O",
+     "name": "O1",
+     "pos": [
+      0.137052,
+      -1.2e-05,
+      -0.0
+     ],
+     "charge": -0.3747699999999999,
+     "sigma": 0.3242871334030835,
+     "epsilon": 0.389112,
+     "gaff_type": "oh"
+    },
+    {
+     "element": "H",
+     "name": "HO1",
+     "pos": [
+      0.16796,
+      0.09235,
+      -0.0
+     ],
+     "charge": 0.28003,
+     "sigma": 0.053792464601313685,
+     "epsilon": 0.019664800000000003,
+     "gaff_type": "ho"
+    }
+   ],
+   "terms": {
+    "bonds": [
+     [
+      10,
+      16,
+      0.13705192584843726,
+      305934.07999999996
+     ],
+     [
+      16,
+      17,
+      0.09739669095085175,
+      471536.79999999993
+     ]
+    ],
+    "angles": [
+     [
+      9,
+      10,
+      16,
+      2.094306146936491,
+      729.6896
+     ],
+     [
+      10,
+      16,
+      17,
+      1.8936314838718975,
+      424.2576
+     ],
+     [
+      11,
+      10,
+      16,
+      2.0944840578498978,
+      729.6896
+     ]
+    ],
+    "torsions": [
+     [
+      3,
+      9,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      5,
+      11,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      8,
+      9,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      9,
+      10,
+      16,
+      17,
+      2,
+      3.141592653589793,
+      3.49364
+     ],
+     [
+      11,
+      10,
+      16,
+      17,
+      2,
+      3.141592653589793,
+      3.49364
+     ],
+     [
+      12,
+      11,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      9,
+      11,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      4.6024
+     ]
+    ],
+    "rb": []
+   },
+   "graph_bonds": [
+    [
+     10,
+     16
+    ],
+    [
+     16,
+     17
+    ]
+   ],
+   "provenance": {
+    "method": "RESP HF/STO-3G + GAFF2 (VeloxChem MMForceFieldGenerator.create_topology), group atoms relaxed with GAFF2 at zero charge, skeleton fixed",
+    "basis": "STO-3G",
+    "test_only": true,
+    "cluster": "C14H10O1",
+    "cluster_atoms": 25,
+    "cluster_charge": 0,
+    "shell_bonds": 3,
+    "n_reference_atoms": 16,
+    "n_cap_h": 7,
+    "cap_h_charge_moved_to_their_carbons": 0.477141,
+    "group_resp_sum": -0.09473999999999988,
+    "relax_max_shift_nm": 0.00065440368040659,
+    "veloxchem": "1.0rc4",
+    "created": "2026-10-26T09:45:05"
+   }
+  },
+  "phenolate/armchair": {
+   "group": "phenolate",
+   "site": "armchair",
+   "formal_charge": -1,
+   "skeleton_refs": [
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      0.0,
+      0.0
+     ],
+     "charge": -0.237504,
+     "gaff_type": "ca",
+     "resp_charge": -0.270599,
+     "neighbours": [
+      1,
+      3
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.019084,
+     "gaff_type": "ca",
+     "resp_charge": 0.019084,
+     "neighbours": [
+      0,
+      2,
+      6
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.083646,
+     "gaff_type": "ca",
+     "resp_charge": -0.12149,
+     "neighbours": [
+      1,
+      7
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      0.122976,
+      0.0
+     ],
+     "charge": -0.043595,
+     "gaff_type": "ca",
+     "resp_charge": -0.095432,
+     "neighbours": [
+      0,
+      4
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.122976,
+      0.0
+     ],
+     "charge": -0.249587,
+     "gaff_type": "ca",
+     "resp_charge": -0.249587,
+     "neighbours": [
+      3,
+      5,
+      10
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "charge": 0.26376,
+     "gaff_type": "ca",
+     "resp_charge": 0.26376,
+     "neighbours": [
+      4,
+      6
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.027408,
+     "gaff_type": "ca",
+     "resp_charge": 0.027408,
+     "neighbours": [
+      1,
+      5,
+      9
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.053728,
+     "gaff_type": "ca",
+     "resp_charge": -0.094596,
+     "neighbours": [
+      2,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.112622,
+     "gaff_type": "ca",
+     "resp_charge": -0.147203,
+     "neighbours": [
+      7,
+      9
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.0,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.026473999999999998,
+     "gaff_type": "ca",
+     "resp_charge": -0.082786,
+     "neighbours": [
+      6,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "H",
+     "pos": [
+      -0.0167,
+      0.217026,
+      0.0
+     ],
+     "charge": 0.023949,
+     "gaff_type": "ha",
+     "resp_charge": 0.023949,
+     "neighbours": [
+      4
+     ],
+     "n_caps": 0
+    }
+   ],
+   "group_atoms": [
+    {
+     "element": "O",
+     "name": "O1",
+     "pos": [
+      0.12817,
+      0.002626,
+      0.0
+     ],
+     "charge": -0.527045,
+     "sigma": 0.3048120874245357,
+     "epsilon": 0.6121192000000001,
+     "gaff_type": "o"
+    }
+   ],
+   "terms": {
+    "bonds": [
+     [
+      5,
+      11,
+      0.12819738094197955,
+      507519.1999999999
+     ]
+    ],
+    "angles": [
+     [
+      4,
+      5,
+      11,
+      2.073905787429971,
+      748.936
+     ],
+     [
+      6,
+      5,
+      11,
+      2.1148844173564196,
+      748.936
+     ]
+    ],
+    "torsions": [
+     [
+      1,
+      6,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      3,
+      4,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      9,
+      6,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      10,
+      4,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      4,
+      6,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      4.6024
+     ]
+    ],
+    "rb": []
+   },
+   "graph_bonds": [
+    [
+     5,
+     11
+    ]
+   ],
+   "provenance": {
+    "method": "RESP HF/STO-3G + GAFF2 (VeloxChem MMForceFieldGenerator.create_topology), group atoms relaxed with GAFF2 at zero charge, skeleton fixed",
+    "basis": "STO-3G",
+    "test_only": true,
+    "cluster": "C10H7O1",
+    "cluster_atoms": 18,
+    "cluster_charge": -1,
+    "shell_bonds": 3,
+    "n_reference_atoms": 11,
+    "n_cap_h": 6,
+    "cap_h_charge_moved_to_their_carbons": 0.254537,
+    "group_resp_sum": -0.527045,
+    "relax_max_shift_nm": 0.0021893731897433266,
+    "veloxchem": "1.0rc4",
+    "created": "2026-10-26T09:45:07"
+   }
+  },
+  "phenolate/zigzag": {
+   "group": "phenolate",
+   "site": "zigzag",
+   "formal_charge": -1,
+   "skeleton_refs": [
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.07305200000000034,
+     "gaff_type": "ca",
+     "resp_charge": -0.104947,
+     "neighbours": [
+      1,
+      3
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.050637999999999996,
+     "gaff_type": "ca",
+     "resp_charge": -0.096316,
+     "neighbours": [
+      0,
+      7
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.0,
+      0.0
+     ],
+     "charge": -0.291713,
+     "gaff_type": "ca",
+     "resp_charge": -0.352117,
+     "neighbours": [
+      3,
+      5
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.017604,
+     "gaff_type": "ca",
+     "resp_charge": 0.017604,
+     "neighbours": [
+      0,
+      2,
+      9
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.073052,
+     "gaff_type": "ca",
+     "resp_charge": -0.104947,
+     "neighbours": [
+      5,
+      6
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.017604,
+     "gaff_type": "ca",
+     "resp_charge": 0.017604,
+     "neighbours": [
+      2,
+      4,
+      11
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      0.368927,
+      0.0
+     ],
+     "charge": -0.050637999999999996,
+     "gaff_type": "ca",
+     "resp_charge": -0.096316,
+     "neighbours": [
+      4,
+      13
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.11867,
+     "gaff_type": "ca",
+     "resp_charge": -0.153281,
+     "neighbours": [
+      1,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.066818,
+     "gaff_type": "ca",
+     "resp_charge": -0.066818,
+     "neighbours": [
+      7,
+      9,
+      14
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.010293,
+     "gaff_type": "ca",
+     "resp_charge": 0.010293,
+     "neighbours": [
+      3,
+      8,
+      10
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "charge": 0.197942,
+     "gaff_type": "ca",
+     "resp_charge": 0.197942,
+     "neighbours": [
+      9,
+      11
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.010293,
+     "gaff_type": "ca",
+     "resp_charge": 0.010293,
+     "neighbours": [
+      5,
+      10,
+      12
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.0,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.066818,
+     "gaff_type": "ca",
+     "resp_charge": -0.066818,
+     "neighbours": [
+      11,
+      13,
+      15
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.368927,
+      0.0
+     ],
+     "charge": -0.11867,
+     "gaff_type": "ca",
+     "resp_charge": -0.153281,
+     "neighbours": [
+      6,
+      12
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "H",
+     "pos": [
+      0.1086,
+      -0.245951,
+      0.0
+     ],
+     "charge": 0.05011,
+     "gaff_type": "ha",
+     "resp_charge": 0.05011,
+     "neighbours": [
+      8
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "H",
+     "pos": [
+      0.1086,
+      0.245951,
+      0.0
+     ],
+     "charge": 0.05011,
+     "gaff_type": "ha",
+     "resp_charge": 0.05011,
+     "neighbours": [
+      12
+     ],
+     "n_caps": 0
+    }
+   ],
+   "group_atoms": [
+    {
+     "element": "O",
+     "name": "O1",
+     "pos": [
+      0.128346,
+      -0.0,
+      -0.0
+     ],
+     "charge": -0.4438869999999997,
+     "sigma": 0.3048120874245357,
+     "epsilon": 0.6121192000000001,
+     "gaff_type": "o"
+    }
+   ],
+   "terms": {
+    "bonds": [
+     [
+      10,
+      16,
+      0.12834551002964237,
+      507519.1999999999
+     ]
+    ],
+    "angles": [
+     [
+      9,
+      10,
+      16,
+      2.0943951023931935,
+      748.936
+     ],
+     [
+      11,
+      10,
+      16,
+      2.0943951023931953,
+      748.936
+     ]
+    ],
+    "torsions": [
+     [
+      3,
+      9,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      5,
+      11,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      8,
+      9,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      12,
+      11,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      9,
+      11,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      4.6024
+     ]
+    ],
+    "rb": []
+   },
+   "graph_bonds": [
+    [
+     10,
+     16
+    ]
+   ],
+   "provenance": {
+    "method": "RESP HF/STO-3G + GAFF2 (VeloxChem MMForceFieldGenerator.create_topology), group atoms relaxed with GAFF2 at zero charge, skeleton fixed",
+    "basis": "STO-3G",
+    "test_only": true,
+    "cluster": "C14H9O1",
+    "cluster_atoms": 24,
+    "cluster_charge": -1,
+    "shell_bonds": 3,
+    "n_reference_atoms": 16,
+    "n_cap_h": 7,
+    "cap_h_charge_moved_to_their_carbons": 0.284772,
+    "group_resp_sum": -0.4438869999999997,
+    "relax_max_shift_nm": 0.00034551002964233746,
+    "veloxchem": "1.0rc4",
+    "created": "2026-10-26T09:50:18"
+   }
+  },
+  "carboxyl/armchair": {
+   "group": "carboxyl",
+   "site": "armchair",
+   "formal_charge": 0,
+   "skeleton_refs": [
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      0.0,
+      0.0
+     ],
+     "charge": -0.04141799999999997,
+     "gaff_type": "ca",
+     "resp_charge": -0.118222,
+     "neighbours": [
+      1,
+      3
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.111057,
+     "gaff_type": "ca",
+     "resp_charge": 0.111057,
+     "neighbours": [
+      0,
+      2,
+      6
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.057802000000000006,
+     "gaff_type": "ca",
+     "resp_charge": -0.139018,
+     "neighbours": [
+      1,
+      7
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.011038000000000006,
+     "gaff_type": "ca",
+     "resp_charge": -0.051981,
+     "neighbours": [
+      0,
+      4
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.122976,
+      0.0
+     ],
+     "charge": -0.066177,
+     "gaff_type": "ca",
+     "resp_charge": -0.066177,
+     "neighbours": [
+      3,
+      5,
+      10
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "charge": -0.198181,
+     "gaff_type": "ca",
+     "resp_charge": -0.198181,
+     "neighbours": [
+      4,
+      6
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.106306,
+     "gaff_type": "ca",
+     "resp_charge": 0.106306,
+     "neighbours": [
+      1,
+      5,
+      9
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.368927,
+      0.0
+     ],
+     "charge": 0.011649,
+     "gaff_type": "ca",
+     "resp_charge": -0.051666,
+     "neighbours": [
+      2,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.368927,
+      0.0
+     ],
+     "charge": 0.014948000000000003,
+     "gaff_type": "ca",
+     "resp_charge": -0.049094,
+     "neighbours": [
+      7,
+      9
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.0,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.06346699999999998,
+     "gaff_type": "ca",
+     "resp_charge": -0.149909,
+     "neighbours": [
+      6,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "H",
+     "pos": [
+      -0.0167,
+      0.217026,
+      0.0
+     ],
+     "charge": 0.076825,
+     "gaff_type": "ha",
+     "resp_charge": 0.076825,
+     "neighbours": [
+      4
+     ],
+     "n_caps": 0
+    }
+   ],
+   "group_atoms": [
+    {
+     "element": "C",
+     "name": "C1",
+     "pos": [
+      0.148811,
+      0.006758,
+      -0.001775
+     ],
+     "charge": 0.7593509999999999,
+     "sigma": 0.3315212309943831,
+     "epsilon": 0.4133792,
+     "gaff_type": "c"
+    },
+    {
+     "element": "O",
+     "name": "O1",
+     "pos": [
+      0.213909,
+      0.044481,
+      0.093025
+     ],
+     "charge": -0.454746,
+     "sigma": 0.3048120874245357,
+     "epsilon": 0.6121192000000001,
+     "gaff_type": "o"
+    },
+    {
+     "element": "O",
+     "name": "O2",
+     "pos": [
+      0.202539,
+      -0.030621,
+      -0.118937
+     ],
+     "charge": -0.543125,
+     "sigma": 0.3242871334030835,
+     "epsilon": 0.389112,
+     "gaff_type": "oh"
+    },
+    {
+     "element": "H",
+     "name": "HO2",
+     "pos": [
+      0.299138,
+      -0.021936,
+      -0.110012
+     ],
+     "charge": 0.333742,
+     "sigma": 0.053792464601313685,
+     "epsilon": 0.019664800000000003,
+     "gaff_type": "ho"
+    }
+   ],
+   "terms": {
+    "bonds": [
+     [
+      5,
+      11,
+      0.1489751055860058,
+      228195.35999999996
+     ],
+     [
+      11,
+      12,
+      0.12102831561263401,
+      546095.6799999999
+     ],
+     [
+      11,
+      13,
+      0.134204349631019,
+      320578.07999999996
+     ],
+     [
+      13,
+      14,
+      0.09739856498972876,
+      471536.79999999993
+     ]
+    ],
+    "angles": [
+     [
+      4,
+      5,
+      11,
+      2.0489793325155428,
+      555.6352
+     ],
+     [
+      5,
+      11,
+      12,
+      2.143717440527358,
+      721.3216000000001
+     ],
+     [
+      5,
+      11,
+      13,
+      1.9797699160026576,
+      725.5056000000001
+     ],
+     [
+      6,
+      5,
+      11,
+      2.1397286856403652,
+      555.6352
+     ],
+     [
+      11,
+      13,
+      14,
+      1.867342481218882,
+      431.78880000000004
+     ],
+     [
+      12,
+      11,
+      13,
+      2.15952019703503,
+      968.1776000000001
+     ]
+    ],
+    "torsions": [
+     [
+      1,
+      6,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      3,
+      4,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      4,
+      5,
+      11,
+      12,
+      2,
+      3.141592653589793,
+      2.18614
+     ],
+     [
+      4,
+      5,
+      11,
+      13,
+      2,
+      3.141592653589793,
+      4.184
+     ],
+     [
+      5,
+      11,
+      13,
+      14,
+      2,
+      3.141592653589793,
+      9.623199999999999
+     ],
+     [
+      6,
+      5,
+      11,
+      12,
+      2,
+      3.141592653589793,
+      2.18614
+     ],
+     [
+      6,
+      5,
+      11,
+      13,
+      2,
+      3.141592653589793,
+      4.184
+     ],
+     [
+      9,
+      6,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      10,
+      4,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      12,
+      11,
+      13,
+      14,
+      2,
+      3.141592653589793,
+      9.623199999999999
+     ],
+     [
+      12,
+      11,
+      13,
+      14,
+      1,
+      0.0,
+      7.9496
+     ],
+     [
+      4,
+      6,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      4.6024
+     ],
+     [
+      5,
+      13,
+      11,
+      12,
+      2,
+      3.141592653589793,
+      43.932
+     ]
+    ],
+    "rb": []
+   },
+   "graph_bonds": [
+    [
+     5,
+     11
+    ],
+    [
+     11,
+     12
+    ],
+    [
+     11,
+     13
+    ],
+    [
+     13,
+     14
+    ]
+   ],
+   "provenance": {
+    "method": "RESP HF/STO-3G + GAFF2 (VeloxChem MMForceFieldGenerator.create_topology), group atoms relaxed with GAFF2 at zero charge, skeleton fixed",
+    "basis": "STO-3G",
+    "test_only": true,
+    "cluster": "C11H8O2",
+    "cluster_atoms": 21,
+    "cluster_charge": 0,
+    "shell_bonds": 3,
+    "n_reference_atoms": 11,
+    "n_cap_h": 6,
+    "cap_h_charge_moved_to_their_carbons": 0.434838,
+    "group_resp_sum": 0.09522199999999992,
+    "relax_max_shift_nm": 0.06492125038151775,
+    "veloxchem": "1.0rc4",
+    "created": "2026-10-26T09:45:16"
+   }
+  },
+  "carboxyl/zigzag": {
+   "group": "carboxyl",
+   "site": "zigzag",
+   "formal_charge": 0,
+   "skeleton_refs": [
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.04202800000000004,
+     "gaff_type": "ca",
+     "resp_charge": -0.110272,
+     "neighbours": [
+      1,
+      3
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.368927,
+      0.0
+     ],
+     "charge": 0.005801000000000001,
+     "gaff_type": "ca",
+     "resp_charge": -0.057074,
+     "neighbours": [
+      0,
+      7
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.0,
+      0.0
+     ],
+     "charge": -0.0805,
+     "gaff_type": "ca",
+     "resp_charge": -0.184112,
+     "neighbours": [
+      3,
+      5
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.0928,
+     "gaff_type": "ca",
+     "resp_charge": 0.0928,
+     "neighbours": [
+      0,
+      2,
+      9
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.042027999999999996,
+     "gaff_type": "ca",
+     "resp_charge": -0.110272,
+     "neighbours": [
+      5,
+      6
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.0928,
+     "gaff_type": "ca",
+     "resp_charge": 0.0928,
+     "neighbours": [
+      2,
+      4,
+      11
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      0.368927,
+      0.0
+     ],
+     "charge": 0.005801000000000001,
+     "gaff_type": "ca",
+     "resp_charge": -0.057074,
+     "neighbours": [
+      4,
+      13
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.368927,
+      0.0
+     ],
+     "charge": 0.013585,
+     "gaff_type": "ca",
+     "resp_charge": -0.048534,
+     "neighbours": [
+      1,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.132052,
+     "gaff_type": "ca",
+     "resp_charge": -0.132052,
+     "neighbours": [
+      7,
+      9,
+      14
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.104857,
+     "gaff_type": "ca",
+     "resp_charge": 0.104857,
+     "neighbours": [
+      3,
+      8,
+      10
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "charge": -0.287031,
+     "gaff_type": "ca",
+     "resp_charge": -0.287031,
+     "neighbours": [
+      9,
+      11
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.104857,
+     "gaff_type": "ca",
+     "resp_charge": 0.104857,
+     "neighbours": [
+      5,
+      10,
+      12
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.0,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.132052,
+     "gaff_type": "ca",
+     "resp_charge": -0.132052,
+     "neighbours": [
+      11,
+      13,
+      15
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.368927,
+      0.0
+     ],
+     "charge": 0.013585,
+     "gaff_type": "ca",
+     "resp_charge": -0.048534,
+     "neighbours": [
+      6,
+      12
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "H",
+     "pos": [
+      0.1086,
+      -0.245951,
+      0.0
+     ],
+     "charge": 0.080853,
+     "gaff_type": "ha",
+     "resp_charge": 0.080853,
+     "neighbours": [
+      8
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "H",
+     "pos": [
+      0.1086,
+      0.245951,
+      0.0
+     ],
+     "charge": 0.080853,
+     "gaff_type": "ha",
+     "resp_charge": 0.080853,
+     "neighbours": [
+      12
+     ],
+     "n_caps": 0
+    }
+   ],
+   "group_atoms": [
+    {
+     "element": "C",
+     "name": "C1",
+     "pos": [
+      0.149254,
+      5e-06,
+      3.5e-05
+     ],
+     "charge": 0.7889880000000001,
+     "sigma": 0.3315212309943831,
+     "epsilon": 0.4133792,
+     "gaff_type": "c"
+    },
+    {
+     "element": "O",
+     "name": "O1",
+     "pos": [
+      0.215102,
+      7.8e-05,
+      0.101612
+     ],
+     "charge": -0.457084,
+     "sigma": 0.3048120874245357,
+     "epsilon": 0.6121192000000001,
+     "gaff_type": "o"
+    },
+    {
+     "element": "O",
+     "name": "O2",
+     "pos": [
+      0.202035,
+      -7.2e-05,
+      -0.123296
+     ],
+     "charge": -0.541618,
+     "sigma": 0.3242871334030835,
+     "epsilon": 0.389112,
+     "gaff_type": "oh"
+    },
+    {
+     "element": "H",
+     "name": "HO2",
+     "pos": [
+      0.298867,
+      -5.5e-05,
+      -0.112809
+     ],
+     "charge": 0.329613,
+     "sigma": 0.053792464601313685,
+     "epsilon": 0.019664800000000003,
+     "gaff_type": "ho"
+    }
+   ],
+   "terms": {
+    "bonds": [
+     [
+      10,
+      16,
+      0.14925429589115244,
+      228195.35999999996
+     ],
+     [
+      16,
+      17,
+      0.12105315600095463,
+      546095.6799999999
+     ],
+     [
+      16,
+      18,
+      0.13415006515841577,
+      320578.07999999996
+     ],
+     [
+      18,
+      19,
+      0.09739834453329058,
+      471536.79999999993
+     ]
+    ],
+    "angles": [
+     [
+      9,
+      10,
+      16,
+      2.094429487091631,
+      555.6352
+     ],
+     [
+      10,
+      16,
+      17,
+      2.1461763131157077,
+      721.3216000000001
+     ],
+     [
+      10,
+      16,
+      18,
+      1.9749407001765604,
+      725.5056000000001
+     ],
+     [
+      11,
+      10,
+      16,
+      2.0943606866654796,
+      555.6352
+     ],
+     [
+      16,
+      18,
+      19,
+      1.8672881125025993,
+      431.78880000000004
+     ],
+     [
+      17,
+      16,
+      18,
+      2.1620682925087875,
+      968.1776000000001
+     ]
+    ],
+    "torsions": [
+     [
+      3,
+      9,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      5,
+      11,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      8,
+      9,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      9,
+      10,
+      16,
+      17,
+      2,
+      3.141592653589793,
+      2.18614
+     ],
+     [
+      9,
+      10,
+      16,
+      18,
+      2,
+      3.141592653589793,
+      4.184
+     ],
+     [
+      10,
+      16,
+      18,
+      19,
+      2,
+      3.141592653589793,
+      9.623199999999999
+     ],
+     [
+      11,
+      10,
+      16,
+      17,
+      2,
+      3.141592653589793,
+      2.18614
+     ],
+     [
+      11,
+      10,
+      16,
+      18,
+      2,
+      3.141592653589793,
+      4.184
+     ],
+     [
+      12,
+      11,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      17,
+      16,
+      18,
+      19,
+      2,
+      3.141592653589793,
+      9.623199999999999
+     ],
+     [
+      17,
+      16,
+      18,
+      19,
+      1,
+      0.0,
+      7.9496
+     ],
+     [
+      9,
+      11,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      4.6024
+     ],
+     [
+      10,
+      18,
+      16,
+      17,
+      2,
+      3.141592653589793,
+      43.932
+     ]
+    ],
+    "rb": []
+   },
+   "graph_bonds": [
+    [
+     10,
+     16
+    ],
+    [
+     16,
+     17
+    ],
+    [
+     16,
+     18
+    ],
+    [
+     18,
+     19
+    ]
+   ],
+   "provenance": {
+    "method": "RESP HF/STO-3G + GAFF2 (VeloxChem MMForceFieldGenerator.create_topology), group atoms relaxed with GAFF2 at zero charge, skeleton fixed",
+    "basis": "STO-3G",
+    "test_only": true,
+    "cluster": "C15H10O2",
+    "cluster_atoms": 27,
+    "cluster_charge": 0,
+    "shell_bonds": 3,
+    "n_reference_atoms": 16,
+    "n_cap_h": 7,
+    "cap_h_charge_moved_to_their_carbons": 0.49008799999999997,
+    "group_resp_sum": 0.11989900000000009,
+    "relax_max_shift_nm": 0.10674977472568847,
+    "veloxchem": "1.0rc4",
+    "created": "2026-10-26T09:45:23"
+   }
+  },
+  "carboxylate/armchair": {
+   "group": "carboxylate",
+   "site": "armchair",
+   "formal_charge": -1,
+   "skeleton_refs": [
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      0.0,
+      0.0
+     ],
+     "charge": -0.11804100000000012,
+     "gaff_type": "ca",
+     "resp_charge": -0.168918,
+     "neighbours": [
+      1,
+      3
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.090316,
+     "gaff_type": "ca",
+     "resp_charge": 0.090316,
+     "neighbours": [
+      0,
+      2,
+      6
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.08977800000000001,
+     "gaff_type": "ca",
+     "resp_charge": -0.148404,
+     "neighbours": [
+      1,
+      7
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      0.122976,
+      0.0
+     ],
+     "charge": -0.024285999999999995,
+     "gaff_type": "ca",
+     "resp_charge": -0.072111,
+     "neighbours": [
+      0,
+      4
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.122976,
+      0.0
+     ],
+     "charge": -0.098335,
+     "gaff_type": "ca",
+     "resp_charge": -0.098335,
+     "neighbours": [
+      3,
+      5,
+      10
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "charge": -0.080129,
+     "gaff_type": "ca",
+     "resp_charge": -0.080129,
+     "neighbours": [
+      4,
+      6
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.077569,
+     "gaff_type": "ca",
+     "resp_charge": 0.077569,
+     "neighbours": [
+      1,
+      5,
+      9
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.029474,
+     "gaff_type": "ca",
+     "resp_charge": -0.076128,
+     "neighbours": [
+      2,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.033935999999999994,
+     "gaff_type": "ca",
+     "resp_charge": -0.076801,
+     "neighbours": [
+      7,
+      9
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.0,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.024624999999999994,
+     "gaff_type": "ca",
+     "resp_charge": -0.120888,
+     "neighbours": [
+      6,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "H",
+     "pos": [
+      -0.0167,
+      0.217026,
+      0.0
+     ],
+     "charge": 0.062261,
+     "gaff_type": "ha",
+     "resp_charge": 0.062261,
+     "neighbours": [
+      4
+     ],
+     "n_caps": 0
+    }
+   ],
+   "group_atoms": [
+    {
+     "element": "C",
+     "name": "C1",
+     "pos": [
+      0.151791,
+      0.005916,
+      -0.001713
+     ],
+     "charge": 0.592371,
+     "sigma": 0.3315212309943831,
+     "epsilon": 0.4133792,
+     "gaff_type": "c"
+    },
+    {
+     "element": "O",
+     "name": "O1",
+     "pos": [
+      0.208653,
+      0.061355,
+      0.096163
+     ],
+     "charge": -0.6619569999999999,
+     "sigma": 0.3048120874245357,
+     "epsilon": 0.6121192000000001,
+     "gaff_type": "o"
+    },
+    {
+     "element": "O",
+     "name": "O2",
+     "pos": [
+      0.210155,
+      -0.029463,
+      -0.107722
+     ],
+     "charge": -0.661956,
+     "sigma": 0.3048120874245357,
+     "epsilon": 0.6121192000000001,
+     "gaff_type": "o"
+    }
+   ],
+   "terms": {
+    "bonds": [
+     [
+      5,
+      11,
+      0.15191564503372915,
+      228195.35999999996
+     ],
+     [
+      11,
+      12,
+      0.1260419724483669,
+      546095.6799999999
+     ],
+     [
+      11,
+      13,
+      0.12607952104761697,
+      546095.6799999999
+     ]
+    ],
+    "angles": [
+     [
+      4,
+      5,
+      11,
+      2.0554063862116774,
+      555.6352
+     ],
+     [
+      5,
+      11,
+      12,
+      2.047821937227566,
+      721.3216000000001
+     ],
+     [
+      5,
+      11,
+      13,
+      2.0500223637019506,
+      721.3216000000001
+     ],
+     [
+      6,
+      5,
+      11,
+      2.1333102615446062,
+      555.6352
+     ],
+     [
+      12,
+      11,
+      13,
+      2.1742702760775865,
+      994.1184000000001
+     ]
+    ],
+    "torsions": [
+     [
+      1,
+      6,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      3,
+      4,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      4,
+      5,
+      11,
+      12,
+      2,
+      3.141592653589793,
+      2.18614
+     ],
+     [
+      4,
+      5,
+      11,
+      13,
+      2,
+      3.141592653589793,
+      2.18614
+     ],
+     [
+      6,
+      5,
+      11,
+      12,
+      2,
+      3.141592653589793,
+      2.18614
+     ],
+     [
+      6,
+      5,
+      11,
+      13,
+      2,
+      3.141592653589793,
+      2.18614
+     ],
+     [
+      9,
+      6,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      10,
+      4,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      4,
+      6,
+      5,
+      11,
+      2,
+      3.141592653589793,
+      4.6024
+     ],
+     [
+      5,
+      13,
+      11,
+      12,
+      2,
+      3.141592653589793,
+      4.6024
+     ]
+    ],
+    "rb": []
+   },
+   "graph_bonds": [
+    [
+     5,
+     11
+    ],
+    [
+     11,
+     12
+    ],
+    [
+     11,
+     13
+    ]
+   ],
+   "provenance": {
+    "method": "RESP HF/STO-3G + GAFF2 (VeloxChem MMForceFieldGenerator.create_topology), group atoms relaxed with GAFF2 at zero charge, skeleton fixed",
+    "basis": "STO-3G",
+    "test_only": true,
+    "cluster": "C11H7O2",
+    "cluster_atoms": 20,
+    "cluster_charge": -1,
+    "shell_bonds": 3,
+    "n_reference_atoms": 11,
+    "n_cap_h": 6,
+    "cap_h_charge_moved_to_their_carbons": 0.34310999999999997,
+    "group_resp_sum": -0.7315419999999999,
+    "relax_max_shift_nm": 0.057818805679215046,
+    "veloxchem": "1.0rc4",
+    "created": "2026-10-26T09:45:26"
+   }
+  },
+  "carboxylate/zigzag": {
+   "group": "carboxylate",
+   "site": "zigzag",
+   "formal_charge": -1,
+   "skeleton_refs": [
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.07576,
+     "gaff_type": "ca",
+     "resp_charge": -0.123429,
+     "neighbours": [
+      1,
+      3
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.021871,
+     "gaff_type": "ca",
+     "resp_charge": -0.07095,
+     "neighbours": [
+      0,
+      7
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      -0.0,
+      0.0
+     ],
+     "charge": -0.17928899999999998,
+     "gaff_type": "ca",
+     "resp_charge": -0.259605,
+     "neighbours": [
+      3,
+      5
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.075851,
+     "gaff_type": "ca",
+     "resp_charge": 0.075851,
+     "neighbours": [
+      0,
+      2,
+      9
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.284,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.07576,
+     "gaff_type": "ca",
+     "resp_charge": -0.123429,
+     "neighbours": [
+      5,
+      6
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.075851,
+     "gaff_type": "ca",
+     "resp_charge": 0.075851,
+     "neighbours": [
+      2,
+      4,
+      11
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.213,
+      0.368927,
+      0.0
+     ],
+     "charge": -0.021871,
+     "gaff_type": "ca",
+     "resp_charge": -0.07095,
+     "neighbours": [
+      4,
+      13
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.368927,
+      0.0
+     ],
+     "charge": -0.050997999999999995,
+     "gaff_type": "ca",
+     "resp_charge": -0.09272,
+     "neighbours": [
+      1,
+      8
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      -0.245951,
+      0.0
+     ],
+     "charge": -0.097235,
+     "gaff_type": "ca",
+     "resp_charge": -0.097235,
+     "neighbours": [
+      7,
+      9,
+      14
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      -0.122976,
+      0.0
+     ],
+     "charge": 0.078675,
+     "gaff_type": "ca",
+     "resp_charge": 0.078675,
+     "neighbours": [
+      3,
+      8,
+      10
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      0.0,
+      0.0
+     ],
+     "charge": -0.135282,
+     "gaff_type": "ca",
+     "resp_charge": -0.135282,
+     "neighbours": [
+      9,
+      11
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.122976,
+      0.0
+     ],
+     "charge": 0.078675,
+     "gaff_type": "ca",
+     "resp_charge": 0.078675,
+     "neighbours": [
+      5,
+      10,
+      12
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.0,
+      0.245951,
+      0.0
+     ],
+     "charge": -0.097235,
+     "gaff_type": "ca",
+     "resp_charge": -0.097235,
+     "neighbours": [
+      11,
+      13,
+      15
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.071,
+      0.368927,
+      0.0
+     ],
+     "charge": -0.050997999999999995,
+     "gaff_type": "ca",
+     "resp_charge": -0.09272,
+     "neighbours": [
+      6,
+      12
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "H",
+     "pos": [
+      0.1086,
+      -0.245951,
+      0.0
+     ],
+     "charge": 0.099961,
+     "gaff_type": "ha",
+     "resp_charge": 0.099961,
+     "neighbours": [
+      8
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "H",
+     "pos": [
+      0.1086,
+      0.245951,
+      0.0
+     ],
+     "charge": 0.099961,
+     "gaff_type": "ha",
+     "resp_charge": 0.099961,
+     "neighbours": [
+      12
+     ],
+     "n_caps": 0
+    }
+   ],
+   "group_atoms": [
+    {
+     "element": "C",
+     "name": "C1",
+     "pos": [
+      0.152126,
+      -0.0,
+      0.0
+     ],
+     "charge": 0.618283,
+     "sigma": 0.3315212309943831,
+     "epsilon": 0.4133792,
+     "gaff_type": "c"
+    },
+    {
+     "element": "O",
+     "name": "O1",
+     "pos": [
+      0.210404,
+      -2.7e-05,
+      0.111771
+     ],
+     "charge": -0.66048,
+     "sigma": 0.3048120874245357,
+     "epsilon": 0.6121192000000001,
+     "gaff_type": "o"
+    },
+    {
+     "element": "O",
+     "name": "O2",
+     "pos": [
+      0.210404,
+      -1.7e-05,
+      -0.11177
+     ],
+     "charge": -0.660478,
+     "sigma": 0.3048120874245357,
+     "epsilon": 0.6121192000000001,
+     "gaff_type": "o"
+    }
+   ],
+   "terms": {
+    "bonds": [
+     [
+      10,
+      16,
+      0.15212648039277463,
+      228195.35999999996
+     ],
+     [
+      16,
+      17,
+      0.12605106710578137,
+      546095.6799999999
+     ],
+     [
+      16,
+      18,
+      0.12605103139151788,
+      546095.6799999999
+     ]
+    ],
+    "angles": [
+     [
+      9,
+      10,
+      16,
+      2.0943936182850886,
+      555.6352
+     ],
+     [
+      10,
+      16,
+      17,
+      2.051417954572485,
+      721.3216000000001
+     ],
+     [
+      10,
+      16,
+      18,
+      2.051418303760657,
+      721.3216000000001
+     ],
+     [
+      11,
+      10,
+      16,
+      2.0943965865010052,
+      555.6352
+     ],
+     [
+      17,
+      16,
+      18,
+      2.1803489765089843,
+      994.1184000000001
+     ]
+    ],
+    "torsions": [
+     [
+      3,
+      9,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      5,
+      11,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      8,
+      9,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      9,
+      10,
+      16,
+      17,
+      2,
+      3.141592653589793,
+      2.18614
+     ],
+     [
+      9,
+      10,
+      16,
+      18,
+      2,
+      3.141592653589793,
+      2.18614
+     ],
+     [
+      11,
+      10,
+      16,
+      17,
+      2,
+      3.141592653589793,
+      2.18614
+     ],
+     [
+      11,
+      10,
+      16,
+      18,
+      2,
+      3.141592653589793,
+      2.18614
+     ],
+     [
+      12,
+      11,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      9,
+      11,
+      10,
+      16,
+      2,
+      3.141592653589793,
+      4.6024
+     ],
+     [
+      10,
+      18,
+      16,
+      17,
+      2,
+      3.141592653589793,
+      4.6024
+     ]
+    ],
+    "rb": []
+   },
+   "graph_bonds": [
+    [
+     10,
+     16
+    ],
+    [
+     16,
+     17
+    ],
+    [
+     16,
+     18
+    ]
+   ],
+   "provenance": {
+    "method": "RESP HF/STO-3G + GAFF2 (VeloxChem MMForceFieldGenerator.create_topology), group atoms relaxed with GAFF2 at zero charge, skeleton fixed",
+    "basis": "STO-3G",
+    "test_only": true,
+    "cluster": "C15H9O2",
+    "cluster_atoms": 26,
+    "cluster_charge": -1,
+    "shell_bonds": 3,
+    "n_reference_atoms": 16,
+    "n_cap_h": 7,
+    "cap_h_charge_moved_to_their_carbons": 0.35725599999999996,
+    "group_resp_sum": -0.7026749999999999,
+    "relax_max_shift_nm": 0.09681724161621053,
+    "veloxchem": "1.0rc4",
+    "created": "2026-10-26T09:45:32"
+   }
+  },
+  "o_quinone/armchair": {
+   "group": "o_quinone",
+   "site": "armchair",
+   "formal_charge": 0,
+   "skeleton_refs": [
+    {
+     "element": "C",
+     "pos": [
+      -0.245951,
+      0.355,
+      0.0
+     ],
+     "charge": -0.009737999999999886,
+     "gaff_type": "ca",
+     "resp_charge": -0.078146,
+     "neighbours": [
+      1,
+      2
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.368927,
+      0.284,
+      0.0
+     ],
+     "charge": -0.0019570000000000004,
+     "gaff_type": "ca",
+     "resp_charge": -0.070411,
+     "neighbours": [
+      0,
+      3
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.122976,
+      0.284,
+      0.0
+     ],
+     "charge": 0.045699,
+     "gaff_type": "ca",
+     "resp_charge": -0.016416,
+     "neighbours": [
+      0,
+      7
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.368927,
+      0.142,
+      0.0
+     ],
+     "charge": 0.033339999999999995,
+     "gaff_type": "ca",
+     "resp_charge": -0.027764,
+     "neighbours": [
+      1,
+      4
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.245951,
+      0.071,
+      0.0
+     ],
+     "charge": -0.028117,
+     "gaff_type": "ca",
+     "resp_charge": -0.028117,
+     "neighbours": [
+      3,
+      5,
+      7
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.245951,
+      -0.071,
+      0.0
+     ],
+     "charge": -0.028117,
+     "gaff_type": "ca",
+     "resp_charge": -0.028117,
+     "neighbours": [
+      4,
+      6,
+      10
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.368927,
+      -0.142,
+      0.0
+     ],
+     "charge": 0.033339999999999995,
+     "gaff_type": "ca",
+     "resp_charge": -0.027764,
+     "neighbours": [
+      5,
+      11
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.122976,
+      0.142,
+      0.0
+     ],
+     "charge": -0.068953,
+     "gaff_type": "ca",
+     "resp_charge": -0.068953,
+     "neighbours": [
+      2,
+      4,
+      8
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      0.0,
+      0.071,
+      0.0
+     ],
+     "charge": 0.33422599999999997,
+     "gaff_type": "ca",
+     "resp_charge": 0.33422599999999997,
+     "neighbours": [
+      7,
+      9
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.0,
+      -0.071,
+      0.0
+     ],
+     "charge": 0.334228,
+     "gaff_type": "ca",
+     "resp_charge": 0.334228,
+     "neighbours": [
+      8,
+      10
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.122976,
+      -0.142,
+      0.0
+     ],
+     "charge": -0.068953,
+     "gaff_type": "ca",
+     "resp_charge": -0.068953,
+     "neighbours": [
+      5,
+      9,
+      13
+     ],
+     "n_caps": 0
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.368927,
+      -0.284,
+      0.0
+     ],
+     "charge": -0.0019570000000000004,
+     "gaff_type": "ca",
+     "resp_charge": -0.070411,
+     "neighbours": [
+      6,
+      12
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.245951,
+      -0.355,
+      0.0
+     ],
+     "charge": -0.009737999999999997,
+     "gaff_type": "ca",
+     "resp_charge": -0.078146,
+     "neighbours": [
+      11,
+      13
+     ],
+     "n_caps": 1
+    },
+    {
+     "element": "C",
+     "pos": [
+      -0.122976,
+      -0.284,
+      0.0
+     ],
+     "charge": 0.045699,
+     "gaff_type": "ca",
+     "resp_charge": -0.016416,
+     "neighbours": [
+      10,
+      12
+     ],
+     "n_caps": 1
+    }
+   ],
+   "group_atoms": [
+    {
+     "element": "O",
+     "name": "O1",
+     "pos": [
+      0.10651,
+      0.131363,
+      -0.0
+     ],
+     "charge": -0.304501,
+     "sigma": 0.3048120874245357,
+     "epsilon": 0.6121192000000001,
+     "gaff_type": "o"
+    },
+    {
+     "element": "O",
+     "name": "O2",
+     "pos": [
+      0.10651,
+      -0.131363,
+      -0.0
+     ],
+     "charge": -0.304501,
+     "sigma": 0.3048120874245357,
+     "epsilon": 0.6121192000000001,
+     "gaff_type": "o"
+    }
+   ],
+   "terms": {
+    "bonds": [
+     [
+      8,
+      14,
+      0.12242612847027004,
+      507519.1999999999
+     ],
+     [
+      9,
+      15,
+      0.12242612847027037,
+      507519.1999999999
+     ]
+    ],
+    "angles": [
+     [
+      7,
+      8,
+      14,
+      2.1023930164680436,
+      748.936
+     ],
+     [
+      8,
+      9,
+      15,
+      2.0863971883183496,
+      748.936
+     ],
+     [
+      9,
+      8,
+      14,
+      2.086397188318348,
+      748.936
+     ],
+     [
+      10,
+      9,
+      15,
+      2.102393016468041,
+      748.936
+     ]
+    ],
+    "torsions": [
+     [
+      2,
+      7,
+      8,
+      14,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      4,
+      7,
+      8,
+      14,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      5,
+      10,
+      9,
+      15,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      7,
+      8,
+      9,
+      15,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      10,
+      9,
+      8,
+      14,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      13,
+      10,
+      9,
+      15,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      14,
+      8,
+      9,
+      15,
+      2,
+      3.141592653589793,
+      15.167
+     ],
+     [
+      7,
+      9,
+      8,
+      14,
+      2,
+      3.141592653589793,
+      4.6024
+     ],
+     [
+      8,
+      10,
+      9,
+      15,
+      2,
+      3.141592653589793,
+      4.6024
+     ]
+    ],
+    "rb": []
+   },
+   "graph_bonds": [
+    [
+     8,
+     14
+    ],
+    [
+     9,
+     15
+    ]
+   ],
+   "provenance": {
+    "method": "RESP HF/STO-3G + GAFF2 (VeloxChem MMForceFieldGenerator.create_topology), group atoms relaxed with GAFF2 at zero charge, skeleton fixed",
+    "basis": "STO-3G",
+    "test_only": true,
+    "cluster": "C14H8O2",
+    "cluster_atoms": 24,
+    "cluster_charge": 0,
+    "shell_bonds": 3,
+    "n_reference_atoms": 14,
+    "n_cap_h": 8,
+    "cap_h_charge_moved_to_their_carbons": 0.520162,
+    "group_resp_sum": -0.609002,
+    "relax_max_shift_nm": 0.0008552187038450842,
+    "veloxchem": "1.0rc4",
+    "created": "2026-10-26T09:45:37"
+   }
+  }
+ }
+}
