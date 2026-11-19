@@ -15,8 +15,11 @@ from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.tdaeigensolverunrest import TdaUnrestrictedEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
+from veloxchem.threepatransitiondriver import ThreePATransitionDriver
+from veloxchem.excitedstatemomentdriver import ExcitedStateMomentDriver
 from veloxchem.tddftgradientdriver import TddftGradientDriver
 from veloxchem.errorhandler import VeloxChemError
+from veloxchem import riresponse
 from veloxchem.riresponse import lend_ri
 from veloxchem.rijkresponse import initialize_ri_jk
 from veloxchem.rijkresponse import ri_jk_fock_matrices
@@ -233,6 +236,88 @@ class TestResponseRiOwnership:
             assert solver._ri_j_memory is None
             assert driver._ri_drv is not None
             assert not driver._ri_jk_lent
+
+    def test_ri_j_drivers_release_their_solvers(self, monkeypatch):
+        """The 3PA transition and excited-state moment drivers with RI-J: each
+        solver they drive lets go of the RI-J driver it set up when its block
+        of lend_ri ends, and the results match the RI-J references."""
+
+        xyzstr = """3
+        xyz
+        O   0.000000    0.000000    0.000000
+        H   0.758602    0.000000   -0.504284
+        H   0.758602    0.000000    0.504284
+        """
+        molecule = Molecule.read_xyz_string(xyzstr)
+        basis = MolecularBasis.read(molecule, 'cc-pvdz', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.xcfun = 'blyp'
+        scf_drv.ri = True
+        scf_drv.conv_thresh = 1.0e-8
+        scf_results = scf_drv.compute(molecule, basis)
+
+        if scf_drv.rank == mpi_master():
+            assert scf_results['ri_coulomb'] and not scf_results['ri_jk']
+            assert not scf_results['ri_fallback']
+
+        # NOTE: the solvers a driver computes are not returned; the release
+        # is recorded for each solver which holds an RI-J driver when lend_ri
+        # lets go of it.
+        released = []
+        real_release = riresponse._release_ri_j
+
+        def recorded_release(solver):
+            if solver._ri_drv is not None:
+                released.append(type(solver).__name__)
+            real_release(solver)
+            assert solver._ri_drv is None
+
+        monkeypatch.setattr(riresponse, '_release_ri_j', recorded_release)
+
+        three_pa_drv = ThreePATransitionDriver()
+        three_pa_drv.ostream.mute()
+        three_pa_drv.xcfun = 'blyp'
+        three_pa_drv.nstates = 2
+        three_pa_results = three_pa_drv.compute(molecule, basis, scf_results)
+
+        assert three_pa_drv._uses_ri_coulomb()
+        assert released == [
+            'LinearResponseEigenSolver', 'ComplexResponseSolver',
+            'ComplexResponseSolver'
+        ]
+
+        released.clear()
+
+        esm_drv = ExcitedStateMomentDriver()
+        esm_drv.ostream.mute()
+        esm_drv.xcfun = 'blyp'
+        esm_drv.state = 1
+        esm_results = esm_drv.compute(molecule, basis, scf_results)
+
+        assert esm_drv._uses_ri_coulomb()
+        assert released == [
+            'LinearResponseEigenSolver', 'ComplexResponseSolver'
+        ]
+
+        if scf_drv.rank == mpi_master():
+            lin_3pa_str = np.array([
+                val.real for val in three_pa_results['3pa_strengths']
+                ['linear'].values()
+            ])
+            cir_3pa_str = np.array([
+                val.real for val in three_pa_results['3pa_strengths']
+                ['circular'].values()
+            ])
+            es_dipole = np.array(esm_results['excited_state_dipole_moment'])
+
+            assert np.max(
+                np.abs(lin_3pa_str - np.array([2865.274, 28484.970]))) < 0.1
+            assert np.max(
+                np.abs(cir_3pa_str - np.array([2472.439, 71212.424]))) < 0.1
+            assert np.max(
+                np.abs(es_dipole - np.array([-0.395035, 0.0, 0.0]))) < 1.0e-4
 
     def test_lending_hands_back_the_memory_of_the_builds(self):
         """The driver's memory check takes the largest RI build and batch of
