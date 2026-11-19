@@ -37,7 +37,7 @@ import time
 import sys
 
 from .veloxchemlib import mpi_master
-from . import rijkresponse
+from .riresponse import lend_ri
 from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponseSolver
@@ -411,7 +411,7 @@ class TpaReducedDriver(TpaDriverBase):
             fpath = fpath.with_name(fpath.stem)
             N_total_drv.checkpoint_file = str(fpath) + '_tpa_2_red.h5'
 
-        with rijkresponse.lend(self, N_total_drv):
+        with lend_ri(self, N_total_drv):
             N_total_results = N_total_drv.compute(
                 molecule, ao_basis, scf_results, xy_dict)
 

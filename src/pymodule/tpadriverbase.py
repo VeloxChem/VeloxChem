@@ -35,7 +35,7 @@ import numpy as np
 import time
 
 from .oneeints import compute_electric_dipole_integrals
-from . import rijkresponse
+from .riresponse import lend_ri
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
                            hartree_in_inverse_nm, hartree_in_wavenumber,
                            fine_structure_constant,
@@ -261,7 +261,7 @@ class TpaDriverBase(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             Nb_drv.checkpoint_file = str(fpath) + '_tpa_1.h5'
 
-        with rijkresponse.lend(self, Nb_drv):
+        with lend_ri(self, Nb_drv):
             Nb_results = Nb_drv.compute(molecule, ao_basis, scf_results, v_grad)
 
         self._is_converged = Nb_drv.is_converged

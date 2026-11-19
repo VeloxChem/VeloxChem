@@ -482,8 +482,9 @@ class LinearResponseEigenSolverBase(LinearSolver):
                 continue
             # NOTE: the RI drivers and B vectors are not copied. The simd RI
             # drivers have no copy in Python, and every calculation forms its
-            # own at its start (rijkresponse.initialize, rijresponse.initialize).
-            # The copy keeps them unset as constructed, neither lent nor
+            # own at its start (rijkresponse.initialize_ri_jk,
+            # rijresponse.initialize_ri_j). The copy keeps them unset as
+            # constructed, neither lent nor
             # borrowing.
             if key in self._ri_not_copied:
                 continue

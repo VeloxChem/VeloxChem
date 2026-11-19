@@ -52,10 +52,12 @@ from .veloxchemlib import rimode
 from .molecularbasis import MolecularBasis
 from .sanitychecks import get_ri_auxiliary_basis
 from .profiler import Profiler
-from . import rijkresponse
+from .riresponse import get_ri_memory_budget
+from .riresponse import mark_ri_setup
+from .riresponse import get_ri_chunks
 
 
-def initialize(solver, molecule, basis):
+def initialize_ri_j(solver, molecule, basis):
     """
     Prepares the simd Coulomb only driver the solver builds with, or falls back
     to the four-center integrals where it does not fit. Every rank must call
@@ -74,7 +76,7 @@ def initialize(solver, molecule, basis):
     solver._ri_j_memory = None
     solver._ri_drv = None
 
-    rijkresponse.mark_setup(solver)
+    mark_ri_setup(solver)
 
     basis_ri = MolecularBasis.read(molecule,
                                    get_ri_auxiliary_basis(
@@ -89,7 +91,7 @@ def initialize(solver, molecule, basis):
     # is therefore the smallest of the ranks' and not each one's own.
     budget = min(
         solver.comm.allgather(
-            rijkresponse.memory_budget(solver, molecule, basis)))
+            get_ri_memory_budget(solver, molecule, basis)))
 
     # NOTE: the integrals are held in memory, the way a response build wants:
     # it sweeps them for many densities a call. A calculation whose peak in
@@ -193,7 +195,7 @@ def _max_densities(solver, nao, nspins):
     return max((budget - peak) // per_density, 1)
 
 
-def coulomb_matrices(solver, dens, comm):
+def ri_j_coulomb_matrices(solver, dens, comm):
     """
     Computes this rank's share of the Coulomb matrices of a batch of densities.
 
@@ -219,7 +221,7 @@ def coulomb_matrices(solver, dens, comm):
 
     fock_arrays = []
 
-    for start, end in rijkresponse._chunks(len(dens), count):
+    for start, end in get_ri_chunks(len(dens), count):
         # NOTE: twice, as every other way of building a matrix of the `j`
         # kind is doubled by its caller; this path does not go through the
         # loop which doubles what the conventional driver answers.
@@ -231,7 +233,7 @@ def coulomb_matrices(solver, dens, comm):
     return fock_arrays
 
 
-def coulomb_matrices_unrestricted(solver, dens_a, dens_b, comm):
+def ri_j_coulomb_matrices_unrestricted(solver, dens_a, dens_b, comm):
     """
     Computes this rank's share of the Coulomb matrices of an open shell batch.
 
@@ -258,7 +260,7 @@ def coulomb_matrices_unrestricted(solver, dens_a, dens_b, comm):
 
     fock_arrays = []
 
-    for start, end in rijkresponse._chunks(len(dens_a), count):
+    for start, end in get_ri_chunks(len(dens_a), count):
         # NOTE: the Coulomb of an open shell is of the two densities added and
         # is the same matrix for both spins, so one is formed and handed to
         # each. There is no factor of two here, where the closed shell carries

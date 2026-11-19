@@ -35,7 +35,8 @@ import numpy as np
 import time
 
 from .oneeints import compute_electric_dipole_integrals
-from . import rijkresponse
+from .riresponse import lend_ri
+from .rijkresponse import ri_jk_general_factors
 from .veloxchemlib import mpi_master, hartree_in_ev, hartree_in_wavenumber
 from .profiler import Profiler
 from .cppsolver import ComplexResponseSolver
@@ -262,7 +263,7 @@ class ThgDriver(NonlinearSolver):
             Nb_drv.checkpoint_file = str(fpath) + '_tpa_1.h5'
             # Nb_drv.write_h5 = self.write_h5
 
-        with rijkresponse.lend(self, Nb_drv):
+        with lend_ri(self, Nb_drv):
             Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
 
         self._is_converged = Nb_drv.is_converged
@@ -663,7 +664,7 @@ class ThgDriver(NonlinearSolver):
                                       ('third', D_lam_sig_tau_y),
                                       ('third', D_lam_sig_tau_z)):
                         for part in (np.real, np.imag):
-                            ra, rb = rijkresponse.general_factors(
+                            ra, rb = ri_jk_general_factors(
                                 mo, nocc, part(mat))
                             self._ri_jk_factors[name][0].append(ra)
                             self._ri_jk_factors[name][1].append(rb)
@@ -1196,7 +1197,7 @@ class ThgDriver(NonlinearSolver):
 
         # commutpute second-order response vectors
 
-        with rijkresponse.lend(self, N_total_drv):
+        with lend_ri(self, N_total_drv):
             N_total_results = N_total_drv.compute(
                 molecule, ao_basis, scf_tensors, xy_dict)
 
@@ -1400,7 +1401,7 @@ class ThgDriver(NonlinearSolver):
                 if self._ri_jk_factors is not None:
                     for mat in (Dx, Dy, Dz):
                         for part in (np.real, np.imag):
-                            ra, rb = rijkresponse.general_factors(
+                            ra, rb = ri_jk_general_factors(
                                 mo, nocc, part(mat))
                             self._ri_jk_factors[1].append(ra)
                             self._ri_jk_factors[3].append(rb)

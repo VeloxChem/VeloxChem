@@ -37,7 +37,8 @@ import time
 import sys
 
 from .oneeints import compute_electric_dipole_integrals
-from . import rijkresponse
+from .riresponse import lend_ri
+from .rijkresponse import initialize_ri_jk
 from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -279,7 +280,7 @@ class ShgDriver(NonlinearSolver):
         # Computing the first-order response vectors (3 per frequency)
 
         # NOTE: the B vectors are formed before the solvers this driver drives
-        # are made and lent to each of them (rijkresponse.lend), rather than
+        # are made and lent to each of them (riresponse.lend_ri), rather than
         # formed by each. The integral setup in compute_quad_components
         # uses them again. Not gated on _uses_ri_jk(), for the reason given
         # in _init_eri.
@@ -288,7 +289,7 @@ class ShgDriver(NonlinearSolver):
         self._set_ri_jk_reserve_floor(molecule, ao_basis, scf_results)
 
         if self.ri_jk and not self._ri_fallback:
-            rijkresponse.initialize(self, molecule, ao_basis)
+            initialize_ri_jk(self, molecule, ao_basis)
 
         N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
@@ -309,7 +310,7 @@ class ShgDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             N_drv.checkpoint_file = str(fpath) + '_shg.h5'
 
-        with rijkresponse.lend(self, N_drv):
+        with lend_ri(self, N_drv):
             N_results = N_drv.compute(molecule, ao_basis, scf_results, AB)
 
         self._is_converged = N_drv.is_converged

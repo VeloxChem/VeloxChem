@@ -51,7 +51,9 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_and_ri_sanity_check,
                            nonlinear_response_environment_sanity_check)
 from .errorhandler import assert_msg_critical
-from . import rijkresponse
+from .riresponse import lend_ri
+from .rijkresponse import initialize_ri_jk
+from .rijkresponse import ri_jk_general_factors
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
@@ -401,7 +403,7 @@ class CubicResponseDriver(NonlinearSolver):
             self.comp = None
 
         # NOTE: the B vectors are formed before the solvers this driver drives
-        # are made and lent to each of them (rijkresponse.lend), rather than
+        # are made and lent to each of them (riresponse.lend_ri), rather than
         # formed by each. The integral setup in compute_cubic_components
         # uses them again. Not gated on _uses_ri_jk(), for the reason given
         # in _init_eri.
@@ -410,7 +412,7 @@ class CubicResponseDriver(NonlinearSolver):
         self._set_ri_jk_reserve_floor(molecule, ao_basis, scf_results)
 
         if self.ri_jk and not self._ri_fallback:
-            rijkresponse.initialize(self, molecule, ao_basis)
+            initialize_ri_jk(self, molecule, ao_basis)
 
         # Computing the first-order response vectors (3 per frequency)
         N_drv = ComplexResponseSolver(self.comm, self.ostream)
@@ -432,7 +434,7 @@ class CubicResponseDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             N_drv.checkpoint_file = str(fpath) + '_crf_1.h5'
 
-        with rijkresponse.lend(self, N_drv):
+        with lend_ri(self, N_drv):
             N_results = N_drv.compute(molecule, ao_basis, scf_results, ABCD)
 
         self._is_converged = N_drv.is_converged
@@ -992,7 +994,7 @@ class CubicResponseDriver(NonlinearSolver):
                                       ('third', Dbcd + Dbdc + Dcbd + Dcdb +
                                        Ddbc + Ddcb)):
                         for part in (np.real, np.imag):
-                            ra, rb = rijkresponse.general_factors(
+                            ra, rb = ri_jk_general_factors(
                                 mo, nocc, part(mat))
                             self._ri_jk_factors[name][0].append(ra)
                             self._ri_jk_factors[name][1].append(rb)
@@ -1148,7 +1150,7 @@ class CubicResponseDriver(NonlinearSolver):
                     total_mo = (Db_cd + Dcd_b + Dc_bd + Dbd_c + Dd_bc + Dbc_d)
 
                     for part in (np.real, np.imag):
-                        ra, rb = rijkresponse.general_factors(
+                        ra, rb = ri_jk_general_factors(
                             mo, nocc, part(total_mo))
                         self._ri_jk_factors[1].append(ra)
                         self._ri_jk_factors[3].append(rb)
@@ -1691,7 +1693,7 @@ class CubicResponseDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             Nxy_drv.checkpoint_file = str(fpath) + '_crf_2.h5'
 
-        with rijkresponse.lend(self, Nxy_drv):
+        with lend_ri(self, Nxy_drv):
             Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_results, XY)
 
         self._is_converged = (self._is_converged and Nxy_drv.is_converged)

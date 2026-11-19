@@ -11,8 +11,7 @@ from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.lreigensolverunrest import LinearResponseUnrestrictedEigenSolver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.linearsolver import LinearSolver
-from veloxchem import rijkresponse
-from veloxchem import rijresponse
+from veloxchem import linearsolver
 
 
 @pytest.mark.solvers
@@ -53,15 +52,20 @@ class TestResponseRiExcitationSubsets:
 
         monkeypatch.setattr(LinearSolver, name, recorded)
 
+        # NOTE: the solvers call the RI builds through the names linearsolver
+        # imports, so those are the names replaced; replacing them in
+        # rijkresponse or rijresponse would leave the solvers' calls uncounted.
         ri_jk_calls = []
-        for fname in ['fock_matrices', 'fock_matrices_unrestricted']:
-            real_ri = getattr(rijkresponse, fname)
+        for fname in [
+                'ri_jk_fock_matrices', 'ri_jk_fock_matrices_unrestricted'
+        ]:
+            real_ri = getattr(linearsolver, fname)
 
             def counted(*args, real_ri=real_ri, **kwargs):
                 ri_jk_calls.append(1)
                 return real_ri(*args, **kwargs)
 
-            monkeypatch.setattr(rijkresponse, fname, counted)
+            monkeypatch.setattr(linearsolver, fname, counted)
 
         return calls, ri_jk_calls
 
@@ -188,13 +192,13 @@ class TestResponseRiExcitationSubsets:
         scf_results = scf_drv.compute(molecule, basis)
 
         ri_j_calls = []
-        real = rijresponse.coulomb_matrices
+        real = linearsolver.ri_j_coulomb_matrices
 
         def counted(*args, **kwargs):
             ri_j_calls.append(1)
             return real(*args, **kwargs)
 
-        monkeypatch.setattr(rijresponse, 'coulomb_matrices', counted)
+        monkeypatch.setattr(linearsolver, 'ri_j_coulomb_matrices', counted)
 
         rsp_drv = solver_type()
         rsp_drv.ostream.mute()

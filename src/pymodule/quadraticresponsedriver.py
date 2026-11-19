@@ -51,7 +51,8 @@ from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
                            dft_and_ri_sanity_check,
                            nonlinear_response_environment_sanity_check)
 from .errorhandler import assert_msg_critical
-from . import rijkresponse
+from .riresponse import lend_ri
+from .rijkresponse import initialize_ri_jk
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
@@ -363,7 +364,7 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         # Computing the first-order response vectors (3 per frequency)
         # NOTE: the B vectors are formed before the solvers this driver drives
-        # are made and lent to each of them (rijkresponse.lend), rather than
+        # are made and lent to each of them (riresponse.lend_ri), rather than
         # formed by each. The integral setup in compute_quad_components
         # uses them again. Not gated on _uses_ri_jk(), for the reason given
         # in _init_eri.
@@ -372,7 +373,7 @@ class QuadraticResponseDriver(NonlinearSolver):
         self._set_ri_jk_reserve_floor(molecule, ao_basis, scf_results)
 
         if self.ri_jk and not self._ri_fallback:
-            rijkresponse.initialize(self, molecule, ao_basis)
+            initialize_ri_jk(self, molecule, ao_basis)
 
         N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
@@ -393,7 +394,7 @@ class QuadraticResponseDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             N_drv.checkpoint_file = str(fpath) + '_qrf.h5'
 
-        with rijkresponse.lend(self, N_drv):
+        with lend_ri(self, N_drv):
             N_results = N_drv.compute(molecule, ao_basis, scf_results, ABC)
 
         self._is_converged = N_drv.is_converged

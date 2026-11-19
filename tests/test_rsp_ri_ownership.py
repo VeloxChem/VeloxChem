@@ -17,7 +17,9 @@ from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.tddftgradientdriver import TddftGradientDriver
 from veloxchem.errorhandler import VeloxChemError
-from veloxchem import rijkresponse
+from veloxchem.riresponse import lend_ri
+from veloxchem.rijkresponse import initialize_ri_jk
+from veloxchem.rijkresponse import ri_jk_fock_matrices
 
 
 @pytest.mark.solvers
@@ -176,15 +178,15 @@ class TestResponseRiOwnership:
 
         assert driver._ri_jk_drv is not None
 
-        with rijkresponse.lend(driver, solver):
+        with lend_ri(driver, solver):
             assert driver._ri_jk_lent
             assert solver._ri_jk_borrowing
 
             with pytest.raises(VeloxChemError, match='are lent'):
-                rijkresponse.fock_matrices(driver, basis, None, 0.0)
+                ri_jk_fock_matrices(driver, basis, None, 0.0)
 
             with pytest.raises(VeloxChemError, match='are lent'):
-                rijkresponse.initialize(driver, molecule, basis)
+                initialize_ri_jk(driver, molecule, basis)
 
         assert not driver._ri_jk_lent
         assert not solver._ri_jk_borrowing
@@ -193,7 +195,7 @@ class TestResponseRiOwnership:
 
         # NOTE: also when the call they were lent for raises.
         with pytest.raises(RuntimeError, match='raised inside'):
-            with rijkresponse.lend(driver, solver):
+            with lend_ri(driver, solver):
                 raise RuntimeError('raised inside')
 
         assert not driver._ri_jk_lent
@@ -218,7 +220,7 @@ class TestResponseRiOwnership:
             solver = self.make_eigensolver(TdaEigenSolver)
 
             try:
-                with rijkresponse.lend(driver, solver):
+                with lend_ri(driver, solver):
                     solver.compute(molecule, basis, scf_results)
                     assert solver._ri_drv is not None
                     assert solver._ri_j_memory is not None
@@ -248,7 +250,7 @@ class TestResponseRiOwnership:
                                                        (300, 30, 300, 30)]:
             solver = self.make_eigensolver(TdaEigenSolver)
 
-            with rijkresponse.lend(driver, solver):
+            with lend_ri(driver, solver):
                 # NOTE: what the solver's builds record while it borrows.
                 solver._ri_jk_predicted_peak = solver_peak
                 solver._ri_batch_memory = solver_batch
@@ -265,7 +267,7 @@ class TestResponseRiOwnership:
         solver = self.make_eigensolver(TdaEigenSolver)
 
         with pytest.raises(VeloxChemError, match='no RI-JK B vectors'):
-            rijkresponse.initialize(solver, molecule, basis, reuse=True)
+            initialize_ri_jk(solver, molecule, basis, reuse=True)
 
     @pytest.mark.parametrize('solver_type', [
         TdaEigenSolver,

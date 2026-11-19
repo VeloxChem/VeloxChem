@@ -48,8 +48,13 @@ from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
-from . import rijkresponse
-from . import rijresponse
+from .riresponse import print_ri_memory_check
+from .rijkresponse import initialize_ri_jk
+from .rijkresponse import ri_jk_fock_matrices
+from .rijkresponse import ri_jk_fock_matrices_unrestricted
+from .rijresponse import initialize_ri_j
+from .rijresponse import ri_j_coulomb_matrices
+from .rijresponse import ri_j_coulomb_matrices_unrestricted
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -144,7 +149,7 @@ class LinearSolver:
     # NOTE: the attributes a deepcopy leaves as the constructor sets them: the
     # simd RI drivers, which have no copy in Python, what describes the B
     # vectors of the RI-JK one, and whether they are lent or borrowed (see
-    # rijkresponse.lend). Read by the __deepcopy__ of the eigensolver bases.
+    # riresponse.lend_ri). Read by the __deepcopy__ of the eigensolver bases.
     _ri_not_copied = ('_ri_drv', '_ri_jk_drv', '_ri_jk_response_drv',
                       '_ri_jk_aux_basis', '_ri_jk_memory', '_ri_jk_lent',
                       '_ri_jk_borrowing')
@@ -189,7 +194,7 @@ class LinearSolver:
         # NOTE: whether this response fell back from RI to the four-center
         # integrals for want of memory of its own, and what the build was
         # checked with. RI-JK's is decided with the B vectors at the start of
-        # each calculation and lent with them (rijkresponse.lend); RI-J's is
+        # each calculation and lent with them (riresponse.lend_ri); RI-J's is
         # decided again whenever the integrals are.
         self._ri_jk_fallback = False
         self._ri_jk_memory = None
@@ -198,7 +203,7 @@ class LinearSolver:
 
         # NOTE: whether this solver's RI-JK B vectors are lent to a solver it
         # drives, and whether the ones it holds are borrowed from the driver
-        # that drives it, for the duration of one compute (rijkresponse.lend).
+        # that drives it, for the duration of one compute (riresponse.lend_ri).
         self._ri_jk_lent = False
         self._ri_jk_borrowing = False
 
@@ -639,7 +644,7 @@ class LinearSolver:
             The AO basis set.
         :param reuse_ri_jk:
             True where the RI-JK B vectors were formed earlier in the same
-            calculation and are used again (see rijkresponse.initialize).
+            calculation and are used again (see rijkresponse.initialize_ri_jk).
 
         :return:
             The dictionary of ERI information.
@@ -662,12 +667,12 @@ class LinearSolver:
         self._print_ri_fallback_info(asks_ri_coulomb, asks_ri_jk)
 
         if asks_ri_coulomb and not self._ri_fallback:
-            rijresponse.initialize(self, molecule, basis)
+            initialize_ri_j(self, molecule, basis)
 
         # NOTE: not gated on _uses_ri_jk(), which reads this response's own
-        # fallback: that is decided again by rijkresponse.initialize at the
-        # start of each calculation, and one left from an earlier calculation
-        # would otherwise keep it from being decided again.
+        # fallback: that is decided again by rijkresponse.initialize_ri_jk at
+        # the start of each calculation, and one left from an earlier
+        # calculation would otherwise keep it from being decided again.
         if asks_ri_jk and not self._ri_fallback:
             self._init_simd_ri_jk(molecule, basis, reuse_ri_jk)
 
@@ -857,7 +862,7 @@ class LinearSolver:
         set up. Every rank must call this.
         """
 
-        rijkresponse.print_memory_check(self)
+        print_ri_memory_check(self)
 
     def _print_ri_fallback_info(self, asks_ri_coulomb, asks_ri_jk):
         """
@@ -893,10 +898,10 @@ class LinearSolver:
             The AO basis set.
         :param reuse:
             True where they were formed earlier in the same calculation and
-            are used again (see rijkresponse.initialize).
+            are used again (see rijkresponse.initialize_ri_jk).
         """
 
-        rijkresponse.initialize(self, molecule, basis, reuse)
+        initialize_ri_jk(self, molecule, basis, reuse)
 
     def _init_dft(self, molecule, scf_results, silent=False):
         """
@@ -2585,7 +2590,7 @@ class LinearSolver:
         use_ri_coulomb = (self._uses_ri_coulomb() and fock_type == 'j')
 
         if use_ri_coulomb:
-            fock_arrays = rijresponse.coulomb_matrices(self, dens, comm)
+            fock_arrays = ri_j_coulomb_matrices(self, dens, comm)
 
         elif use_ri_jk:
             # NOTE: a hybrid range-separated functional has its attenuated
@@ -2729,7 +2734,7 @@ class LinearSolver:
             The Fock matrices as numpy arrays, one for each density.
         """
 
-        return rijkresponse.fock_matrices(self, basis, dens_factors,
+        return ri_jk_fock_matrices(self, basis, dens_factors,
                                           exchange_scaling_factor,
                                           erf_exchange_scaling_factor)
 
@@ -2855,7 +2860,7 @@ class LinearSolver:
                      dens_factors is not None)
 
         if use_ri_coulomb:
-            fock_arrays = rijresponse.coulomb_matrices_unrestricted(
+            fock_arrays = ri_j_coulomb_matrices_unrestricted(
                 self, dens_a, dens_b, comm)
 
         elif use_ri_jk:
@@ -2865,7 +2870,7 @@ class LinearSolver:
             # densities, and that loop runs zero times here.
             factors_a, factors_b = dens_factors
 
-            fock_arrays = rijkresponse.fock_matrices_unrestricted(
+            fock_arrays = ri_jk_fock_matrices_unrestricted(
                 self, basis, factors_a, factors_b, exchange_scaling_factor,
                 erf_k_coef if need_omega else 0.0)
 

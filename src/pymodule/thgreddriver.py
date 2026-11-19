@@ -35,7 +35,8 @@ import numpy as np
 import time
 
 from .oneeints import compute_electric_dipole_integrals
-from . import rijkresponse
+from .riresponse import lend_ri
+from .rijkresponse import ri_jk_general_factors
 from .veloxchemlib import mpi_master, hartree_in_ev, hartree_in_wavenumber
 from .profiler import Profiler
 from .cppsolver import ComplexResponseSolver
@@ -257,7 +258,7 @@ class ThgReducedDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             Nb_drv.checkpoint_file = str(fpath) + '_tpa_1.h5'
 
-        with rijkresponse.lend(self, Nb_drv):
+        with lend_ri(self, Nb_drv):
             Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
 
         self._is_converged = Nb_drv.is_converged
@@ -596,7 +597,7 @@ class ThgReducedDriver(NonlinearSolver):
                                       ('third', D_lam_sig_tau_x),
                                       ('third', D_lam_sig_tau_y),
                                       ('third', D_lam_sig_tau_z)):
-                        ra, rb = rijkresponse.general_factors(
+                        ra, rb = ri_jk_general_factors(
                             mo, nocc, np.real(mat))
                         self._ri_jk_factors[name][0].append(ra)
                         self._ri_jk_factors[name][1].append(rb)
@@ -1026,7 +1027,7 @@ class ThgReducedDriver(NonlinearSolver):
 
         # commutpute second-order response vectors
 
-        with rijkresponse.lend(self, N_total_drv):
+        with lend_ri(self, N_total_drv):
             N_total_results = N_total_drv.compute(
                 molecule, ao_basis, scf_tensors, xy_dict)
 
@@ -1140,7 +1141,7 @@ class ThgReducedDriver(NonlinearSolver):
                 # quadrature alone and no Fock matrix is asked of them.
                 if self._ri_jk_factors is not None:
                     for mat in (Dx, Dy, Dz):
-                        ra, rb = rijkresponse.general_factors(
+                        ra, rb = ri_jk_general_factors(
                             mo, nocc, np.real(mat))
                         self._ri_jk_factors[1].append(ra)
                         self._ri_jk_factors[3].append(rb)

@@ -49,8 +49,12 @@ from .distributedarray import DistributedArray
 from .sanitychecks import dft_and_ri_sanity_check
 from .sanitychecks import nonlinear_response_environment_sanity_check
 from .errorhandler import assert_msg_critical
-from . import rijkresponse
-from . import rijresponse
+from .riresponse import print_ri_memory_check
+from .rijkresponse import initialize_ri_jk
+from .rijkresponse import ri_jk_fock_matrices
+from .rijkresponse import ri_jk_slice_factors
+from .rijresponse import initialize_ri_j
+from .rijresponse import ri_j_coulomb_matrices
 from .inputparser import parse_input, print_keywords, print_attributes
 from .dftutils import get_default_grid_level, get_optimal_grid_box_size
 from .dftutils import get_response_fock_xc_density_memory
@@ -199,13 +203,13 @@ class NonlinearSolver:
         # NOTE: the memory each rank keeps back from the RI-JK B vectors for the
         # smallest batch of this driver's nonlinear Fock builds, in bytes, set
         # by _set_ri_jk_reserve_floor before the B vectors are formed and read
-        # by rijkresponse.memory_budget.
+        # by riresponse.get_ri_memory_budget.
         self._ri_jk_reserve_floor = 0
 
         # NOTE: whether this response fell back from RI to the four-center
         # integrals for want of memory of its own, and what the build was
         # checked with. RI-JK's is decided with the B vectors at the start of
-        # each calculation and lent with them (rijkresponse.lend); RI-J's is
+        # each calculation and lent with them (riresponse.lend_ri); RI-J's is
         # decided again whenever the integrals are.
         self._ri_jk_fallback = False
         self._ri_jk_memory = None
@@ -214,7 +218,7 @@ class NonlinearSolver:
 
         # NOTE: whether this solver's RI-JK B vectors are lent to a solver it
         # drives, and whether the ones it holds are borrowed from the driver
-        # that drives it, for the duration of one compute (rijkresponse.lend).
+        # that drives it, for the duration of one compute (riresponse.lend_ri).
         self._ri_jk_lent = False
         self._ri_jk_borrowing = False
 
@@ -413,7 +417,7 @@ class NonlinearSolver:
             The AO basis set.
         :param reuse_ri_jk:
             True where the RI-JK B vectors were formed earlier in the same
-            calculation and are used again (see rijkresponse.initialize).
+            calculation and are used again (see rijkresponse.initialize_ri_jk).
 
         :return:
             The dictionary of ERI information.
@@ -436,14 +440,14 @@ class NonlinearSolver:
         self._print_ri_fallback_info(asks_ri_coulomb, asks_ri_jk)
 
         if asks_ri_coulomb and not self._ri_fallback:
-            rijresponse.initialize(self, molecule, basis)
+            initialize_ri_j(self, molecule, basis)
 
         # NOTE: not gated on _uses_ri_jk(), which reads this response's own
-        # fallback: that is decided again by rijkresponse.initialize at the
-        # start of each calculation, and one left from an earlier calculation
-        # would otherwise keep it from being decided again.
+        # fallback: that is decided again by rijkresponse.initialize_ri_jk at
+        # the start of each calculation, and one left from an earlier
+        # calculation would otherwise keep it from being decided again.
         if asks_ri_jk and not self._ri_fallback:
-            rijkresponse.initialize(self, molecule, basis, reuse_ri_jk)
+            initialize_ri_jk(self, molecule, basis, reuse_ri_jk)
 
         return {
             'screening': screening,
@@ -667,7 +671,7 @@ class NonlinearSolver:
         this.
         """
 
-        rijkresponse.print_memory_check(self)
+        print_ri_memory_check(self)
 
     def _ri_density_memory(self, molecule, ao_basis, dft_dict, n_ao, mode,
                            mode_is_cubic, n_factor_columns=0):
@@ -759,12 +763,12 @@ class NonlinearSolver:
         # three-time ones, cut from two arrays with strides of their own and
         # carrying two different block structures between them.
         if not isinstance(dens_factors, dict):
-            return rijkresponse.slice_factors(dens_factors, batch_start,
+            return ri_jk_slice_factors(dens_factors, batch_start,
                                               batch_end)
 
         batch_factors = {
             'third':
-                rijkresponse.slice_factors(dens_factors['third'], batch_start,
+                ri_jk_slice_factors(dens_factors['third'], batch_start,
                                            batch_end)
         }
 
@@ -788,7 +792,7 @@ class NonlinearSolver:
             last_two = min(first_two + batch_size_second_order,
                            second_order_dens.shape(1))
 
-            batch_factors['second'] = rijkresponse.slice_factors(
+            batch_factors['second'] = ri_jk_slice_factors(
                 second, first_two, last_two)
 
         return batch_factors
@@ -1476,12 +1480,12 @@ class NonlinearSolver:
             erf_k_factor = erf_k_coef if need_omega else 0.0
 
             if use_ri_coulomb:
-                fock_arrays = rijresponse.coulomb_matrices(
+                fock_arrays = ri_j_coulomb_matrices(
                     self, dts_for_fock, self.comm)
 
             elif use_ri_jk:
                 if not factors_are_split:
-                    fock_arrays = rijkresponse.fock_matrices(
+                    fock_arrays = ri_jk_fock_matrices(
                         self, ao_basis, batch_factors, fock_k_factor,
                         erf_k_factor)
                 else:
@@ -1496,11 +1500,11 @@ class NonlinearSolver:
                     second = batch_factors.get('second')
 
                     if second is not None:
-                        fock_arrays += rijkresponse.fock_matrices(
+                        fock_arrays += ri_jk_fock_matrices(
                             self, ao_basis, second, fock_k_factor,
                             erf_k_factor)
 
-                    fock_arrays += rijkresponse.fock_matrices(
+                    fock_arrays += ri_jk_fock_matrices(
                         self, ao_basis, batch_factors['third'],
                         fock_k_factor, erf_k_factor)
 

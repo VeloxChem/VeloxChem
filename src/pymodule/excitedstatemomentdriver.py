@@ -38,7 +38,9 @@ import time
 import sys
 
 from .oneeints import compute_electric_dipole_integrals
-from . import rijkresponse
+from .riresponse import lend_ri
+from .rijkresponse import initialize_ri_jk
+from .rijkresponse import ri_jk_general_factors
 from .veloxchemlib import mpi_master
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -257,7 +259,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         # run RPA
         # NOTE: the B vectors are formed before the solvers this driver drives
-        # are made and lent to each of them (rijkresponse.lend), rather than
+        # are made and lent to each of them (riresponse.lend_ri), rather than
         # formed by each. The integral setup in compute_quad_components
         # uses them again. Not gated on _uses_ri_jk(), for the reason given
         # in _init_eri.
@@ -266,7 +268,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         self._set_ri_jk_reserve_floor(molecule, ao_basis, scf_results)
 
         if self.ri_jk and not self._ri_fallback:
-            rijkresponse.initialize(self, molecule, ao_basis)
+            initialize_ri_jk(self, molecule, ao_basis)
 
         rpa_drv = LinearResponseEigenSolver(self.comm, self.ostream)
         rpa_drv.nonlinear = True
@@ -288,7 +290,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             rpa_drv.checkpoint_file = str(fpath) + '_doublequadres_rpa.h5'
 
-        with rijkresponse.lend(self, rpa_drv):
+        with lend_ri(self, rpa_drv):
             rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
         available_states = len(rpa_results['eigenvalues'])
         assert_msg_critical(
@@ -349,7 +351,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             N_drv.checkpoint_file = str(fpath) + '_doublequadres_cpp.h5'
 
-        with rijkresponse.lend(self, N_drv):
+        with lend_ri(self, N_drv):
             N_results = N_drv.compute(molecule, ao_basis, scf_results, B)
 
         self._is_converged = N_drv.is_converged
@@ -697,7 +699,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             # alone and no Fock matrix is asked of them.
             if self._ri_jk_factors is not None:
                 for part in (np.real, np.imag):
-                    ra, rb = rijkresponse.general_factors(mo, nocc, part(Dfg_))
+                    ra, rb = ri_jk_general_factors(mo, nocc, part(Dfg_))
                     self._ri_jk_factors[1].append(ra)
                     self._ri_jk_factors[3].append(rb)
 
