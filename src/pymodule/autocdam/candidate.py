@@ -323,9 +323,11 @@ class CDAMCandidate:
     :param dummy_mass:
         The mass of each dummy site in amu.
     :param bond_force_constant:
-        The metal-dummy bond force constant in kcal/mol/angstrom^2.
+        The metal-dummy bond force constant in kcal/mol/angstrom^2, OpenMM
+        convention E = k/2 (r - d)^2 (an Amber K_b, E = K_b (r - d)^2, is k/2).
     :param angle_force_constant:
-        The dummy angle force constant in kcal/mol/rad^2.
+        The dummy angle force constant in kcal/mol/rad^2, OpenMM convention
+        E = k/2 (theta - theta0)^2 (an Amber K_theta is k/2).
     """
 
     geometries = GEOMETRIES

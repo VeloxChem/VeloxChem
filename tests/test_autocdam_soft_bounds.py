@@ -97,9 +97,12 @@ class TestAutoCdamSoftBounds:
         driver = AutoCDAM()
         driver.calculator = Surface()
         driver.setup(CDAMCandidate("Al", 3), {"IOD": {"value": 2.0}})
-        names = {s.name for s in driver.parameter_specs}
-        assert names == {"metal_lj_sigma", "metal_lj_epsilon"}
-        assert all(s.expandable for s in driver.parameter_specs)
+        specs = {s.name: s for s in driver.parameter_specs}
+        assert set(specs) == {
+            "metal_lj_sigma", "metal_lj_epsilon", "metal_dummy_distance"
+        }
+        assert specs["metal_lj_sigma"].expandable
+        assert specs["metal_lj_epsilon"].expandable
 
     @pytest.mark.parametrize("value, message",
                              [("gaff", "unknown bound keyword"),

@@ -78,7 +78,9 @@ from .geometry import (minimum_image, align_template, angle_degrees,
                        atom_labels, box_widths, count_within, distance_angstrom,
                        element_matched_rmsd, kabsch_rmsd, nearest_heavy_atoms,
                        resolve_atom)
-from .models import all_finite, CalculationResult, default_ostream, ANGSTROM_TO_NM
+from .models import (all_finite, CalculationResult, default_ostream,
+                     minimum_bond_force_constant, ANGSTROM_TO_NM,
+                     BOND_SAFETY_FACTOR)
 
 # ==========================================================================
 # framework baseline
@@ -1027,6 +1029,42 @@ class FrameworkSystem:
         observed /= np.linalg.norm(observed, axis=1)[:, None]
         return align_template(template, observed)
 
+    def bond_check(self, candidate) -> str | None:
+        """
+        Checks that harmonic metal-dummy bonds hold the dummies against the
+        first-shell donors of the input structure.
+
+        :param candidate:
+            The CDAM candidate.
+
+        :return:
+            The reason the bond is too weak, or None.
+        """
+
+        if (self.representation == "atom" or
+                self.metal_dummy_bond != "harmonic"):
+            return None
+        baseline = self.prepare_baseline()
+        target = baseline.target_index
+        shell = self.first_shell(len(candidate.geometries[candidate.geometry]))
+        vectors = minimum_image(
+            baseline.positions_nm[shell] - baseline.positions_nm[target],
+            baseline.box_vectors_nm)
+        distances = np.linalg.norm(vectors, axis=1) / ANGSTROM_TO_NM
+        needed = BOND_SAFETY_FACTOR * max(
+            minimum_bond_force_constant(candidate.dummy_charge,
+                                        baseline.charges[atom], distance,
+                                        candidate.metal_dummy_distance)
+            for atom, distance in zip(shell, distances))
+        if candidate.bond_force_constant >= needed:
+            return None
+        return (f"metal-dummy bond {candidate.bond_force_constant:g} "
+                f"kcal/mol/A^2 is too weak for dummy charge "
+                f"{candidate.dummy_charge:.3g} e at "
+                f"{candidate.metal_dummy_distance:.3g} A; the dummies would "
+                f"fall onto the donors (needs >= {needed:.0f}, "
+                f"{BOND_SAFETY_FACTOR:g} x the stability limit)")
+
     def _add_cdam_site(self, system, nonbonded, candidate, sigma, epsilon):
         """Replace the target by a central particle plus charge-only dummies."""
         import openmm as mm
@@ -1213,6 +1251,9 @@ class FrameworkSystem:
         try:
             self.check_targets(targets)
             baseline = self.prepare_baseline()
+            reason = self.bond_check(candidate)
+            if reason:
+                raise ValueError(reason)
             system, positions, site = self.build(candidate)
             preserved = compare_to_baseline(system,
                                             baseline,

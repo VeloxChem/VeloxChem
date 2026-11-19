@@ -124,6 +124,9 @@ class TestCheapFirst:
         class Framework:
             calls = 0
 
+            def bond_check(self, candidate):
+                return None
+
             def calculate(self, candidate, targets, protocol=None):
                 Framework.calls += 1
                 return CalculationResult(values={"Al-O": 1.9})

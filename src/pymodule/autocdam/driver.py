@@ -93,6 +93,13 @@ STAGED_DEFAULTS = {
     "seed": 42
 }
 SEARCH_METHODS = ("staged", "bayesian")
+# Searched when metal_dummy_distance / bond_force_constant are None: the
+# M-D distance in angstrom (Golo et al., ACS Omega 2025, tested 0.70-0.90)
+# and, with harmonic M-D bonds, the bond constant in kcal/mol/angstrom^2
+# (too weak a bond lets the dummies collapse onto the donor oxygens; such
+# candidates fail and the search moves away from them)
+DEFAULT_DISTANCE_BOUNDS = (0.70, 1.00)
+DEFAULT_BOND_BOUNDS = (1000.0, 8000.0)
 
 
 class AutoCDAM:
@@ -155,12 +162,16 @@ class AutoCDAM:
         # HFE or framework target can determine it
         self.dummy_atom_charge = None
 
-        # metal-dummy distance in angstrom: None keeps 0.90, a number fixes
-        # it, a (lower, upper) pair fits it within these bounds
+        # metal-dummy distance in angstrom: None fits it in 0.70-1.00, a
+        # number fixes it, a (lower, upper) pair fits it within these bounds
         self.metal_dummy_distance = None
         # "constraint" fixes the metal-dummy distance; "harmonic" holds it by
         # the M-D bonds only (bond_force_constant, 1 fs MD/FEP time step)
         self.metal_dummy_bond = 'constraint'
+        # metal-dummy bond force constant in kcal/mol/angstrom^2, only used
+        # with metal_dummy_bond = 'harmonic': None fits it in 1000-8000, a
+        # number fixes it, a (lower, upper) pair fits it within these bounds
+        self.bond_force_constant = None
         self._fit_result = None
         self.study_id = None
 
@@ -229,9 +240,11 @@ class AutoCDAM:
                 'dummy_atom_charge':
                     ('raw', 'fixed dummy charge in e, or None to fit it'),
                 'metal_dummy_distance':
-                    ('raw', 'angstrom: fixed value, or (lower, upper) to fit'),
+                    ('raw', 'angstrom: fixed, (lower, upper) or None to fit'),
                 'metal_dummy_bond':
                     ('str_lower', 'constraint, or harmonic (M-D bonds only)'),
+                'bond_force_constant':
+                    ('raw', 'harmonic M-D bond: fixed, (lower, upper) or None'),
                 'potential_form': ('str_lower', 'lj12_6 or lj12_6_4'),
                 'search_method': ('str_lower', 'staged or bayesian search'),
                 'geometries': ('raw', 'dummy geometries searched one by one'),
@@ -454,6 +467,10 @@ class AutoCDAM:
         if self._distance_bounds() is None and self.metal_dummy_distance is not None:
             candidate = candidate.with_parameters(
                 {'metal_dummy_distance': float(self.metal_dummy_distance)})
+        if (self._bond_bounds() is None and
+                isinstance(self.bond_force_constant, (int, float))):
+            candidate = candidate.with_parameters(
+                {'bond_force_constant': float(self.bond_force_constant)})
         assert_msg_critical(
             self.metal_dummy_bond in ('constraint', 'harmonic'),
             "AutoCDAM: metal_dummy_bond must be 'constraint' or 'harmonic'")
@@ -470,9 +487,10 @@ class AutoCDAM:
             }
         if self.metal_dummy_bond == 'harmonic':
             self.ostream.print_info(
-                'Metal-dummy bonds: harmonic, '
-                f'{candidate.bond_force_constant:g} kcal/mol/A^2, no '
-                'constraint; MD and FEP time step 1 fs unless set')
+                'Metal-dummy bonds: harmonic, ' +
+                ('constant fitted' if self._bond_bounds() is not None else
+                 f'{candidate.bond_force_constant:g} kcal/mol/A^2') +
+                ', no constraint; MD and FEP time step 1 fs unless set')
             self.ostream.flush()
         self.candidate = candidate
         self.calculator_options = self._calculator_options()
@@ -607,6 +625,15 @@ class AutoCDAM:
             self.ostream.print_info(
                 'Metal-dummy distance fixed at '
                 f'{candidate.metal_dummy_distance:.2f} angstrom')
+        bond = self._bond_bounds()
+        if bond is not None:
+            parameters['bond_force_constant'] = ParameterSpec(
+                'bond_force_constant',
+                min(max(candidate.bond_force_constant, bond[0]), bond[1]),
+                bond)
+            self.ostream.print_info(
+                f'Metal-dummy bond constant fitted in [{bond[0]:g}, '
+                f'{bond[1]:g}] kcal/mol/angstrom^2')
         if candidate.potential_form == 'lj12_6_4':
             # soft bounds: the Bayesian search widens them up to 3000
             parameters['c4_metal_water'] = ParameterSpec(
@@ -649,13 +676,40 @@ class AutoCDAM:
             The (lower, upper) pair in angstrom, or None if it is fixed.
         """
 
-        value = self.metal_dummy_distance
-        if value is None or isinstance(value, (int, float)):
+        return self._bounds('metal_dummy_distance', DEFAULT_DISTANCE_BOUNDS,
+                            'angstrom')
+
+    def _bond_bounds(self):
+        """
+        Gets the fitting bounds of the harmonic metal-dummy bond constant.
+
+        :return:
+            The (lower, upper) pair in kcal/mol/angstrom^2, or None if it is
+            fixed or the M-D distance is constrained.
+        """
+
+        if self.metal_dummy_bond != 'harmonic':
+            assert_msg_critical(
+                self.bond_force_constant is None or
+                isinstance(self.bond_force_constant, (int, float)),
+                "AutoCDAM: bond_force_constant is only fitted with "
+                "metal_dummy_bond = 'harmonic'")
+            return None
+        return self._bounds('bond_force_constant', DEFAULT_BOND_BOUNDS,
+                            'kcal/mol/angstrom^2')
+
+    def _bounds(self, name, default, unit):
+        """(lower, upper) of a setting that is None (default bounds), a
+        number (fixed: None) or a pair."""
+        value = getattr(self, name)
+        if value is None:
+            return default
+        if isinstance(value, (int, float)):
             return None
         assert_msg_critical(
             len(value) == 2 and 0 < float(value[0]) < float(value[1]),
-            'AutoCDAM: metal_dummy_distance must be a number or a '
-            '(lower, upper) pair in angstrom')
+            f'AutoCDAM: {name} must be None, a number or a (lower, upper) '
+            f'pair in {unit}')
         return float(value[0]), float(value[1])
 
     def _resolve_parameters(self, parameters,
@@ -1051,7 +1105,7 @@ class AutoCDAM:
         Prints the short MD protocol of fast mode.
         """
 
-        md = md_settings({'fast_mode': True, **(self.md_options or {})})
+        md = md_settings(self._calculator_options().get('md_options'))
         step_ps = float(md['timestep_fs']) / 1000.0
         self.ostream.print_info(
             'Fast mode: each candidate runs '

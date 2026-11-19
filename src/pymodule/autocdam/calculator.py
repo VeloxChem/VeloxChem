@@ -542,9 +542,12 @@ class Calculator:
                 "Pilot MD (0.05 ps) only tests the workflow; its values are "
                 "not meaningful.")
         if md_options.get("fast_mode"):
+            md = md_settings(md_options)
+            production_ps = md["production_steps"] * md["timestep_fs"] / 1000.0
             results.warnings.append(
-                "Fast-mode MD (50 ps production); check the final parameters "
-                "with the production protocol (fast_mode = False).")
+                f"Fast-mode MD ({production_ps:g} ps production); check the "
+                "final parameters with the production protocol "
+                "(fast_mode = False).")
         for key, value in md_results.items():
             if key.endswith("_std"):
                 name = key[:-len("_std")]

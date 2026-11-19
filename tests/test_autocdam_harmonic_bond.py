@@ -1,21 +1,33 @@
+import json
+from pathlib import Path
+
 import numpy as np
 import openmm as mm
 import pytest
 
-from veloxchem.autocdam import AutoCDAM, CDAMCandidate, CoordinateGenerator
+from veloxchem.autocdam import (AutoCDAM, CDAMCandidate, CoordinateGenerator,
+                                MetalNode)
 from veloxchem.autocdam.md import run_md
+from veloxchem.autocdam.models import coerce_targets, minimum_bond_force_constant
+from veloxchem.autocdam.multisystem import build_systems, expand_system_objects
 from veloxchem.outputstream import OutputStream
+
+DATA = Path(__file__).parent / "data"
+XYZ = DATA / "autocdam_al_node_fragment.xyz"
+CHARGES = json.loads(
+    (DATA / "autocdam_al_node_fragment_charges.json").read_text())["charges_e"]
 
 # Al3+ of Golo, Ahlquist, Su, ACS Omega 10, 3801 (2025), Table 1:
 # Rmin/2 0.6158 A, epsilon 29.9565 kcal/mol, dummy 0.73 e at 0.74 A,
-# Kb 1950 kcal/mol/A^2, D-M-D 200 kcal/mol/rad^2, harmonic M-D bonds
+# Kb 1950 kcal/mol/A^2, D-M-D 200 kcal/mol/rad^2 (Amber, E = K x^2; AutoCDAM
+# uses OpenMM's E = k/2 x^2, so k = 2 K), harmonic M-D bonds
 PAPER_AL = {
     "metal_lj_sigma": 2 * 0.6158 / 2**(1 / 6),
     "metal_lj_epsilon": 29.9565,
     "dummy_charge": 0.73,
     "metal_dummy_distance": 0.74,
-    "bond_force_constant": 1950.0,
-    "angle_force_constant": 200.0,
+    "bond_force_constant": 3900.0,
+    "angle_force_constant": 400.0,
 }
 
 
@@ -55,7 +67,7 @@ class TestHarmonicMetalDummyBond:
         site = [bonds.getBondParameters(i) for i in range(bonds.getNumBonds())
                 if bonds.getBondParameters(i)[0] < 7]
         assert len(site) == 6
-        assert site[0][3]._value == pytest.approx(1950.0 * 418.4)
+        assert site[0][3]._value == pytest.approx(3900.0 * 418.4)
 
     def test_paper_al_dummies_stay_on_their_bonds_in_water(self):
         systems = CoordinateGenerator(
@@ -89,3 +101,64 @@ class TestHarmonicMetalDummyBond:
         fit.metal_dummy_bond = "constraint"
         fit.pilot = False
         assert "md_options" not in fit._calculator_options()
+
+    def test_bond_force_constant_keyword_sets_the_candidate(self):
+        fit = AutoCDAM()
+        fit.update_settings({"metal_dummy_bond": "harmonic",
+                             "bond_force_constant": 5000.0,
+                             "cheap_first": False})
+        fit.setup(CDAMCandidate("Al", 3), {
+            "IOD": {"value": 1.9, "tolerance": 0.05, "role": "required"}})
+        assert fit.candidate.bond_force_constant == 5000.0
+        assert fit.candidate.metal_dummy_bond == "harmonic"
+        assert "bond_force_constant" not in {
+            s.name for s in fit.parameter_specs if s.optimizable}
+
+    def test_distance_and_bond_constant_are_searched_when_none(self):
+        fit = AutoCDAM()
+        fit.update_settings({"metal_dummy_bond": "harmonic",
+                             "cheap_first": False})
+        fit.setup(CDAMCandidate("Al", 3), {
+            "IOD": {"value": 1.9, "tolerance": 0.05, "role": "required"}})
+        bounds = {s.name: tuple(s.bounds) for s in fit.parameter_specs
+                  if s.optimizable}
+        assert bounds["metal_dummy_distance"] == (0.70, 1.00)
+        assert bounds["bond_force_constant"] == (1000.0, 8000.0)
+        # constrained M-D: the bond constant has no effect and is not searched
+        fit.metal_dummy_bond = "constraint"
+        fit.setup(CDAMCandidate("Al", 3), {
+            "IOD": {"value": 1.9, "tolerance": 0.05, "role": "required"}})
+        assert "bond_force_constant" not in {
+            s.name for s in fit.parameter_specs if s.optimizable}
+
+
+class TestBondStabilityCheck:
+
+    def test_minimum_bond_constant(self):
+        # dummy 0.94 e at 0.71 A, hydroxide O -1.212 e at 1.80 A: collapsed at
+        # k = 1950 in the k1950 fit (Al-O(hydroxide) 1.505 A)
+        k = minimum_bond_force_constant(0.94, -1.212, 1.80, 0.71)
+        assert k == pytest.approx(1972.0, rel=0.01)
+        assert minimum_bond_force_constant(0.94, 0.4, 1.80, 0.71) == 0.0
+        assert minimum_bond_force_constant(0.94, -1.0, 0.70, 0.71) == np.inf
+
+    def test_node_fails_weak_bonds_before_any_md(self):
+        node = MetalNode.read_xyz_file(XYZ, charge=-1, charges=CHARGES)
+        targets = coerce_targets(
+            expand_system_objects({"Al in MOF": {"system": node}}, None,
+                                  "spce")[0])
+        spec = node.system(water_model="spce")
+        spec.update(type="framework", metal_dummy_bond="harmonic")
+        router = build_systems({"node": spec}, targets, None, None)
+        framework = router.systems["node"]
+        strong = al("harmonic", dummy_charge=0.4, metal_dummy_distance=0.7,
+                    bond_force_constant=1950.0)
+        weak = al("harmonic", dummy_charge=0.94, metal_dummy_distance=0.71,
+                  bond_force_constant=1950.0)
+        assert framework.bond_check(strong) is None
+        assert "too weak" in framework.bond_check(weak)
+        result = router.calculate(weak.to_generated_batch(), None, targets)
+        assert result.failed and "too weak" in result.failure_reason
+        # constrained M-D: no check
+        framework.metal_dummy_bond = "constraint"
+        assert framework.bond_check(weak) is None

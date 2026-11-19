@@ -276,7 +276,9 @@ class TestAutoCdamAttributeInterface:
         cdamfit = AutoCDAM(ostream=OutputStream(None))
 
         cdamfit.setup(CDAMCandidate("Al", 3), iod)
-        assert set(_fitted(cdamfit)) == {"metal_lj_sigma", "metal_lj_epsilon"}
+        assert set(_fitted(cdamfit)) == {
+            "metal_lj_sigma", "metal_lj_epsilon", "metal_dummy_distance"
+        }
         assert cdamfit.candidate.dummy_charge == 0.5
 
         cdamfit.setup(CDAMCandidate("Al", 3), {**iod, **hfe})
@@ -322,9 +324,10 @@ class TestAutoCdamAttributeInterface:
 
         iod = {"IOD": {"value": 1.9, "tolerance": 0.05}}
         cdamfit = AutoCDAM(ostream=OutputStream(None))
+        # None (default): searched in 0.70-1.00 angstrom, starting at 0.90
         cdamfit.setup(CDAMCandidate("Al", 3), iod)
         assert cdamfit.candidate.metal_dummy_distance == 0.9
-        assert "metal_dummy_distance" not in _fitted(cdamfit)
+        assert _fitted(cdamfit)["metal_dummy_distance"] == (0.70, 1.00)
 
         cdamfit.metal_dummy_distance = 0.95
         cdamfit.setup(CDAMCandidate("Al", 3), iod)
@@ -373,7 +376,8 @@ class TestAutoCdamAttributeInterface:
         # defaults are part of the ID: setting them explicitly changes nothing
         explicit = run(tmp_path / "explicit", search_method="bayesian",
                        water_model="tip3p", coordination_type="octahedral",
-                       potential_form="lj12_6", metal_dummy_distance=0.9,
+                       potential_form="lj12_6",
+                       metal_dummy_distance=(0.70, 1.00),
                        md_options={"production_steps": 250000})
         assert explicit.study_id == first.study_id
         for name, value in (("search_method", "staged"), ("fast_mode", True),

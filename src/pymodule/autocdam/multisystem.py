@@ -167,6 +167,16 @@ class MultiSystemCalculator:
         failures = []
         framework_protocol = kwargs.pop("framework_protocol", None)
         skipped = None
+        # a metal-dummy bond too weak for a framework's donors fails the
+        # proposal before any MD
+        for name, system in self.systems.items():
+            if system is None or not any(
+                    self.system_of(t) == name for t in targets):
+                continue
+            reason = system.bond_check(CDAMCandidate.from_generated_batch(batch))
+            if reason:
+                return CalculationResult(failed=True,
+                                         failure_reason=f"[{name}] {reason}")
         # The aqueous system first: its MD decides whether the frameworks run.
         order = sorted(self.systems.items(), key=lambda item: item[1] is not None)
         for name, system in order:

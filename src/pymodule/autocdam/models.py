@@ -62,7 +62,8 @@ from mpi4py import MPI
 
 from ..errorhandler import assert_msg_critical
 from ..outputstream import OutputStream
-from ..veloxchemlib import hartree_in_kcalpermol, hartree_in_kjpermol, mpi_master
+from ..veloxchemlib import (bohr_in_angstrom, hartree_in_kcalpermol,
+                            hartree_in_kjpermol, mpi_master)
 
 # ==========================================================================
 # printing
@@ -324,6 +325,43 @@ def site_parameters_openmm(*, sigma, epsilon, c4, distance, bond_k,
         "bond_k": bond_k * KCAL_TO_KJ / ANGSTROM_TO_NM**2,
         "angle_k": angle_k * KCAL_TO_KJ,
     }
+
+
+# A harmonic metal-dummy bond (OpenMM convention, E = k/2 (r - d)^2; an Amber
+# K_b, E = K_b (r - d)^2, is k/2) holds a dummy of charge q_D against a donor
+# of charge q at distance R from the metal only if
+# k > 27 k_e q_D |q| / (4 (R - d)^3); a weaker bond lets the dummy fall onto the
+# donor. Candidates need BOND_SAFETY_FACTOR times this.
+BOND_SAFETY_FACTOR = 1.5
+
+
+def minimum_bond_force_constant(dummy_charge, donor_charge, donor_distance,
+                                metal_dummy_distance) -> float:
+    """
+    Gets the smallest metal-dummy bond constant that holds a dummy in place.
+
+    :param dummy_charge:
+        The dummy charge in e.
+    :param donor_charge:
+        The donor atom charge in e.
+    :param donor_distance:
+        The metal-donor distance in angstrom.
+    :param metal_dummy_distance:
+        The metal-dummy bond length in angstrom.
+
+    :return:
+        The bond constant in kcal/mol/angstrom^2 (OpenMM convention), 0 for a
+        donor that repels the dummy, inf for a donor inside the bond length.
+    """
+
+    attraction = -float(dummy_charge) * float(donor_charge)
+    if attraction <= 0.0:
+        return 0.0
+    gap = float(donor_distance) - float(metal_dummy_distance)
+    if gap <= 0.0:
+        return math.inf
+    coulomb = hartree_in_kcalpermol() * bohr_in_angstrom()
+    return 27.0 * coulomb * attraction / (4.0 * gap**3)
 
 
 # ==========================================================================
