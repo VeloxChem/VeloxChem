@@ -81,6 +81,7 @@ from .veloxchemlib import SimdRIJKResponseDriver
 from .veloxchemlib import PackedMatrix
 from .veloxchemlib import mat_t
 from .veloxchemlib import rimode
+from .veloxchemlib import release_free_memory
 from .molecularbasis import MolecularBasis
 from .sanitychecks import get_ri_auxiliary_basis
 from .environment import get_ri_free_memory
@@ -876,6 +877,25 @@ def _release(solver):
     solver._ri_jk_fallback = False
 
 
+def _release_ri_j(solver):
+    """Lets go of the simd RI-J driver the solver set up for itself
+    (rijresponse.initialize) and of the memory it was checked with.
+
+    :param solver:
+        The solver.
+    """
+
+    if getattr(solver, '_ri_drv', None) is None:
+        return
+
+    solver._ri_drv = None
+    solver._ri_j_memory = None
+
+    # NOTE: the three-center integrals are freed in blocks the allocator may
+    # keep resident; they are returned here.
+    release_free_memory()
+
+
 def _check_not_lent(solver):
     """Raises an error where the solver's B vectors are lent out (see lend).
 
@@ -941,7 +961,9 @@ def lend(driver, solver):
     solvers do not form the B vectors it could not hold or warn again. A
     driver which holds neither lends nothing, and the solver sets itself up.
     Where that driver set up the simd RI-J driver and profiles its memory, its
-    memory check leaves out the solver, which checks its own builds.
+    memory check leaves out the solver, which checks its own builds. On
+    leaving the block, also on an error, the solver lets go of the simd RI-J
+    driver it set up.
 
     :param driver:
         The driver which formed the B vectors.
@@ -965,7 +987,16 @@ def lend(driver, solver):
         measures = _measures_own_window(driver)
         if measures:
             _keep_peak_growth(driver)
-        yield
+        try:
+            yield
+        finally:
+            # NOTE: the callers keep the solver until their own calculation
+            # returns and read only is_converged from it after the block. The
+            # solver's own RI-J integrals are not used after its compute, and
+            # kept, they stay resident: the driver's RI-J budget and batches,
+            # fixed at its setup, do not count them, and the next solver the
+            # driver computes finds them taken from its free memory.
+            _release_ri_j(solver)
         # NOTE: a solver which sets itself up resets the peak (mark_setup) and
         # checks its own builds. The driver's check then reads, beside the
         # growth it kept before the solver, the peak of what follows the

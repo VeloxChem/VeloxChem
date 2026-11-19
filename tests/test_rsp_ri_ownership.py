@@ -200,6 +200,38 @@ class TestResponseRiOwnership:
         assert not solver._ri_jk_borrowing
         assert solver._ri_jk_drv is None
 
+    def test_solver_lets_go_of_its_ri_j_driver(self):
+        """A driver which uses RI-J lends nothing, and the solver it drives
+        lets go of the RI-J driver it set up for itself on leaving the block,
+        also when the call raises."""
+
+        molecule, basis = self.get_water(1)
+        _, scf_results = self.run_scf(ScfRestrictedDriver, molecule, basis,
+                                      'blyp')
+
+        driver = self.run_tda(molecule, basis, scf_results)
+
+        assert driver._uses_ri_coulomb()
+        assert driver._ri_drv is not None
+
+        for raises in [False, True]:
+            solver = self.make_eigensolver(TdaEigenSolver)
+
+            try:
+                with rijkresponse.lend(driver, solver):
+                    solver.compute(molecule, basis, scf_results)
+                    assert solver._ri_drv is not None
+                    assert solver._ri_j_memory is not None
+                    if raises:
+                        raise RuntimeError('raised inside')
+            except RuntimeError:
+                assert raises
+
+            assert solver._ri_drv is None
+            assert solver._ri_j_memory is None
+            assert driver._ri_drv is not None
+            assert not driver._ri_jk_lent
+
     def test_lending_hands_back_the_memory_of_the_builds(self):
         """The driver's memory check takes the largest RI build and batch of
         the solver it lent its B vectors to."""
