@@ -123,7 +123,7 @@ class TestHarmonicMetalDummyBond:
         bounds = {s.name: tuple(s.bounds) for s in fit.parameter_specs
                   if s.optimizable}
         assert bounds["metal_dummy_distance"] == (0.70, 1.00)
-        assert bounds["bond_force_constant"] == (1000.0, 8000.0)
+        assert bounds["bond_force_constant"] == (1000.0, 3000.0)
         # constrained M-D: the bond constant has no effect and is not searched
         fit.metal_dummy_bond = "constraint"
         fit.setup(CDAMCandidate("Al", 3), {
@@ -162,3 +162,22 @@ class TestBondStabilityCheck:
         # constrained M-D: no check
         framework.metal_dummy_bond = "constraint"
         assert framework.bond_check(weak) is None
+
+    def test_search_proposes_only_points_that_pass(self):
+        fit = AutoCDAM()
+        fit.update_settings({"metal_dummy_bond": "harmonic",
+                             "bond_force_constant": 1950.0,
+                             "cheap_first": False, "initial_samples": 9})
+        node = MetalNode.read_xyz_file(XYZ, charge=-1, charges=CHARGES)
+        fit.setup(CDAMCandidate("Al", 3, water_model="spce"), {
+            "IOD": {"value": 1.9, "tolerance": 0.05, "role": "required"},
+            "Al in MOF": {"system": node}})
+        search = fit._make_fitting_driver({})
+        design = search._design()
+        assert len(design) == 9
+        points = [search._from_unit(u) for u in design]
+        assert all(fit._candidate_check(p) is None for p in points)
+        # the plain Sobol design of the same size has failing points
+        search.feasible = None
+        plain = [search._from_unit(u) for u in search._design()]
+        assert any(fit._candidate_check(p) for p in plain)

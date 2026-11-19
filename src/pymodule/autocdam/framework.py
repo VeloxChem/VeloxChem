@@ -577,6 +577,7 @@ class FrameworkSystem:
         self.ostream = default_ostream(self.ostream)
         self.baseline_builds = 0
         self._baseline: FrameworkBaseline | None = None
+        self._donors: dict[int, tuple] = {}
 
     def _check_options(self):
         """Critical error for any option value outside the supported set."""
@@ -1044,18 +1045,21 @@ class FrameworkSystem:
         if (self.representation == "atom" or
                 self.metal_dummy_bond != "harmonic"):
             return None
-        baseline = self.prepare_baseline()
-        target = baseline.target_index
-        shell = self.first_shell(len(candidate.geometries[candidate.geometry]))
-        vectors = minimum_image(
-            baseline.positions_nm[shell] - baseline.positions_nm[target],
-            baseline.box_vectors_nm)
-        distances = np.linalg.norm(vectors, axis=1) / ANGSTROM_TO_NM
+        size = len(candidate.geometries[candidate.geometry])
+        if size not in self._donors:  # (charge, distance in angstrom) pairs
+            baseline = self.prepare_baseline()
+            shell = self.first_shell(size)
+            vectors = minimum_image(
+                baseline.positions_nm[shell] -
+                baseline.positions_nm[baseline.target_index],
+                baseline.box_vectors_nm)
+            self._donors[size] = tuple(
+                zip([baseline.charges[atom] for atom in shell],
+                    np.linalg.norm(vectors, axis=1) / ANGSTROM_TO_NM))
         needed = BOND_SAFETY_FACTOR * max(
-            minimum_bond_force_constant(candidate.dummy_charge,
-                                        baseline.charges[atom], distance,
-                                        candidate.metal_dummy_distance)
-            for atom, distance in zip(shell, distances))
+            minimum_bond_force_constant(candidate.dummy_charge, charge,
+                                        distance, candidate.metal_dummy_distance)
+            for charge, distance in self._donors[size])
         if candidate.bond_force_constant >= needed:
             return None
         return (f"metal-dummy bond {candidate.bond_force_constant:g} "

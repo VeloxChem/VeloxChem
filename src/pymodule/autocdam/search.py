@@ -632,6 +632,7 @@ class SearchDriver:
                  quality_check: Callable[[CalculationResult],
                                          QualityStatus] = default_quality_check,
                  noise: bool = False,
+                 feasible: Callable[[ParameterSet], str | None] | None = None,
                  study_metadata: dict[str, Any] | None = None,
                  checkpoint_file: str | Path | None = None,
                  checkpoint_group: str = CHECKPOINT_GROUP,
@@ -642,6 +643,8 @@ class SearchDriver:
         It is a critical error if parameters or targets are missing or
         duplicated, an optimizable parameter has no bounds, or
         ``objective_threshold`` is negative or not finite. ``noise`` lets the property GPs learn observation noise.
+        ``feasible(parameters)`` returns why a point cannot be calculated (None
+        if it can); the search proposes only points that pass it.
         """
         self.specs = list(specs)
         self.targets = list(targets)
@@ -663,6 +666,7 @@ class SearchDriver:
         self.calculator = calculator
         self.evaluator = evaluator
         self.make_inputs = make_inputs
+        self.feasible = feasible
         self.seed = seed
         self.objective_threshold = objective_threshold
         self.quality_check = quality_check

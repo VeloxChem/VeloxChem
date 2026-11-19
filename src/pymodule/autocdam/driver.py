@@ -96,10 +96,12 @@ SEARCH_METHODS = ("staged", "bayesian")
 # Searched when metal_dummy_distance / bond_force_constant are None: the
 # M-D distance in angstrom (Golo et al., ACS Omega 2025, tested 0.70-0.90)
 # and, with harmonic M-D bonds, the bond constant in kcal/mol/angstrom^2
-# (too weak a bond lets the dummies collapse onto the donor oxygens; such
-# candidates fail and the search moves away from them)
+# (OpenMM convention). Below ~1000 the dummies collapse onto the donor
+# oxygens (points too weak for their dummy charge are never proposed); above
+# ~3000 the targets hardly change. With element-mass dummies the M-D
+# vibration (10-15 fs) needs a 1 fs time step at any of these constants.
 DEFAULT_DISTANCE_BOUNDS = (0.70, 1.00)
-DEFAULT_BOND_BOUNDS = (1000.0, 8000.0)
+DEFAULT_BOND_BOUNDS = (1000.0, 3000.0)
 
 
 class AutoCDAM:
@@ -169,7 +171,7 @@ class AutoCDAM:
         # the M-D bonds only (bond_force_constant, 1 fs MD/FEP time step)
         self.metal_dummy_bond = 'constraint'
         # metal-dummy bond force constant in kcal/mol/angstrom^2, only used
-        # with metal_dummy_bond = 'harmonic': None fits it in 1000-8000, a
+        # with metal_dummy_bond = 'harmonic': None fits it in 1000-3000, a
         # number fixes it, a (lower, upper) pair fits it within these bounds
         self.bond_force_constant = None
         self._fit_result = None
@@ -491,6 +493,9 @@ class AutoCDAM:
                 ('constant fitted' if self._bond_bounds() is not None else
                  f'{candidate.bond_force_constant:g} kcal/mol/A^2') +
                 ', no constraint; MD and FEP time step 1 fs unless set')
+            self.ostream.print_info(
+                'Note: the metal-dummy vibration (10-15 fs) needs 1 fs; for '
+                "2 fs MD and FEP fit with metal_dummy_bond = 'constraint'")
             self.ostream.flush()
         self.candidate = candidate
         self.calculator_options = self._calculator_options()
@@ -1159,6 +1164,10 @@ class AutoCDAM:
             ('Ion', f'{candidate.metal}{candidate.formal_charge}+ CDAM, '
              f'{candidate.geometry}, {candidate.water_model} water, '
              f'{candidate.potential_form}'),
+            ('Metal-Dummy Bonds',
+             'harmonic, no constraint (1 fs)'
+             if candidate.metal_dummy_bond == 'harmonic' else
+             'constrained distance'),
             ('Search', f'{self.search_method}, {len(samples)} candidates'
              f' ({failed} failed)'),
             ('MD Protocol', protocol),
@@ -1181,6 +1190,8 @@ class AutoCDAM:
             lines.append(f'{name:<22s}{value:>12.5g}   {span:<18s}'
                          f"{PARAMETER_UNITS.get(name, ''):<20s}")
         fixed = ['dummy_charge', 'metal_dummy_distance']
+        if candidate.metal_dummy_bond == 'harmonic':
+            fixed.append('bond_force_constant')
         if candidate.potential_form == 'lj12_6_4':
             fixed.append('c4_metal_water')
         for name in fixed:
@@ -1394,6 +1405,8 @@ class AutoCDAM:
         if self.search is not None:
             options["search"] = self.search
         driver = FittingDriver if self.search is None else BayesianFittingDriver
+        if self._bonded_frameworks():
+            options["feasible"] = self._candidate_check
         return driver(self.parameter_specs,
                       self.search_targets,
                       self.calculator,
@@ -1403,6 +1416,34 @@ class AutoCDAM:
                       comm=self.comm,
                       ostream=self.ostream,
                       **options)
+
+    def _bonded_frameworks(self) -> list:
+        """The framework systems whose metal-dummy bonds are harmonic."""
+        if self.system_router is None:
+            return []
+        return [
+            system for system in self.system_router.systems.values()
+            if system is not None and system.metal_dummy_bond == 'harmonic'
+        ]
+
+    def _candidate_check(self, parameters) -> str | None:
+        """
+        Checks that a parameter point can be calculated: its harmonic
+        metal-dummy bonds hold the dummies against every framework's donors.
+
+        :param parameters:
+            The parameter set.
+
+        :return:
+            The reason it cannot, or None.
+        """
+
+        candidate = self.candidate.with_parameters(parameters)
+        for system in self._bonded_frameworks():
+            reason = system.bond_check(candidate)
+            if reason:
+                return f"[{system.name}] {reason}"
+        return None
 
     def _fit_geometries(self, study_metadata, resume) -> FitResult:
         """One full search per dummy geometry; keep the best (feasible first, then objective).

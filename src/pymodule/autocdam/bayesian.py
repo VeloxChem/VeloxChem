@@ -160,6 +160,11 @@ def resolve_search_settings(search, specs, targets) -> dict[str, Any]:
     return settings
 
 
+# the design draws up to this many times initial_samples points to find
+# initial_samples that pass the feasible check
+DESIGN_DRAWS = 64
+
+
 def _quasi_random(d: int, n: int, seed: int):
     """Return ``n`` scrambled Sobol points in the ``d``-dimensional unit cube, shape (n, d)."""
     from scipy.stats import qmc
@@ -418,13 +423,44 @@ class BayesianFittingDriver(SearchDriver):
             [self._to_unit(sample.parameters) for sample in self.table.samples])
 
     def _design(self) -> np.ndarray:
-        """Initial space-filling design in the unit cube (Sobol or Latin hypercube), seeded."""
+        """
+        Initial space-filling design in the unit cube (Sobol or Latin
+        hypercube), seeded. With a ``feasible`` check, more points are drawn
+        until ``initial_samples`` of them pass, so every design point is
+        calculated.
+        """
+
         n = int(self.search["initial_samples"])
-        if self.search["initial_design"] == "lhs":
-            from scipy.stats import qmc
-            return qmc.LatinHypercube(d=len(self.free),
-                                      seed=self.seed).random(n)
-        return _quasi_random(len(self.free), n, self.seed)
+
+        def draw(m):
+            if self.search["initial_design"] == "lhs":
+                from scipy.stats import qmc
+                return qmc.LatinHypercube(d=len(self.free),
+                                          seed=self.seed).random(m)
+            return _quasi_random(len(self.free), m, self.seed)
+
+        if self.feasible is None:
+            return draw(n)
+        drawn = n
+        while True:
+            units = self._feasible_units(draw(drawn))
+            if len(units) >= n or drawn >= DESIGN_DRAWS * n:
+                break
+            drawn *= 2
+        assert_msg_critical(
+            len(units) > 0,
+            f"no point of {drawn} in the parameter bounds passes the check: "
+            f"{self.feasible(self._from_unit(draw(1)[0]))}")
+        self._info(f"Initial design: {min(n, len(units))} of {drawn} "
+                   "space-filling points pass the candidate check")
+        return units[:n]
+
+    def _feasible_units(self, units: np.ndarray) -> np.ndarray:
+        """The unit-cube points whose parameters pass ``feasible``."""
+        if self.feasible is None or len(units) == 0:
+            return units
+        keep = [self.feasible(self._from_unit(u)) is None for u in units]
+        return units[np.array(keep, dtype=bool)]
 
     # ----------------------------------------------------------- acquisition
 
@@ -555,6 +591,9 @@ class BayesianFittingDriver(SearchDriver):
                 best.parameters) + LOCAL_POOL_SPREAD * rng.standard_normal(
                     (n_pool // 4, len(self.free)))
             pool = np.vstack([pool, np.clip(local, 0.0, 1.0)])
+        pool = self._feasible_units(pool)
+        if len(pool) == 0:
+            return [], []
         evaluated = self._evaluated_units()
         duplicate = self.search["duplicate_tolerance"]
         cost = self._cost_factor(pool) if self.search["cost_aware"] else None
@@ -603,7 +642,9 @@ class BayesianFittingDriver(SearchDriver):
                 far_enough = all(
                     np.linalg.norm(refined.x - other) >= duplicate
                     for other in [*evaluated, *chosen])
-                if refined.success and -refined.fun > value and far_enough:
+                if (refined.success and -refined.fun > value and far_enough and
+                        len(self._feasible_units(
+                            np.clip(refined.x, 0.0, 1.0)[None])) == 1):
                     point, value = np.clip(refined.x, 0.0,
                                            1.0), float(-refined.fun)
             chosen.append(point)

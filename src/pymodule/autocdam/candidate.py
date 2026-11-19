@@ -245,7 +245,11 @@ def candidate_forcefield_xml(c):
                  f'water_model="{c.water_model or "unspecified"}" '
                  f'c4_metal_water="{site["c4"]:.12g}" '
                  'c4_unit="kJ mol^-1 nm^4" partner_role="water_oxygen" '
-                 'lj_mixing_rule="lorentz_berthelot"/>')
+                 'lj_mixing_rule="lorentz_berthelot" '
+                 f'metal_dummy_bond="{c.metal_dummy_bond}"/>')
+    if c.metal_dummy_bond == "constraint":
+        lines.append("  <!-- The metal-dummy distances are constrained in AutoCDAM; "
+                     "XML cannot hold constraints: add them in the MD setup. -->")
     if c.potential_form == "lj12_6_4":
         lines.append(
             "  <!-- Add -C4_metal_water/r^4 for central_metal-water_oxygen pairs. -->"
