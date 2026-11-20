@@ -794,6 +794,18 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                         'num_virtual': orbital_details['num_virtual']
                     }
 
+                    # NOTE: the C-PCM settings of this response, which
+                    # TddftOrbitalResponse takes from these results
+                    # (rsp_results_solvation_sanity_check);
+                    # cpcm_optical_epsilon and non_equilibrium_solv are not
+                    # in the SCF results.
+                    if self._cpcm:
+                        ret_dict['solvation_model'] = self.solvation_model
+                        ret_dict['cpcm_optical_epsilon'] = (
+                            self.cpcm_optical_epsilon)
+                        ret_dict['non_equilibrium_solv'] = (
+                            self.non_equilibrium_solv)
+
                     if (self.save_solutions and
                             final_h5_fname is not None):
                         full_solutions_keys = [
