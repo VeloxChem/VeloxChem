@@ -567,9 +567,10 @@ class TddftOrbitalResponse(CphfSolver):
 
         profiler.start_timer('Prep')
 
-        # ERI information. The RI-JK B vectors are the ones compute formed:
-        # callers run compute first, with the same molecule and basis.
-        eri_dict = self._init_eri(molecule, basis, reuse_ri_jk=True)
+        # ERI information. The RI-JK B vectors or the RI-J driver, or the
+        # fallback of either, are the ones compute set up: callers run compute
+        # first, with the same molecule and basis.
+        eri_dict = self._init_eri(molecule, basis, reuse_ri=True)
 
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors, silent=True)

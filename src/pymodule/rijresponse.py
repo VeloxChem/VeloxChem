@@ -52,12 +52,13 @@ from .veloxchemlib import rimode
 from .molecularbasis import MolecularBasis
 from .sanitychecks import get_ri_auxiliary_basis
 from .profiler import Profiler
+from .errorhandler import assert_msg_critical
 from .riresponse import get_ri_memory_budget
 from .riresponse import mark_ri_setup
 from .riresponse import get_ri_chunks
 
 
-def initialize_ri_j(solver, molecule, basis):
+def initialize_ri_j(solver, molecule, basis, reuse=False):
     """
     Prepares the simd Coulomb only driver the solver builds with, or falls back
     to the four-center integrals where it does not fit. Every rank must call
@@ -70,7 +71,20 @@ def initialize_ri_j(solver, molecule, basis):
         The molecule.
     :param basis:
         The AO basis set.
+    :param reuse:
+        True where the solver set up the driver, or fell back, earlier in the
+        same calculation with the same molecule and basis, and uses that
+        again: nothing is set up or checked, and an error is raised if there
+        is nothing to use. Callers pass it for an orbital response's omega
+        after its compute.
     """
+
+    if reuse:
+        assert_msg_critical(
+            solver._ri_j_fallback or solver._ri_drv is not None,
+            f'{type(solver).__name__}: no RI-J driver was set up earlier ' +
+            'in this calculation')
+        return
 
     solver._ri_j_fallback = False
     solver._ri_j_memory = None

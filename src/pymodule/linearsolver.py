@@ -634,7 +634,7 @@ class LinearSolver:
         return (checkpoint_rsp_input == current_rsp_input and
                 checkpoint_method_input == current_method_input)
 
-    def _init_eri(self, molecule, basis, reuse_ri_jk=False):
+    def _init_eri(self, molecule, basis, reuse_ri=False):
         """
         Initializes ERI.
 
@@ -642,9 +642,11 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param reuse_ri_jk:
-            True where the RI-JK B vectors were formed earlier in the same
-            calculation and are used again (see rijkresponse.initialize_ri_jk).
+        :param reuse_ri:
+            True where the RI-JK B vectors or the RI-J driver, or the fallback
+            of either, were set up earlier in the same calculation and are used
+            again (see rijkresponse.initialize_ri_jk and
+            rijresponse.initialize_ri_j).
 
         :return:
             The dictionary of ERI information.
@@ -667,14 +669,14 @@ class LinearSolver:
         self._print_ri_fallback_info(asks_ri_coulomb, asks_ri_jk)
 
         if asks_ri_coulomb and not self._ri_fallback:
-            initialize_ri_j(self, molecule, basis)
+            initialize_ri_j(self, molecule, basis, reuse_ri)
 
         # NOTE: not gated on _uses_ri_jk(), which reads this response's own
         # fallback: that is decided again by rijkresponse.initialize_ri_jk at
         # the start of each calculation, and one left from an earlier
         # calculation would otherwise keep it from being decided again.
         if asks_ri_jk and not self._ri_fallback:
-            self._init_simd_ri_jk(molecule, basis, reuse_ri_jk)
+            self._init_simd_ri_jk(molecule, basis, reuse_ri)
 
         return {
             'screening': screening,
