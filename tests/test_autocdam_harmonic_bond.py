@@ -91,6 +91,7 @@ class TestHarmonicMetalDummyBond:
         from veloxchem.autocdam import FrameworkSystem
         assert AutoCDAM().metal_dummy_bond == "harmonic"
         assert CDAMCandidate("Al", 3).metal_dummy_bond == "harmonic"
+        assert CDAMCandidate("Al", 3).bond_force_constant == 2000.0
         assert FrameworkSystem.metal_dummy_bond == "harmonic"
 
     def test_framework_object_must_match_the_driver(self):

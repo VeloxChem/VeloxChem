@@ -353,7 +353,7 @@ class CDAMCandidate:
             water_model="tip3p",
             metal_mass=None,
             dummy_mass=3.0,
-            bond_force_constant=800.0,  # TODO: check against VeloxChem defaults
+            bond_force_constant=2000.0,  # OpenMM E = k/2 dr^2, in the fitted 1000-3000
             angle_force_constant=250.0,  # TODO: check against VeloxChem defaults
             metal_dummy_bond="harmonic",
     ):
