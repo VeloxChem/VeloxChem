@@ -149,12 +149,15 @@ _FOUR_CENTER_ERI_MATRICES_PER_THREAD = 3
 # of threads; with more threads than this, a density is charged one matrix for
 # each thread, as get_batch_size does. Measured on the master rank, the peak of
 # an RPA initial guess (21 Fock builds, def2-SVPD) at batch sizes 1 to 16 grew
-# by 6 to 7 such matrices for each density at 1, 4 and 8 threads (a 43-atom
-# molecule with 689 basis functions on 8 ranks, a 76-atom one with 1196 on 16
-# ranks, and with 8 threads a 248-atom one with 3860 on 64 ranks) and at 16
-# threads for the 3860 basis functions; at 16 threads the 689 and 1196 basis
-# functions took 10 to 13 for each density over 16 densities.
-_FOUR_CENTER_DENSITY_MATRICES_FLOOR = 7
+# by 5.9 to 7.7 such matrices for each density at 1, 4 and 8 threads (HF and
+# B3LYP; a 43-atom molecule with 689 basis functions on 8 ranks, a 76-atom one
+# with 1196 on 16 ranks, and with 8 threads a 248-atom one with 3860 on 64
+# ranks) and by 7.0 at 16 threads for the 3860 basis functions; at 16 threads
+# the 689 and 1196 basis functions took 10 to 13 for each density over 16
+# densities. With BLYP at 4 threads, a 152-atom molecule with 2392 basis
+# functions on 32 ranks took 7.5 between batch sizes 1 and 4. The floor is
+# above each of these at fewer than 8 threads.
+_FOUR_CENTER_DENSITY_MATRICES_FLOOR = 8
 
 
 def get_four_center_batch_size(input_batch_size,
