@@ -32,6 +32,7 @@
 
 from mpi4py import MPI
 from datetime import datetime, timedelta
+from pathlib import Path
 import traceback
 import sys
 import os
@@ -271,6 +272,33 @@ def updated_dict_with_eri_settings(settings_dict, scf_drv):
     return new_dict
 
 
+def check_checkpoint_files(input_dict):
+    """
+    Checks that no checkpoint file set in the input is the final h5 file of
+    the run. Every rank must call this.
+
+    :param input_dict:
+        The input dictionary, with the input file's path without its suffix
+        under 'filename'.
+    """
+
+    # NOTE: every driver writes its results to the final h5 file of the run,
+    # f'{filename}.h5'. A checkpoint file of that name would be overwritten by
+    # the results, and a restart from it would then fail. Checkpoint files
+    # sharing a name with each other, or with the names a driver derives from
+    # its checkpoint file, are not checked here.
+    final_h5 = Path(f"{input_dict['filename']}.h5").resolve()
+
+    for group, settings in input_dict.items():
+        if isinstance(settings, dict) and 'checkpoint_file' in settings:
+            checkpoint_file = settings['checkpoint_file']
+            assert_msg_critical(
+                Path(checkpoint_file).resolve() != final_h5,
+                f'@{group}: checkpoint_file {checkpoint_file} collides with ' +
+                'the final h5 file of this run, where the results are ' +
+                'written; set another name, or leave it unset for the default')
+
+
 def main():
     """
     Runs VeloxChem with command line arguments.
@@ -304,6 +332,8 @@ def _main_body():
 
     task = MpiTask([args.input_file, args.output_file], MPI.COMM_WORLD)
     task_type = task.input_dict['jobs']['task'].lower()
+
+    check_checkpoint_files(task.input_dict)
 
     # Timelimit
 
