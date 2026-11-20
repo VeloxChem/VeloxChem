@@ -374,12 +374,11 @@ class CphfSolver(LinearSolver):
         """
 
         release_ri_jk(self)
-
         release_ri_j(self)
-        self._ri_j_fallback = False
 
-        # NOTE: the B vectors are freed in blocks the allocator may keep
-        # resident; they are returned here.
+        # NOTE: the RI-JK B vectors are freed in blocks the allocator may keep
+        # resident, and release_ri_jk does not return them; they are returned
+        # here (release_ri_j returns the RI-J integrals itself).
         release_free_memory()
 
     def compute_subspace_solver(self, molecule, basis, scf_results, *args):

@@ -94,6 +94,41 @@ class TestCphfReleaseRi:
             with pytest.raises(VeloxChemError, match='no RI-J'):
                 orbrsp.compute_omega(molecule, basis, scf_drv.scf_results)
 
+    @pytest.mark.parametrize('xcfun, fallback', [
+        ('blyp', '_ri_j_fallback'),
+        ('b3lyp', '_ri_jk_fallback'),
+    ])
+    def test_release_ri_after_fallback(self, xcfun, fallback):
+
+        molecule, basis = get_water()
+        scf_drv = run_scf(ScfRestrictedDriver, molecule, basis, xcfun)
+        _, rsp_results = run_tda(molecule, basis, scf_drv)
+
+        orbrsp = TddftOrbitalResponse()
+        orbrsp.update_settings({
+            'tamm_dancoff': 'yes',
+            'state_deriv_index': '1'
+        })
+        orbrsp.ostream.mute()
+
+        # NOTE: a budget of 1 kB, which the RI set does not fit in.
+        orbrsp.ri_memory_budget = 1.0e-6
+        orbrsp.compute(molecule, basis, scf_drv.scf_results, rsp_results)
+        orbrsp.compute_omega(molecule, basis, scf_drv.scf_results)
+
+        assert getattr(orbrsp, fallback)
+        assert not holds_ri(orbrsp)
+
+        orbrsp.release_ri()
+
+        assert not orbrsp._ri_j_fallback
+        assert not orbrsp._ri_jk_fallback
+
+        if MPI.COMM_WORLD.Get_size() == 1:
+            # NOTE: pytest.raises is only valid in serial
+            with pytest.raises(VeloxChemError, match='no RI-J'):
+                orbrsp.compute_omega(molecule, basis, scf_drv.scf_results)
+
     @pytest.mark.parametrize('driver', [
         'hessian', 'hessian_unrestricted', 'tddft_gradient'
     ])

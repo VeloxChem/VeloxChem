@@ -318,21 +318,23 @@ def release_ri_jk(solver):
 
 def release_ri_j(solver):
     """Lets go of the simd RI-J driver the solver set up for itself
-    (rijresponse.initialize_ri_j) and of the memory it was checked with.
+    (rijresponse.initialize_ri_j), of the memory it was checked with and of
+    its fallback.
 
     :param solver:
         The solver.
     """
 
-    if getattr(solver, '_ri_drv', None) is None:
-        return
+    held = solver._ri_drv is not None
 
     solver._ri_drv = None
     solver._ri_j_memory = None
+    solver._ri_j_fallback = False
 
     # NOTE: the three-center integrals are freed in blocks the allocator may
-    # keep resident; they are returned here.
-    release_free_memory()
+    # keep resident; they are returned here, where the solver held them.
+    if held:
+        release_free_memory()
 
 
 def check_ri_jk_not_lent(solver):
