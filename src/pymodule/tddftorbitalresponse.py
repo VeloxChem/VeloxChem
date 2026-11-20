@@ -148,6 +148,12 @@ class TddftOrbitalResponse(CphfSolver):
             The AO basis set.
         :param scf_tensors:
             The dictionary of tensors from the converged SCF calculation.
+        :param eri_dict:
+            The dictionary containing ERI information.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
         :param rsp_results:
             The results from a converged linear response calculation.
 
@@ -186,17 +192,14 @@ class TddftOrbitalResponse(CphfSolver):
         self.tamm_dancoff = self.comm.bcast(self.tamm_dancoff,
                                             root=mpi_master())
 
-        # TODO: in the original implementation eri_dict, dft_dict, pe_dict
-        # are passed as arguments, but I am not sure why. Better to initialize
-        # here instead and remove from function arguments.
-        # ERI information
-        eri_dict = self._init_eri(molecule, basis)
-
-        # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
-
-        # PE information
-        pe_dict = self._init_pe(molecule, basis, silent=True)
+        # NOTE: eri_dict, dft_dict and pe_dict are the ones
+        # CphfSolver.compute_subspace_solver set up just before, which the
+        # solve uses as well; the RI-JK B vectors or the RI-J driver, or the
+        # fallback of either, were set up there. C-PCM and GOSTSHYP are set up
+        # here, after the checks above that switch them on (_cpcm, _gostshyp)
+        # and take the solvation settings of the response results;
+        # compute_subspace_solver calls _init_cpcm and _init_gostshyp before
+        # compute_rhs without running these checks.
 
         # CPCM information
         self._init_cpcm(molecule, basis)
