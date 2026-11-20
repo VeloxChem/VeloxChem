@@ -47,6 +47,7 @@ from .reactionsystembuilder import ReactionSystemBuilder
 from .evbfepdriver import EvbFepDriver
 from .reaffbuilder import ReactionForceFieldBuilder
 from .evbdataprocessing import EvbDataProcessing
+from .evbtrajectoryanalysis import EvbTrajectoryAnalysis
 from .solvationbuilder import SolvationBuilder
 from .waterparameters import get_water_parameters
 from .errorhandler import assert_msg_critical
@@ -975,6 +976,252 @@ class EvbDriver:
                 decompose_bonded=decompose_bonded,
             )
 
+    def compute_trajectory_analysis(self,
+                                    terms=None,
+                                    residues=None,
+                                    hamiltonians=("E1", "E2", "E_int"),
+                                    frame_stride=1,
+                                    trajectory_format=None,
+                                    platform=None,
+                                    platform_properties=None,
+                                    progress_interval=1000):
+        """
+        Recompute, from the trajectory already sampled, the energies of chosen
+        force-field terms and residues in every frame, for every
+        configuration in self.system_confs. A post-processing step: nothing
+        is re-sampled. See EvbTrajectoryAnalysis for the definitions.
+
+        The configurations must hold their systems and topology, e.g. via
+        load_initialisation(folder, load_systems=True, load_top=True).
+        Writes TrajectoryAnalysis.csv (one row per analysed frame, with its
+        Energies.csv row as 'frame') and TrajectoryAnalysis.json (selections,
+        matched force-field terms, conventions) into each configuration's
+        data folder. Loading the results afterwards (compute_energy_profiles,
+        or _load_output_from_folders) puts them in
+        configuration_results[name]['trajectory_analysis'];
+        EvbTrajectoryAnalysis.lambda_averages averages them per lambda.
+
+        :param terms:
+            Tracked terms: a list of atom selections, or a dict label -> atom
+            selection, of 2 (pair), 3 (angle) or 4 (torsion) atoms. An atom is
+            a particle index, a 'chain:resid:name' string or a (chain, resid,
+            name) tuple.
+        :param residues:
+            Tracked residues: 'chain:resid' strings or (chain, resid) tuples;
+            also 'fragment' (the reacting atoms) or an atom group {'label':
+            name, 'atoms': [atom selections]}. Groups may overlap.
+        :param hamiltonians:
+            Which of 'E1' (reactant PES), 'E2' (product PES) and 'E_int' (the
+            integration system of each frame's own lambda) to evaluate.
+        :param frame_stride:
+            Analyse every frame_stride-th frame.
+        :param trajectory_format:
+            'dcd' or 'xtc'. None: the configuration's trajectory_format, else
+            the one trajectory file present.
+        :param platform:
+            OpenMM platform name, or None for OpenMM's choice.
+        :param platform_properties:
+            OpenMM platform properties.
+        :param progress_interval:
+            Print progress every this many frames.
+        """
+
+        if self.rank != mpi_master():
+            return
+
+        assert_msg_critical(
+            len(self.states) <= 2,
+            "compute_trajectory_analysis is not available for a multi-step "
+            "reaction path yet")
+        assert_msg_critical(
+            isinstance(frame_stride, (int, np.integer)) and frame_stride >= 1,
+            f"frame_stride must be a positive integer, got {frame_stride!r}")
+
+        for conf in self.system_confs:
+            self.ostream.print_blank()
+            self.ostream.print_header(
+                f"Trajectory analysis for {conf['name']}")
+            self.ostream.flush()
+            self._trajectory_analysis(conf, terms, residues, hamiltonians,
+                                      int(frame_stride), trajectory_format,
+                                      platform, platform_properties,
+                                      progress_interval)
+
+    def _trajectory_analysis(self, conf, terms, residues, hamiltonians,
+                             frame_stride, trajectory_format, platform,
+                             platform_properties, progress_interval):
+        """One configuration of compute_trajectory_analysis."""
+
+        systems = conf.get("systems")
+        topology = conf.get("topology")
+        assert_msg_critical(
+            systems is not None and topology is not None,
+            "compute_trajectory_analysis needs the configuration's systems "
+            "and topology, e.g. load_initialisation(folder, "
+            "load_systems=True, load_top=True)")
+        assert_msg_critical(
+            len(conf.get("steps") or []) <= 1,
+            "compute_trajectory_analysis is not available for a multi-step "
+            "reaction path yet")
+        for name in ("reactant", "product"):
+            assert_msg_critical(name in systems,
+                                f"No {name} system in configuration "
+                                f"{conf['name']}")
+
+        cwd = Path.cwd()
+        data_folder = cwd / conf["data_folder"]
+        run_folder = cwd / conf.get("run_folder",
+                                    str(Path(conf["data_folder"]) / "run"))
+
+        fg_path = run_folder / "force_group_name.json"
+        if fg_path.is_file():
+            with fg_path.open("r", encoding="utf-8") as f:
+                force_group_map = json.load(f)
+        else:
+            self.ostream.print_warning(
+                f"No force_group_name.json in {run_folder}; using the current "
+                "EvbForceGroup definition")
+            force_group_map = None
+
+        if trajectory_format is None:
+            trajectory_format = conf.get("trajectory_format")
+        if trajectory_format is None:
+            present = [
+                fmt for fmt in ("dcd", "xtc")
+                if (data_folder / f"trajectory.{fmt}").is_file()
+            ]
+            assert_msg_critical(
+                len(present) == 1,
+                f"Found {len(present)} trajectory files (trajectory.dcd / "
+                f"trajectory.xtc) in {data_folder}; name the one to use with "
+                "trajectory_format")
+            trajectory_format = present[0]
+        traj_file = data_folder / f"trajectory.{trajectory_format}"
+        assert_msg_critical(traj_file.is_file(), f"No {traj_file}")
+
+        energies_file = data_folder / "Energies.csv"
+        E_data = np.loadtxt(energies_file, skiprows=1, delimiter=",",
+                            ndmin=2).T
+        columns = self._parse_energies_header(energies_file, E_data.shape[0])
+        n_rows = E_data.shape[1]
+        Lambda_frame = E_data[columns["Lambda"]]
+        replica = (E_data[columns["replica"]].astype(int)
+                   if "replica" in columns else np.zeros(n_rows, dtype=int))
+        direction = (E_data[columns["direction"]].astype(int)
+                     if "direction" in columns else np.zeros(n_rows, dtype=int))
+
+        analysis = EvbTrajectoryAnalysis(topology,
+                                         systems["reactant"],
+                                         force_group_map,
+                                         terms=terms,
+                                         residues=residues,
+                                         hamiltonians=hamiltonians,
+                                         platform=platform,
+                                         platform_properties=platform_properties,
+                                         comm=self.comm,
+                                         ostream=self.ostream)
+
+        with EvbFepDriver._open_trajectory(traj_file,
+                                           analysis.periodic) as (n_frames,
+                                                                  read):
+            assert_msg_critical(
+                n_frames == n_rows,
+                f"{traj_file} has {n_frames} frames but {energies_file} has "
+                f"{n_rows} rows; they must be row-aligned")
+
+            frames = np.arange(0, n_rows, frame_stride)
+            lam_frames = np.round(Lambda_frame[frames], 3)
+            out = np.full((len(frames), len(analysis.columns)), np.nan)
+            out_row = {int(f): k for k, f in enumerate(frames)}
+
+            fixed = {}
+            for ham, name in (("E1", "reactant"), ("E2", "product")):
+                if ham in hamiltonians:
+                    fixed[ham] = analysis.evaluator(systems[name], ham)
+            matched = {ham: ev.matched for ham, ev in fixed.items()}
+            if "E_int" in hamiltonians:
+                matched["E_int"] = {}
+
+            self.ostream.print_info(
+                f"Analysing {len(frames)} of {n_rows} frames from "
+                f"{traj_file} ({len(analysis.columns)} columns)")
+            self.ostream.flush()
+
+            done = 0
+            for lam in np.unique(lam_frames):
+                evaluators = list(fixed.values())
+                lam_ev = None
+                if "E_int" in hamiltonians:
+                    keys = [
+                        k for k in systems
+                        if isinstance(k, (float, np.floating))
+                        and round(float(k), 3) == lam
+                    ]
+                    assert_msg_critical(
+                        len(keys) == 1,
+                        f"No integration system for lambda {lam} in "
+                        f"configuration {conf['name']}")
+                    lam_ev = analysis.evaluator(systems[keys[0]], "E_int")
+                    matched["E_int"][f"{lam:.3f}"] = lam_ev.matched
+                    evaluators.append(lam_ev)
+
+                selected = frames[lam_frames == lam]
+                breaks = np.where(np.diff(selected) != frame_stride)[0] + 1
+                for run in np.split(selected, breaks):
+                    start = int(run[0])
+                    count = int(run[-1]) - start + 1
+                    for k, (pos, box) in enumerate(read(start, count)):
+                        if k % frame_stride:
+                            continue
+                        frame = start + k
+                        geo = analysis.frame_geometry(pos, box)
+                        values = dict(geo["values"])
+                        for ev in evaluators:
+                            ev.evaluate(geo, pos, box, values)
+                        out[out_row[frame]] = [
+                            values[c] for c in analysis.columns
+                        ]
+                        done += 1
+                        if done % progress_interval == 0:
+                            self.ostream.print_info(
+                                f"Trajectory analysis: {done}/{len(frames)} "
+                                "frames")
+                            self.ostream.flush()
+                if lam_ev is not None:
+                    lam_ev.close()
+            for ev in fixed.values():
+                ev.close()
+
+        csv_path = data_folder / "TrajectoryAnalysis.csv"
+        header = ", ".join(["frame", "Lambda", "replica", "direction"] +
+                           analysis.columns)
+        table = np.column_stack([
+            frames, Lambda_frame[frames], replica[frames], direction[frames],
+            out
+        ])
+        np.savetxt(csv_path,
+                   table,
+                   delimiter=", ",
+                   header=header,
+                   comments="",
+                   fmt=["%d", "%.6f", "%d", "%d"] +
+                   ["%.10e"] * len(analysis.columns))
+
+        metadata = analysis.metadata()
+        metadata.update({
+            "configuration": conf["name"],
+            "trajectory": str(traj_file),
+            "n_frames": int(n_rows),
+            "frame_stride": int(frame_stride),
+            "columns": analysis.columns,
+            "matched_terms": matched,
+        })
+        with (data_folder / "TrajectoryAnalysis.json").open("w") as f:
+            json.dump(metadata, f, indent=2)
+
+        self.ostream.print_info(f"Wrote {csv_path} and TrajectoryAnalysis.json")
+        self.ostream.flush()
+
     def update_options_json(self, entries, conf):
         """
         Merges a dictionary into a configuration's options.json file.
@@ -1194,6 +1441,7 @@ class EvbDriver:
                     state_left=step_conf.get("state_left"),
                     state_right=step_conf.get("state_right"),
                     integration_file=str(folder / "IntegrationEnergies.csv"),
+                    analysis_file=str(folder / "TrajectoryAnalysis.csv"),
                 )
                 step_results.append(specific)
                 common_results.append(common)
@@ -1239,6 +1487,7 @@ class EvbDriver:
         state_left=None,
         state_right=None,
         integration_file=None,
+        analysis_file=None,
     ):
         """Read one step's sampled output.
 
@@ -1423,6 +1672,25 @@ class EvbDriver:
                     "names": decomp_names,
                 }
             })
+
+        # compute_trajectory_analysis output, on the same kept frames (NaN for
+        # a kept frame it did not analyse)
+        if analysis_file is not None and Path(analysis_file).is_file():
+            analysis = EvbTrajectoryAnalysis.read_csv(analysis_file,
+                                                      sub_indices,
+                                                      E_data.shape[1])
+            n_kept = len(sub_indices)
+            analysis.update({
+                "Lambda_frame":
+                Lambda_frame,
+                "Replica_frame": (replica_frame.astype(int)
+                                  if replica_frame is not None else np.zeros(
+                                      n_kept, dtype=int)),
+                "Direction_frame": (direction_frame.astype(int)
+                                    if direction_frame is not None else
+                                    np.zeros(n_kept, dtype=int)),
+            })
+            specific_result["trajectory_analysis"] = analysis
 
         lambda_indices = [
             np.where(np.round(Lambda, 3) == L)[0][0] for L in Lambda_frame

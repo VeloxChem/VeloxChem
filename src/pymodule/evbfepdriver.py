@@ -1821,12 +1821,16 @@ class EvbFepDriver:
             active_atoms = sorted(active)
 
             # Sanity check against the fragment-local forming/breaking bonds: the
-            # number of distinct reacting atoms should agree
-            local_active = {
-                a
-                for bond in self.forming_bonds + self.breaking_bonds
-                for a in bond
-            }
+            # number of distinct reacting atoms should agree. They are per-step
+            # collections of pairs (lists of lists after options.json), or
+            # flat pairs.
+            local_active = set()
+            for entry in self.forming_bonds + self.breaking_bonds:
+                for item in entry:
+                    if isinstance(item, (int, np.integer)):
+                        local_active.add(int(item))
+                    else:
+                        local_active.update(int(a) for a in item)
             if len(active_atoms) != len(local_active):
                 self.ostream.print_warning(
                     f"Bonded decomposition: recovered {len(active_atoms)} reacting "
