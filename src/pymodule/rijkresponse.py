@@ -84,6 +84,8 @@ from .sanitychecks import get_ri_auxiliary_basis
 from .errorhandler import assert_msg_critical
 from .profiler import Profiler
 from .riresponse import get_ri_memory_budget
+from .riresponse import get_ri_reserve_floor_text
+from .riresponse import print_ri_reserve_floor
 from .riresponse import mark_ri_setup
 from .riresponse import get_ri_chunks
 from .riresponse import release_ri_jk
@@ -215,7 +217,7 @@ def initialize_ri_jk(solver, molecule, basis, reuse=False):
     # the same decision against the largest of their peaks.
     # NOTE: a nonlinear driver sets the floor of its rank reserve before this;
     # the linear solvers have none.
-    reserve_floor = getattr(solver, '_ri_jk_reserve_floor', 0)
+    reserve_floor = getattr(solver, '_ri_reserve_floor', 0)
 
     # NOTE: the free memory and the reserve of the rank whose budget is the
     # smallest go with it into the fallback warning.
@@ -279,15 +281,9 @@ def initialize_ri_jk(solver, molecule, basis, reuse=False):
 
         # NOTE: where the floor of a nonlinear driver set the reserve of the
         # rank with the smallest budget, the warning gives that rank's free
-        # memory and the floor. The budget is their difference, or zero where
-        # the floor exceeds the free memory.
-        floor_text = ''
-        if (reserve_floor > 0 and budget_free is not None and
-                budget_reserve == reserve_floor):
-            floor_text = (
-                f' ({Profiler.memory_to_string(budget_free)} free less ' +
-                f'{Profiler.memory_to_string(reserve_floor)} for the ' +
-                'smallest batch of the nonlinear Fock build)')
+        # memory and the floor.
+        floor_text = get_ri_reserve_floor_text(reserve_floor, budget_free,
+                                               budget_reserve)
 
         solver.ostream.print_warning(
             'RI-JK would need roughly ' +
@@ -379,31 +375,9 @@ def initialize_ri_jk(solver, molecule, basis, reuse=False):
         f'{Profiler.memory_to_string(max(peaks))} of ' +
         f'{Profiler.memory_to_string(budget)} {where} for a build of one ' +
         'density; larger batches are cut to fit.')
-    _print_reserve_floor(solver, reserve_floor)
+    print_ri_reserve_floor(solver, reserve_floor)
     solver.ostream.print_blank()
     solver.ostream.flush()
-
-
-def _print_reserve_floor(solver, reserve_floor):
-    """
-    Prints the memory each rank keeps for the smallest batch of a nonlinear
-    driver's Fock builds, where that and not the share of
-    riresponse.rank_reserve set the reserve.
-
-    :param solver:
-        The solver.
-    :param reserve_floor:
-        The floor of the rank reserve, in bytes.
-    """
-
-    # NOTE: a budget the solver sets (ri_memory_budget) is taken as it is,
-    # with no reserve.
-    if (reserve_floor > 0 and
-            getattr(solver, 'ri_memory_budget', None) is None and
-            reserve_floor >= getattr(solver, '_ri_memory_reserve', 0)):
-        solver.ostream.print_info(
-            f'{Profiler.memory_to_string(reserve_floor)} of each rank is ' +
-            'kept for the smallest batch of the nonlinear Fock build.')
 
 
 def _worst_shapes(molecule, basis):

@@ -169,9 +169,10 @@ class TpaDriverBase(NonlinearSolver):
 
         start_time = time.time()
 
-        # NOTE: before the B vectors are formed, which keep back from what
-        # they may hold the smallest batch of the nonlinear Fock builds.
-        self._set_ri_jk_reserve_floor(molecule, ao_basis, scf_results)
+        # NOTE: before the RI-JK B vectors or the RI-J integrals are set up,
+        # which keep back from what they may hold the smallest batch of the
+        # nonlinear Fock builds.
+        self._set_ri_reserve_floor(molecule, ao_basis, scf_results)
 
         eri_dict = self._init_eri(molecule, ao_basis)
 

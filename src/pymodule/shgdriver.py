@@ -284,9 +284,10 @@ class ShgDriver(NonlinearSolver):
         # formed by each. The integral setup in compute_quad_components
         # uses them again. Not gated on _uses_ri_jk(), for the reason given
         # in _init_eri.
-        # NOTE: before the B vectors are formed, which keep back from what
-        # they may hold the smallest batch of the nonlinear Fock builds.
-        self._set_ri_jk_reserve_floor(molecule, ao_basis, scf_results)
+        # NOTE: before the RI-JK B vectors or the RI-J integrals are set up,
+        # which keep back from what they may hold the smallest batch of the
+        # nonlinear Fock builds.
+        self._set_ri_reserve_floor(molecule, ao_basis, scf_results)
 
         if self.ri_jk and not self._ri_fallback:
             initialize_ri_jk(self, molecule, ao_basis)

@@ -200,11 +200,11 @@ class NonlinearSolver:
         # ri_memory_budget is not handed on to response.
         self.ri_memory_budget = None
 
-        # NOTE: the memory each rank keeps back from the RI-JK B vectors for the
-        # smallest batch of this driver's nonlinear Fock builds, in bytes, set
-        # by _set_ri_jk_reserve_floor before the B vectors are formed and read
-        # by riresponse.get_ri_memory_budget.
-        self._ri_jk_reserve_floor = 0
+        # NOTE: the memory each rank keeps back from the RI-JK B vectors or
+        # the RI-J integrals for the smallest batch of this driver's nonlinear
+        # Fock builds, in bytes, set by _set_ri_reserve_floor before either is
+        # set up and read by riresponse.get_ri_memory_budget.
+        self._ri_reserve_floor = 0
 
         # NOTE: whether this response fell back from RI to the four-center
         # integrals for want of memory of its own, and what the build was
@@ -808,12 +808,12 @@ class NonlinearSolver:
 
         return ()
 
-    def _set_ri_jk_reserve_floor(self, molecule, basis, scf_results):
+    def _set_ri_reserve_floor(self, molecule, basis, scf_results):
         """
-        Sets the memory each rank keeps back from the RI-JK B vectors for the
-        smallest batch of this driver's nonlinear Fock builds, in bytes
-        (_ri_jk_reserve_floor). Every rank must call this, before the B vectors
-        are formed.
+        Sets the memory each rank keeps back from the RI-JK B vectors or the
+        RI-J integrals for the smallest batch of this driver's nonlinear Fock
+        builds, in bytes (_ri_reserve_floor). Every rank must call this,
+        before either is set up.
 
         :param molecule:
             The molecule.
@@ -828,19 +828,25 @@ class NonlinearSolver:
             exchange-correlation integration takes a group at once; without
             one it is one density. The memory is what _comp_two_el_int is
             charged for those densities: the master's matrices of each
-            density (_ri_density_memory) with the right factors of the
-            general shape, max(norb, 2 nocc) columns, and the
-            exchange-correlation and left-factor memory of a call (n_ao by
-            norb). The largest over the driver's modes is kept.
+            density (_ri_density_memory) and the exchange-correlation memory
+            of a call. With RI-JK each density also has right factors of the
+            general shape, max(norb, 2 nocc) columns, and a call the left
+            factors (n_ao by norb); RI-J builds take no factors. The largest
+            over the driver's modes is kept.
         """
 
-        self._ri_jk_reserve_floor = 0
+        self._ri_reserve_floor = 0
 
         modes = self._get_nonlinear_fock_modes()
 
-        # NOTE: the B vectors are formed under the same condition (see
-        # _init_eri).
-        if not (self.ri_jk and not self._ri_fallback and modes):
+        # NOTE: the same conditions as the setups in _init_eri.
+        asks_ri_coulomb = (self.ri_coulomb and self._dft and
+                           self.xcfun is not None and
+                           not self.xcfun.is_hybrid())
+        asks_ri_jk = self.ri_jk and not asks_ri_coulomb
+
+        if not ((asks_ri_coulomb or asks_ri_jk) and not self._ri_fallback and
+                modes):
             return
 
         # NOTE: a grid made for this and let go; the one the builds integrate
@@ -854,8 +860,12 @@ class NonlinearSolver:
             n_ao, n_orb = scf_results['C_alpha'].shape
             nocc = molecule.number_of_alpha_electrons()
 
-            columns = max(n_orb, 2 * nocc)
-            left_memory = 8 * n_ao * n_orb
+            if asks_ri_jk:
+                columns = max(n_orb, 2 * nocc)
+                left_memory = 8 * n_ao * n_orb
+            else:
+                columns = 0
+                left_memory = 0
 
             call_memory = get_response_fock_xc_call_memory(
                 molecule, basis, dft_dict, self.xcfun if self._dft else None,
@@ -880,7 +890,7 @@ class NonlinearSolver:
                     floor,
                     int(n_fock * density_memory) + call_memory + left_memory)
 
-        self._ri_jk_reserve_floor = self.comm.bcast(floor, root=mpi_master())
+        self._ri_reserve_floor = self.comm.bcast(floor, root=mpi_master())
 
     def _get_dft_group_sizes(self, mode):
         """

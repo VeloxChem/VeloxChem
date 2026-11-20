@@ -61,7 +61,7 @@ def get_ri_memory_budget(solver, molecule, basis, reserve_floor=0):
     :param reserve_floor:
         The least the rank's reserve may be, in bytes: what a nonlinear
         driver's smallest Fock batch holds (see
-        NonlinearSolver._set_ri_jk_reserve_floor), and zero for the others.
+        NonlinearSolver._set_ri_reserve_floor), and zero for the others.
 
     :return:
         The memory budget in bytes: ri_memory_budget where the solver sets it
@@ -143,6 +143,57 @@ _RANK_RESERVE_MATRICES = 12
 # NOTE: the rank reserve keeps at least this fraction (its inverse) of what is
 # free to the rank; see rank_reserve.
 _RANK_RESERVE_SHARE_DIVISOR = 4
+
+
+def get_ri_reserve_floor_text(reserve_floor, budget_free, budget_reserve):
+    """
+    The part of a fallback warning that says the floor of a nonlinear driver
+    set the reserve of the rank with the smallest budget.
+
+    :param reserve_floor:
+        The floor of the rank reserve, in bytes.
+    :param budget_free:
+        The memory free to the rank with the smallest budget, in bytes, or
+        None where ri_memory_budget set the budget.
+    :param budget_reserve:
+        The reserve of that rank, in bytes.
+
+    :return:
+        The text, with a leading space, or an empty string where the floor
+        did not set that reserve.
+    """
+
+    # NOTE: the budget is the difference of the free memory and the floor, or
+    # zero where the floor exceeds the free memory.
+    if (reserve_floor > 0 and budget_free is not None and
+            budget_reserve == reserve_floor):
+        return (f' ({Profiler.memory_to_string(budget_free)} free less ' +
+                f'{Profiler.memory_to_string(reserve_floor)} for the ' +
+                'smallest batch of the nonlinear Fock build)')
+
+    return ''
+
+
+def print_ri_reserve_floor(solver, reserve_floor):
+    """
+    Prints the memory each rank keeps for the smallest batch of a nonlinear
+    driver's Fock builds, where that and not the share of rank_reserve set the
+    reserve.
+
+    :param solver:
+        The solver.
+    :param reserve_floor:
+        The floor of the rank reserve, in bytes.
+    """
+
+    # NOTE: a budget the solver sets (ri_memory_budget) is taken as it is,
+    # with no reserve.
+    if (reserve_floor > 0 and
+            getattr(solver, 'ri_memory_budget', None) is None and
+            reserve_floor >= getattr(solver, '_ri_memory_reserve', 0)):
+        solver.ostream.print_info(
+            f'{Profiler.memory_to_string(reserve_floor)} of each rank is ' +
+            'kept for the smallest batch of the nonlinear Fock build.')
 
 
 def mark_ri_setup(solver):

@@ -283,9 +283,10 @@ class TestResponseRiMemory:
             assert abs(fallen[key] - plain[key]) < 1.0e-8
 
     @staticmethod
-    def run_thg(molecule, basis, scf_results, xcfun):
+    def run_thg(molecule, basis, scf_results, xcfun, ri_memory_budget=None):
 
         drv = ThgDriver(MPI.COMM_WORLD, OutputStream(None))
+        drv.ri_memory_budget = ri_memory_budget
         drv.update_settings(
             {
                 'frequencies': [0.05],
@@ -296,33 +297,110 @@ class TestResponseRiMemory:
 
         return drv, results
 
-    def test_nonlinear_reserve_floor(self):
-        """A nonlinear driver keeps back from its B vectors at least the
-        smallest batch of its Fock builds: for a THG with a functional one
-        group of 12 second-order and 6 third-order densities."""
+    @pytest.mark.parametrize('xcfun', ['b3lyp', 'blyp'])
+    def test_nonlinear_reserve_floor(self, xcfun):
+        """A nonlinear driver keeps back from its B vectors (RI-JK) or its
+        integrals (RI-J) at least the smallest batch of its Fock builds: for a
+        THG with a functional one group of 12 second-order and 6 third-order
+        densities."""
 
         molecule, basis = self.get_water()
-        scf_results = self.run_scf(molecule, basis, 'b3lyp')
+        scf_results = self.run_scf(molecule, basis, xcfun)
 
-        drv, _ = self.run_thg(molecule, basis, scf_results, 'b3lyp')
+        drv, _ = self.run_thg(molecule, basis, scf_results, xcfun)
 
-        assert not drv._ri_jk_fallback
-        assert drv._ri_jk_reserve_floor > 0
-        assert drv._ri_memory_reserve >= drv._ri_jk_reserve_floor
+        if xcfun == 'blyp':
+            assert drv._uses_ri_coulomb()
+        else:
+            assert drv._uses_ri_jk()
+
+        assert drv._ri_reserve_floor > 0
+        assert drv._ri_memory_reserve >= drv._ri_reserve_floor
 
         n_ao = basis.get_dimensions_of_basis()
 
         # NOTE: of each of the 18 densities, at least the master's 4 matrices
         # of n_ao by n_ao and its share of the 6 first-order densities.
-        assert drv._ri_jk_reserve_floor >= 18 * (4 + 6 / 18) * 8 * n_ao * n_ao
+        assert drv._ri_reserve_floor >= 18 * (4 + 6 / 18) * 8 * n_ao * n_ao
 
-    def test_nonlinear_driver_falls_back_for_its_floor(self, monkeypatch):
-        """A nonlinear driver whose smallest Fock batch does not fit beside the
-        B vectors falls back to the four-center integrals before any work, and
-        equals a four-center driver on the same orbitals."""
+    def test_ri_j_reserve_floor_takes_no_factors(self):
+        """The RI-J floor is the RI-JK floor less the factors RI-J builds do
+        not take: the right factors of each density and the left factors of a
+        call."""
 
         molecule, basis = self.get_water()
-        scf_results = self.run_scf(molecule, basis, 'b3lyp')
+        scf_results = self.run_scf(molecule, basis, 'blyp')
+
+        drv = ThgDriver(MPI.COMM_WORLD, OutputStream(None))
+        drv.update_settings({'frequencies': [0.05]}, {'xcfun': 'blyp'})
+        drv._dft = True
+        drv.ri_coulomb = True
+        drv.ri_jk = False
+        drv._set_ri_reserve_floor(molecule, basis, scf_results)
+        ri_j_floor = drv._ri_reserve_floor
+
+        drv.ri_coulomb = False
+        drv.ri_jk = True
+        drv._set_ri_reserve_floor(molecule, basis, scf_results)
+        ri_jk_floor = drv._ri_reserve_floor
+
+        n_ao = basis.get_dimensions_of_basis()
+        n_orb = MPI.COMM_WORLD.bcast(
+            scf_results['C_alpha'].shape[1]
+            if MPI.COMM_WORLD.Get_rank() == mpi_master() else None,
+            root=mpi_master())
+        nocc = molecule.number_of_alpha_electrons()
+
+        # NOTE: one group of 18 densities, each with max(norb, 2 nocc) columns
+        # of right factors, and the left factors of a call.
+        factors = (18 * 8 * n_ao * max(n_orb, 2 * nocc) + 8 * n_ao * n_orb)
+
+        assert 0 < ri_j_floor < ri_jk_floor
+        assert abs(ri_jk_floor - ri_j_floor - factors) <= 18
+
+    @pytest.mark.parametrize('xcfun', ['b3lyp', 'blyp'])
+    def test_quadratic_driver_keeps_its_floor(self, xcfun):
+        """A driver which sets up RI after the solvers it drives (QRF) keeps
+        its floor as well."""
+
+        molecule, basis = self.get_water()
+        scf_results = self.run_scf(molecule, basis, xcfun)
+
+        drv = QuadraticResponseDriver()
+        drv.ostream.mute()
+        drv.update_settings(
+            {
+                'conv_thresh': 1.0e-6,
+                'b_frequencies': [0.2],
+                'c_frequencies': [0.2],
+                'damping': 0.1,
+                'a_component': 'z',
+                'b_component': 'z',
+                'c_component': 'x',
+            }, {'xcfun': xcfun})
+        drv.compute(molecule, basis, scf_results)
+
+        if xcfun == 'blyp':
+            assert drv._uses_ri_coulomb()
+        else:
+            assert drv._uses_ri_jk()
+
+        assert drv._ri_reserve_floor > 0
+        assert drv._ri_memory_reserve >= drv._ri_reserve_floor
+
+    @pytest.mark.parametrize('xcfun', ['b3lyp', 'blyp'])
+    def test_nonlinear_driver_falls_back_for_its_floor(self, monkeypatch,
+                                                       xcfun):
+        """A nonlinear driver whose smallest Fock batch does not fit beside its
+        B vectors (RI-JK) or its integrals (RI-J) falls back to the
+        four-center integrals before any work. With RI-JK the fallback is lent
+        to its solvers, and the THG equals a four-center THG on the same
+        orbitals. With RI-J the solvers set up their own RI-J, which fits, so
+        only the driver's own Fock builds are four-center, and the THG equals
+        one whose driver falls back for a budget of its own."""
+
+        molecule, basis = self.get_water()
+        scf_results = self.run_scf(molecule, basis, xcfun)
 
         # NOTE: a memory of each density no rank has, which sets the floor
         # alone; the batch sizes of a four-center build do not read it.
@@ -334,26 +412,45 @@ class TestResponseRiMemory:
                             lambda ostream, line: warnings.append(line))
 
         fallen_drv, fallen = self.run_thg(molecule, basis, scf_results,
-                                          'b3lyp')
+                                          xcfun)
 
-        assert fallen_drv._ri_jk_fallback
-        assert not fallen_drv._uses_ri_jk()
-        assert fallen_drv._ri_jk_drv is None
+        if xcfun == 'blyp':
+            assert fallen_drv._ri_j_fallback
+            assert not fallen_drv._uses_ri_coulomb()
+            assert fallen_drv._ri_drv is None
+            label = 'RI-J'
+        else:
+            assert fallen_drv._ri_jk_fallback
+            assert not fallen_drv._uses_ri_jk()
+            assert fallen_drv._ri_jk_drv is None
+            label = 'RI-JK'
 
         # NOTE: the floor is the reserve here, and the warning gives the free
-        # memory and the floor.
-        assert fallen_drv._ri_memory_reserve == fallen_drv._ri_jk_reserve_floor
-        assert any('for the smallest batch of the nonlinear Fock build' in line
-                   and 'four-center integrals' in line for line in warnings)
+        # memory and the floor. It is the only fallback warning: the solvers
+        # of the RI-J driver keep RI-J.
+        assert fallen_drv._ri_memory_reserve == fallen_drv._ri_reserve_floor
+        fallback_warnings = [
+            line for line in warnings if 'four-center integrals' in line
+        ]
+        assert len(fallback_warnings) == 1
+        assert fallback_warnings[0].startswith(f'{label} would need')
+        assert ('for the smallest batch of the nonlinear Fock build'
+                in fallback_warnings[0])
 
         monkeypatch.undo()
 
-        _, plain = self.run_thg(molecule, basis, self.four_center(scf_results),
-                                'b3lyp')
+        if xcfun == 'blyp':
+            # NOTE: a budget of 1 kB on the driver, which its solvers are not
+            # handed.
+            _, reference = self.run_thg(molecule, basis, scf_results, xcfun,
+                                        ri_memory_budget=1.0e-6)
+        else:
+            _, reference = self.run_thg(molecule, basis,
+                                        self.four_center(scf_results), xcfun)
 
         if MPI.COMM_WORLD.Get_rank() == mpi_master():
-            assert fallen['THG'].keys() == plain['THG'].keys()
-            for key, value in plain['THG'].items():
+            assert fallen['THG'].keys() == reference['THG'].keys()
+            for key, value in reference['THG'].items():
                 assert abs(fallen['THG'][key] - value) < 1.0e-8 * max(
                     abs(value), 1.0)
 

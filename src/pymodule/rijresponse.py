@@ -54,6 +54,8 @@ from .sanitychecks import get_ri_auxiliary_basis
 from .profiler import Profiler
 from .errorhandler import assert_msg_critical
 from .riresponse import get_ri_memory_budget
+from .riresponse import get_ri_reserve_floor_text
+from .riresponse import print_ri_reserve_floor
 from .riresponse import mark_ri_setup
 from .riresponse import get_ri_chunks
 
@@ -100,12 +102,20 @@ def initialize_ri_j(solver, molecule, basis, reuse=False):
 
     ri_drv = SimdRIJFockDriver()
 
+    # NOTE: a nonlinear driver sets the floor of its rank reserve before this;
+    # the linear solvers have none.
+    reserve_floor = getattr(solver, '_ri_reserve_floor', 0)
+
     # NOTE: the parts are cut from the budget, and every rank has to cut the
     # same ones or a rank would sweep a part no other rank knows of. The budget
-    # is therefore the smallest of the ranks' and not each one's own.
-    budget = min(
+    # is therefore the smallest of the ranks' and not each one's own. The free
+    # memory and the reserve of the rank whose budget is the smallest go with
+    # it into the fallback warning.
+    budget = get_ri_memory_budget(solver, molecule, basis, reserve_floor)
+    budget, budget_free, budget_reserve = min(
         solver.comm.allgather(
-            get_ri_memory_budget(solver, molecule, basis)))
+            (budget, solver._ri_memory_free, solver._ri_memory_reserve)),
+        key=lambda entry: entry[0])
 
     # NOTE: the integrals are held in memory, the way a response build wants:
     # it sweeps them for many densities a call. A calculation whose peak in
@@ -132,11 +142,18 @@ def initialize_ri_j(solver, molecule, basis, reuse=False):
     elif max(peaks) > budget:
         solver._ri_j_fallback = True
 
+        # NOTE: where the floor of a nonlinear driver set the reserve of the
+        # rank with the smallest budget, the warning gives that rank's free
+        # memory and the floor.
+        floor_text = get_ri_reserve_floor_text(reserve_floor, budget_free,
+                                               budget_reserve)
+
         solver.ostream.print_warning(
             'RI-J would need roughly ' +
             f'{Profiler.memory_to_string(max(peaks))} of ' +
-            f'{Profiler.memory_to_string(budget)} {where}, so the response ' +
-            'Coulomb matrices are formed from the four-center integrals.')
+            f'{Profiler.memory_to_string(budget)} {where}{floor_text}, so ' +
+            'the response Coulomb matrices are formed from the four-center ' +
+            'integrals.')
         solver.ostream.print_blank()
         solver.ostream.flush()
         return
@@ -174,6 +191,7 @@ def initialize_ri_j(solver, molecule, basis, reuse=False):
         'RI-J needs roughly ' + f'{Profiler.memory_to_string(max(peaks))} of ' +
         f'{Profiler.memory_to_string(budget)} {where}; three-center ' +
         f'integrals are held in memory, in {ri_drv.number_of_parts()} parts.')
+    print_ri_reserve_floor(solver, reserve_floor)
     solver.ostream.print_blank()
     solver.ostream.flush()
 
