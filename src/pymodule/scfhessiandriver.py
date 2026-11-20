@@ -318,6 +318,10 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver.compute(molecule, ao_basis, scf_results, atom_pairs)
 
         cphf_solution_dict = cphf_solver.cphf_results
+
+        # NOTE: the CPHF solve is done and the rest of the Hessian reads only
+        # cphf_results; its RI set is let go before the second derivatives.
+        cphf_solver.release_ri()
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
         dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
 
@@ -1142,6 +1146,10 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver.compute(molecule, ao_basis, scf_results, atom_pairs)
 
         cphf_solution_dict = cphf_solver.cphf_results
+
+        # NOTE: the CPHF solve is done and the rest of the Hessian reads only
+        # cphf_results; its RI set is let go before the second derivatives.
+        cphf_solver.release_ri()
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
         dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
 

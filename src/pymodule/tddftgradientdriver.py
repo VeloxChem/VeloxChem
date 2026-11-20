@@ -444,6 +444,12 @@ class TddftGradientDriver(GradientDriver):
 
         orbrsp_results = orbrsp_drv.cphf_results
 
+        # NOTE: the orbital response and its omega are done and the rest of
+        # the gradient reads only orbrsp_results and omega_ao; its RI set is
+        # let go before the ground-state and excited-state gradient terms,
+        # which choose RI or four-center from the free memory.
+        orbrsp_drv.release_ri()
+
         natm = molecule.number_of_atoms()
 
         if self.rank == mpi_master():

@@ -35,7 +35,7 @@ import numpy as np
 import time as tm
 import sys
 
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, release_free_memory
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -52,6 +52,7 @@ from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
 from .batchsize import get_four_center_batch_size
 from .batchsize import get_ri_batch_size
 from .batchsize import get_number_of_batches
+from .riresponse import release_ri_jk, release_ri_j
 
 # NOTE: the matrices of nao by nao which build_sigmas_single_comm holds on the
 # master for each density of a batch: the density (vec_list) and the Fock
@@ -362,6 +363,25 @@ class CphfSolver(LinearSolver):
 
         self._release_freed_memory()
 
+    def release_ri(self):
+        """
+        Releases the RI set the solver formed for its solve: the RI-JK B
+        vectors or the RI-J driver, and the fallback of either. The drivers
+        that run a CPHF solve call this once they have taken cphf_results
+        and, where they compute it, omega. After this, compute_omega stops
+        with an error before any work, until compute is run again. Every
+        rank must call this.
+        """
+
+        release_ri_jk(self)
+
+        release_ri_j(self)
+        self._ri_j_fallback = False
+
+        # NOTE: the B vectors are freed in blocks the allocator may keep
+        # resident; they are returned here.
+        release_free_memory()
+
     def compute_subspace_solver(self, molecule, basis, scf_results, *args):
         """
         Performs CPHF calculation for a molecule and a basis set.
@@ -615,8 +635,7 @@ class CphfSolver(LinearSolver):
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
 
-        profiler.check_memory_usage(
-            'End of ComputeCPHF iterative subspace algorithm')
+        profiler.check_memory_usage('End of CPHF solver')
         profiler.print_memory_usage(self.ostream)
         self._print_ri_memory_check()
 

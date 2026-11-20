@@ -316,7 +316,7 @@ def release_ri_jk(solver):
     solver._ri_jk_fallback = False
 
 
-def _release_ri_j(solver):
+def release_ri_j(solver):
     """Lets go of the simd RI-J driver the solver set up for itself
     (rijresponse.initialize_ri_j) and of the memory it was checked with.
 
@@ -436,7 +436,7 @@ def lend_ri(driver, solver):
             # kept, they stay resident: the driver's RI-J budget and batches,
             # fixed at its setup, do not count them, and the next solver the
             # driver computes finds them taken from its free memory.
-            _release_ri_j(solver)
+            release_ri_j(solver)
         # NOTE: a solver which sets itself up resets the peak (mark_ri_setup)
         # and checks its own builds. The driver's check then reads, beside the
         # growth it kept before the solver, the peak of what follows the

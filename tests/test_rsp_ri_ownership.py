@@ -266,7 +266,7 @@ class TestResponseRiOwnership:
         # is recorded for each solver which holds an RI-J driver when lend_ri
         # lets go of it.
         released = []
-        real_release = riresponse._release_ri_j
+        real_release = riresponse.release_ri_j
 
         def recorded_release(solver):
             if solver._ri_drv is not None:
@@ -274,7 +274,7 @@ class TestResponseRiOwnership:
             real_release(solver)
             assert solver._ri_drv is None
 
-        monkeypatch.setattr(riresponse, '_release_ri_j', recorded_release)
+        monkeypatch.setattr(riresponse, 'release_ri_j', recorded_release)
 
         three_pa_drv = ThreePATransitionDriver()
         three_pa_drv.ostream.mute()
