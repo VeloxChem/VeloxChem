@@ -3607,7 +3607,9 @@ class ScfDriver:
 
         self.ostream.print_warning(
             f'{limit_text}, so the Fock matrices are formed from the ' +
-            'four-center integrals (force_ri keeps RI-JK).')
+            'four-center integrals. To use RI-JK all the same, set the ' +
+            'attribute force_ri = True of the SCF driver, or add the line ' +
+            'force_ri: yes under @method settings of the input file.')
         self.ostream.print_blank()
         self.ostream.flush()
 
