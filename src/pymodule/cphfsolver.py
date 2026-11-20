@@ -903,9 +903,18 @@ class CphfSolver(LinearSolver):
                 # create Fock matrices and contract with two-electron integrals
                 # NOTE: not with RI: build_sigmas turns subcomms off for RI-J
                 # and RI-JK (_disable_subcomms_for_ri).
-                fock = self._comp_lr_fock(dens, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict, profiler,
-                                          local_comm)
+                # NOTE: the CPHF equations are those of the ground state,
+                # whose C-PCM reaction field is in equilibrium (the static
+                # dielectric constant), whatever non_equilibrium_solv is.
+                fock = self._comp_lr_fock(dens,
+                                          molecule,
+                                          basis,
+                                          eri_dict,
+                                          dft_dict,
+                                          pe_dict,
+                                          profiler,
+                                          local_comm,
+                                          cpcm_non_equilibrium=False)
 
                 if profiler is not None:
                     # only increment FockCount on local master
@@ -1119,9 +1128,18 @@ class CphfSolver(LinearSolver):
                 profiler.add_timing_info('PreProc', tm.time() - prep_t0)
 
             # create Fock matrices and contract with two-electron integrals
-            fock = self._comp_lr_fock(vec_list, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict, profiler,
-                                      dens_factors=ri_jk_factors)
+            # NOTE: the CPHF equations are those of the ground state, whose
+            # C-PCM reaction field is in equilibrium (the static dielectric
+            # constant), whatever non_equilibrium_solv is.
+            fock = self._comp_lr_fock(vec_list,
+                                      molecule,
+                                      basis,
+                                      eri_dict,
+                                      dft_dict,
+                                      pe_dict,
+                                      profiler,
+                                      dens_factors=ri_jk_factors,
+                                      cpcm_non_equilibrium=False)
 
             if profiler is not None:
                 # only increment FockCount on master rank

@@ -2480,7 +2480,8 @@ class LinearSolver:
                       pe_dict,
                       profiler=None,
                       comm=None,
-                      dens_factors=None):
+                      dens_factors=None,
+                      cpcm_non_equilibrium=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -2506,6 +2507,10 @@ class LinearSolver:
             density costs the basis squared where the exchange of the same density
             as a matrix costs the basis cubed. None where the caller has not
             formed them, and the dense path is taken.
+        :param cpcm_non_equilibrium:
+            Whether the C-PCM response of a density uses the optical
+            dielectric constant: one bool for all densities, or one for each
+            density; None for non_equilibrium_solv of the solver.
 
         :return:
             The Fock matrix (2e part).
@@ -2673,10 +2678,19 @@ class LinearSolver:
 
             t0 = tm.time()
 
+            if cpcm_non_equilibrium is None:
+                cpcm_non_equilibrium = self.non_equilibrium_solv
+            if isinstance(cpcm_non_equilibrium, (bool, np.bool_)):
+                cpcm_non_equilibrium = [cpcm_non_equilibrium] * num_densities
+            assert_msg_critical(
+                len(cpcm_non_equilibrium) == num_densities,
+                f'{type(self).__name__}._comp_lr_fock: expected one ' +
+                'cpcm_non_equilibrium for each density')
+
             for idx in range(num_densities):
                 Fock_sol = self.cpcm_drv.compute_response_fock(
                     molecule, basis, dens[idx] * 2.0, self.cpcm_cg_thresh,
-                    self.non_equilibrium_solv)
+                    cpcm_non_equilibrium[idx])
 
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += Fock_sol

@@ -385,26 +385,51 @@ class TddftOrbitalResponse(CphfSolver):
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
+        # NOTE: with C-PCM, the unrelaxed density takes the reaction field of
+        # the ground state, in equilibrium (the static dielectric constant),
+        # and the transition densities that of the response's kernel, which
+        # with non_equilibrium_solv is the optical dielectric constant.
+
         if self._uses_ri_jk():
             if self.rank == mpi_master():
                 unrel_dm_ao_list = list(unrel_dm_ao)
             else:
                 unrel_dm_ao_list = None
-            fock_1pdm = self._comp_lr_fock(unrel_dm_ao_list, molecule, basis,
-                                           eri_dict, dft_dict, pe_dict,
+            fock_1pdm = self._comp_lr_fock(unrel_dm_ao_list,
+                                           molecule,
+                                           basis,
+                                           eri_dict,
+                                           dft_dict,
+                                           pe_dict,
                                            profiler,
-                                           dens_factors=ri_jk_factors_1pdm)
-            fock_xy = self._comp_lr_fock(xy_dm_ao, molecule, basis, eri_dict,
-                                         dft_dict, pe_dict, profiler,
-                                         dens_factors=ri_jk_factors_xy)
+                                           dens_factors=ri_jk_factors_1pdm,
+                                           cpcm_non_equilibrium=False)
+            fock_xy = self._comp_lr_fock(
+                xy_dm_ao,
+                molecule,
+                basis,
+                eri_dict,
+                dft_dict,
+                pe_dict,
+                profiler,
+                dens_factors=ri_jk_factors_xy,
+                cpcm_non_equilibrium=self.non_equilibrium_solv)
             if self.rank == mpi_master():
                 fock_ao_rhs = fock_1pdm + fock_xy
             else:
                 fock_ao_rhs = None
         else:
-            fock_ao_rhs = self._comp_lr_fock(dm_ao_list, molecule, basis,
-                                             eri_dict, dft_dict, pe_dict,
-                                             profiler)
+            # dm_ao_list: dof unrelaxed densities, then dof X+Y and dof X-Y
+            fock_ao_rhs = self._comp_lr_fock(
+                dm_ao_list,
+                molecule,
+                basis,
+                eri_dict,
+                dft_dict,
+                pe_dict,
+                profiler,
+                cpcm_non_equilibrium=([False] * dof +
+                                      [self.non_equilibrium_solv] * 2 * dof))
 
         profiler.start_timer('Kxc')
 
@@ -685,9 +710,18 @@ class TddftOrbitalResponse(CphfSolver):
         else:
             lambda_factors = None
 
-        fock_lambda = self._comp_lr_fock(lambda_ao_list, molecule, basis,
-                                         eri_dict, dft_dict, pe_dict, profiler,
-                                         dens_factors=lambda_factors)
+        # NOTE: the lambda multipliers are a ground-state orbital relaxation;
+        # with C-PCM their reaction field is in equilibrium (the static
+        # dielectric constant), whatever non_equilibrium_solv is.
+        fock_lambda = self._comp_lr_fock(lambda_ao_list,
+                                         molecule,
+                                         basis,
+                                         eri_dict,
+                                         dft_dict,
+                                         pe_dict,
+                                         profiler,
+                                         dens_factors=lambda_factors,
+                                         cpcm_non_equilibrium=False)
 
         profiler.start_timer('Other')
 
