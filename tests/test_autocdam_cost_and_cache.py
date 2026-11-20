@@ -397,4 +397,5 @@ class TestAutoCdamCostAndCache:
                   }},
                   parameters=PARAMETERS)
         assert isinstance(fit.calculator, CachedCalculator)
-        assert fit.calculator_options["md_options"] == md_settings(None)
+        assert fit.calculator_options["md_options"] == md_settings(
+            {"timestep_fs": 1.0})

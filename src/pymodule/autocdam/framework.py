@@ -482,9 +482,9 @@ class FrameworkSystem:
     In the CDAM representation the target becomes a central particle plus
     charge-only dummies. ``metal_site_charge`` is the total site charge kept
     while dummy charges change; by default the baseline charge of the target,
-    which preserves the system charge. ``metal_dummy_bond`` is ``"constraint"``
-    (exact distance) or ``"harmonic"`` (finite flexibility, using the
-    candidate's bond force constant). D-M-D harmonic angles hold the geometry,
+    which preserves the system charge. ``metal_dummy_bond`` is ``"harmonic"``
+    (default; finite flexibility, using the candidate's bond force constant)
+    or ``"constraint"`` (exact distance). D-M-D harmonic angles hold the geometry,
     as in the aqueous CDAM model. ``c4_partners`` selects the oxygens that feel
     the 12-6-4 C4 term: ``"water"`` (O with exactly two H) or ``"oxygen"``.
 
@@ -510,7 +510,7 @@ class FrameworkSystem:
     :param metal_site_charge:
         The total charge of the CDAM site.
     :param metal_dummy_bond:
-        The metal-dummy bond, "constraint" or "harmonic".
+        The metal-dummy bond, "harmonic" (default) or "constraint".
     :param c4_partners:
         The oxygens that feel the C4 term, "water" or "oxygen".
     :param metal_charges:
@@ -535,7 +535,7 @@ class FrameworkSystem:
     box_vectors: Any = None
     protocol: dict[str, Any] = field(default_factory=dict)
     metal_site_charge: float | None = None
-    metal_dummy_bond: str = "constraint"
+    metal_dummy_bond: str = "harmonic"
     c4_partners: str = "water"
     metal_charges: dict[Any, float] | None = None
     group_charges: dict[Any, int] | None = None

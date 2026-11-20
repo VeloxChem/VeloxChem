@@ -56,7 +56,7 @@ class SyntheticCalculator:
     def __init__(self):
         self.batches = []
 
-    def calculate(self, batch, parameters, targets):
+    def calculate(self, batch, parameters, targets, **options):
         self.batches.append(batch)
         sigma = batch.system.nonbonded_parameters["metal_lj_sigma_angstrom"]
         assert sigma == parameters["metal_lj_sigma"]
@@ -176,7 +176,7 @@ class TestAutoCdamStagedFitting:
 
         class FailedCalculator:
 
-            def calculate(self, batch, parameters, targets):
+            def calculate(self, batch, parameters, targets, **options):
                 if parameters["x"] < 0.3:
                     raise RuntimeError("unstable candidate")
                 return CalculationResult(
@@ -224,7 +224,7 @@ class TestAutoCdamStagedFitting:
 
         class ArrayCalculator:
 
-            def calculate(self, batch, parameters, targets):
+            def calculate(self, batch, parameters, targets, **options):
                 x = parameters["x"]
                 return CalculationResult(values={"energy": [x, 2 * x]})
 

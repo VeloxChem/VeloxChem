@@ -87,6 +87,28 @@ class TestHarmonicMetalDummyBond:
         d = np.linalg.norm(frames[:, 1:7] - frames[:, :1], axis=-1) * 10.0
         assert np.all(np.abs(d - 0.74) < 0.2), d.round(3)
 
+    def test_harmonic_is_the_default(self):
+        from veloxchem.autocdam import FrameworkSystem
+        assert AutoCDAM().metal_dummy_bond == "harmonic"
+        assert CDAMCandidate("Al", 3).metal_dummy_bond == "harmonic"
+        assert FrameworkSystem.metal_dummy_bond == "harmonic"
+
+    def test_framework_object_must_match_the_driver(self):
+        from veloxchem import Molecule
+        from veloxchem.autocdam import FrameworkSystem
+        from veloxchem.errorhandler import VeloxChemError
+        mol = Molecule.read_xyz_file(str(XYZ))
+        mol.set_charge(-1)
+        mof = FrameworkSystem(structure=mol, charges=CHARGES,
+                              target_metal="Al", representation="cdam",
+                              name="mof")
+        fit = AutoCDAM(ostream=OutputStream(None))
+        fit.metal_dummy_bond = "constraint"
+        targets = {"al_o": {"property": "distance", "atoms": ["Al", "O3"],
+                            "value": 1.93, "tolerance": 0.05}}
+        with pytest.raises(VeloxChemError, match="set the same value"):
+            fit.setup(CDAMCandidate("Al", 3), targets, systems={"mof": mof})
+
     def test_driver_sets_the_bond_time_step_and_frameworks(self):
         fit = AutoCDAM()
         fit.metal_dummy_bond = "harmonic"

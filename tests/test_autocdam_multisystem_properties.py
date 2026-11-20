@@ -58,6 +58,7 @@ def molecule():
 
 def node(**kwargs):
     kwargs.setdefault("representation", "cdam")
+    kwargs.setdefault("metal_dummy_bond", "constraint")
     return FrameworkSystem(structure=molecule(),
                            charges=CHARGES,
                            target_metal="Al",
@@ -78,7 +79,8 @@ def point(sigma=2.0, epsilon=0.2, q=0.5):
                          3,
                          metal_lj_sigma=sigma,
                          metal_lj_epsilon=epsilon,
-                         dummy_charge=q)
+                         dummy_charge=q,
+                         metal_dummy_bond="constraint")
 
 
 STRUCTURAL = [
@@ -336,6 +338,7 @@ class TestAutoCdamMultisystemProperties:
             }
         }
         fit = AutoCDAM()
+        fit.metal_dummy_bond = "constraint"
         fit.setup(CDAMCandidate("Al", 3),
                   targets,
                   parameters=parameters,
@@ -344,7 +347,8 @@ class TestAutoCdamMultisystemProperties:
             "dummy_charge" in warning for warning in fit.parameter_warnings)
 
     def test_one_parameter_set_is_fitted_against_water_and_mof_together(self):
-        mof = SpyFramework(structure=molecule(),
+        mof = SpyFramework(metal_dummy_bond="constraint",
+                           structure=molecule(),
                            charges=CHARGES,
                            target_metal="Al",
                            representation="cdam",
@@ -387,6 +391,7 @@ class TestAutoCdamMultisystemProperties:
             },
         }
         fit = AutoCDAM()
+        fit.metal_dummy_bond = "constraint"
         fit.calculator = aqueous
         # every candidate calculates both systems (no cheap-first skipping)
         fit.update_settings({
@@ -443,6 +448,7 @@ class TestAutoCdamMultisystemProperties:
             }
         }
         fit = AutoCDAM()
+        fit.metal_dummy_bond = "constraint"
         fit.update_settings({"pilot": True, "work_dir": str(tmp_path)})
         fit.setup(CDAMCandidate("Al", 3),
                   targets,

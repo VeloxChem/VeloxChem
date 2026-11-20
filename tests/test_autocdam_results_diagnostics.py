@@ -239,6 +239,7 @@ class TestAutoCdamResultsDiagnostics:
                               charges=CHARGES,
                               target_metal="Al",
                               representation="cdam",
+                              metal_dummy_bond="constraint",
                               name="mof")
         parameters = {"sigma": (1.5, 2.5), "dummy_charge": (0.3, 0.7)}
         targets = {
@@ -251,6 +252,7 @@ class TestAutoCdamResultsDiagnostics:
         }
         search = {"max_evaluations": 6, "initial_samples": 5, "seed": 5}
         driver = AutoCDAM()
+        driver.metal_dummy_bond = "constraint"
         driver.update_settings({"search_method": "bayesian", **search})
         driver.fit(CDAMCandidate("Al", 3),
                             targets,

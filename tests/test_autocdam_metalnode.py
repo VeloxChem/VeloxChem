@@ -157,7 +157,8 @@ class TestMetalNodeInStudy:
         framework = router.systems["node"]
         result = framework.calculate(
             CDAMCandidate("Al", 3, metal_lj_sigma=2.0, metal_lj_epsilon=0.2,
-                          dummy_charge=0.5), targets)
+                          dummy_charge=0.5, bond_force_constant=3000.0),
+            targets)
         assert not result.failed, result.failure_reason
         values = result.values
         for name in ("hydroxide", "carboxylate", "water"):

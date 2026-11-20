@@ -45,7 +45,7 @@ class SurfaceCalculator:
     def __init__(self):
         self.calls = []
 
-    def calculate(self, batch, parameters, targets):
+    def calculate(self, batch, parameters, targets, **options):
         self.calls.append((dict(parameters.values), [t.name for t in targets]))
         sigma = parameters["metal_lj_sigma"]
         values = {

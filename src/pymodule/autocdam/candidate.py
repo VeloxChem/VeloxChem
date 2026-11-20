@@ -355,7 +355,7 @@ class CDAMCandidate:
             dummy_mass=3.0,
             bond_force_constant=800.0,  # TODO: check against VeloxChem defaults
             angle_force_constant=250.0,  # TODO: check against VeloxChem defaults
-            metal_dummy_bond="constraint",
+            metal_dummy_bond="harmonic",
     ):
         """
         Stores the template settings and validates them.
@@ -363,9 +363,9 @@ class CDAMCandidate:
         Distances and sigma are in angstrom, epsilon in kcal/mol, C4 in
         kcal/mol*angstrom^4, charges in e and masses in amu. The bond force
         constant is in kcal/mol/angstrom^2 and the angle constant in
-        kcal/mol/rad^2. ``metal_dummy_bond`` is "constraint" (fixed M-D
-        distance) or "harmonic" (M-D bonds with ``bond_force_constant`` only,
-        as in Golo et al., ACS Omega 2025). ``coordination_number`` defaults to the number of
+        kcal/mol/rad^2. ``metal_dummy_bond`` is "harmonic" (default; M-D
+        bonds with ``bond_force_constant`` only, as in Golo et al., ACS Omega
+        2025) or "constraint" (fixed M-D distance). ``coordination_number`` defaults to the number of
         directions of ``geometry``; ``metal_mass`` defaults to the VeloxChem
         element mass (``chemical_element_mass``) and is the mass of the whole ion (dummy masses
         are subtracted from the central site). ``metal_lj_sigma`` and

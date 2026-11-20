@@ -167,9 +167,10 @@ class AutoCDAM:
         # metal-dummy distance in angstrom: None fits it in 0.70-1.00, a
         # number fixes it, a (lower, upper) pair fits it within these bounds
         self.metal_dummy_distance = None
-        # "constraint" fixes the metal-dummy distance; "harmonic" holds it by
-        # the M-D bonds only (bond_force_constant, 1 fs MD/FEP time step)
-        self.metal_dummy_bond = 'constraint'
+        # "harmonic" (default) holds the metal-dummy distance by the M-D bonds
+        # only (bond_force_constant, 1 fs MD/FEP time step); "constraint"
+        # fixes it (2 fs)
+        self.metal_dummy_bond = 'harmonic'
         # metal-dummy bond force constant in kcal/mol/angstrom^2, only used
         # with metal_dummy_bond = 'harmonic': None fits it in 1000-3000, a
         # number fixes it, a (lower, upper) pair fits it within these bounds
@@ -487,6 +488,16 @@ class AutoCDAM:
                        spec.get('type', 'framework') != 'aqueous' else spec)
                 for name, spec in systems.items()
             }
+            # a FrameworkSystem object keeps its own setting: it must agree
+            # with the time step chosen here
+            for name, spec in systems.items():
+                assert_msg_critical(
+                    not isinstance(spec, FrameworkSystem) or
+                    spec.metal_dummy_bond == self.metal_dummy_bond,
+                    f"AutoCDAM: system '{name}' has metal_dummy_bond = "
+                    f"'{getattr(spec, 'metal_dummy_bond', None)}' but "
+                    f"AutoCDAM has '{self.metal_dummy_bond}'; set the same "
+                    "value on both")
         if self.metal_dummy_bond == 'harmonic':
             self.ostream.print_info(
                 'Metal-dummy bonds: harmonic, ' +
@@ -1141,6 +1152,7 @@ class AutoCDAM:
         samples = self._samples()
         failed = sum(sample.calculation.failed for sample in samples)
         md = self.calculator_options.get('md_options', {})
+        md = md_settings(md) if md else {}
         if md.get('pilot'):
             protocol = 'pilot (workflow test only)'
         elif md.get('fast_mode'):

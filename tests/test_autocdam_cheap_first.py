@@ -206,7 +206,7 @@ class TestQuickDirtyHfe:
         cdamfit.pilot = True
         cdamfit.setup(CDAMCandidate("Al", 3), targets)
         assert cdamfit.calculator_options["fep_options"] == {
-            "quick_dirty": True}
+            "quick_dirty": True, "timestep_fs": 1.0}
         assert cdamfit.calculator.inner.cheap_first is None
         assert cdamfit._study_metadata()["cheap_first"] is None
 

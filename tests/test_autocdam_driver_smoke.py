@@ -103,7 +103,7 @@ class TestAutoCdamDriverSmoke:
 
         class SuppliedCalculator:
 
-            def calculate(self, batch, parameters, targets):
+            def calculate(self, batch, parameters, targets, **options):
                 assert isinstance(parameters, ParameterSet)
                 return calculation
 
@@ -277,7 +277,8 @@ class TestAutoCdamAttributeInterface:
 
         cdamfit.setup(CDAMCandidate("Al", 3), iod)
         assert set(_fitted(cdamfit)) == {
-            "metal_lj_sigma", "metal_lj_epsilon", "metal_dummy_distance"
+            "metal_lj_sigma", "metal_lj_epsilon", "metal_dummy_distance",
+            "bond_force_constant"
         }
         assert cdamfit.candidate.dummy_charge == 0.5
 
@@ -411,6 +412,12 @@ class TestAutoCdamAttributeInterface:
 
         cdamfit = AutoCDAM(ostream=OutputStream(None))
         cdamfit.fast_mode = True
+        cdamfit.setup(CDAMCandidate("Al", 3),
+                      {"IOD": {"value": 1.9, "tolerance": 0.05}})
+        # harmonic metal-dummy bonds (default): 1 fs
+        assert cdamfit.calculator_options["md_options"] == md_settings(
+            {"fast_mode": True, "timestep_fs": 1.0})
+        cdamfit.metal_dummy_bond = "constraint"
         cdamfit.setup(CDAMCandidate("Al", 3),
                       {"IOD": {"value": 1.9, "tolerance": 0.05}})
         assert cdamfit.calculator_options["md_options"] == md

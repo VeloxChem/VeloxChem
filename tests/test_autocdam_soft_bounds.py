@@ -99,7 +99,8 @@ class TestAutoCdamSoftBounds:
         driver.setup(CDAMCandidate("Al", 3), {"IOD": {"value": 2.0}})
         specs = {s.name: s for s in driver.parameter_specs}
         assert set(specs) == {
-            "metal_lj_sigma", "metal_lj_epsilon", "metal_dummy_distance"
+            "metal_lj_sigma", "metal_lj_epsilon", "metal_dummy_distance",
+            "bond_force_constant"
         }
         assert specs["metal_lj_sigma"].expandable
         assert specs["metal_lj_epsilon"].expandable

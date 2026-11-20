@@ -70,6 +70,7 @@ def node(request):
                            charges=CHARGES,
                            target_metal="Al",
                            representation="cdam",
+                           metal_dummy_bond="constraint",
                            box_vectors=box)
 
 

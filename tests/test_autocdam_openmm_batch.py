@@ -49,7 +49,8 @@ def setup(ostream):
                               water_model="tip3p",
                               metal_lj_sigma=2,
                               metal_lj_epsilon=0.2,
-                              potential_form="lj12_6_4")
+                              potential_form="lj12_6_4",
+                              metal_dummy_bond="constraint")
     generator = CoordinateGenerator(ostream=ostream)
     # Small deterministic solute + water system: no stochastic solvent packing.
     topology = app.Topology()
@@ -225,7 +226,8 @@ class TestAutoCdamOpenmmBatch:
                                   3,
                                   water_model=water_model,
                                   metal_lj_sigma=2,
-                                  metal_lj_epsilon=0.2)
+                                  metal_lj_epsilon=0.2,
+                                  metal_dummy_bond="constraint")
         template = CoordinateGenerator().create_openmm_template(candidate)
         assert template.vacuum_system.getNumParticles() == 7
         assert template.solvated_system.getNumParticles() > 7
