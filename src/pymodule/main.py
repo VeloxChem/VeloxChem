@@ -545,6 +545,13 @@ def _main_body():
                                  method_type=scf_drv.scf_type)
             rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
+            # NOTE: the analytical gradient reads the response's results and
+            # the type of its solver, and its numerical gradient computes the
+            # response again, which sets up the RI anew. The response's RI set
+            # is released so that the orbital response (CPHF) after it decides
+            # RI or four-center with that memory free.
+            rsp_prop._rsp_driver.release_ri()
+
             tddftgrad_drv = TddftGradientDriver(scf_drv)
             # set print level for input file based calculation
             tddftgrad_drv.print_level = 2
@@ -761,6 +768,11 @@ def _main_body():
         lr_drv.frequencies = polgrad_drv.frequencies
         lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_results)
 
+        # NOTE: the polarizability gradient reads only lr_results; the linear
+        # response's RI set is released so that its CPHF decides RI or
+        # four-center with that memory free.
+        lr_drv.release_ri()
+
         polgrad_results_not_used = polgrad_drv.compute(
             task.molecule, task.ao_basis, scf_drv.scf_results, lr_results)
 
@@ -801,6 +813,16 @@ def _main_body():
             prop_type = None
 
         if prop_type in ['absorption', 'uv-vis', 'ecd']:
+
+            # NOTE: what follows (the orbital response, the gradient, the
+            # excited-state Hessian) reads the response's results and the type
+            # of its solver, and computes the response again where it needs
+            # it, which sets up the RI anew. The response's RI set is released
+            # so that the orbital response (CPHF) decides RI or four-center
+            # with that memory free.
+            if any(key in task.input_dict for key in
+                   ['orbital_response', 'gradient', 'vibrational']):
+                rsp_prop._rsp_driver.release_ri()
 
             if 'orbital_response' in task.input_dict:
                 orbrsp_dict = task.input_dict['orbital_response']

@@ -49,6 +49,9 @@ from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .riresponse import print_ri_memory_check
+from .riresponse import check_ri_jk_not_lent
+from .riresponse import release_ri_jk
+from .riresponse import release_ri_j
 from .rijkresponse import initialize_ri_jk
 from .rijkresponse import ri_jk_fock_matrices
 from .rijkresponse import ri_jk_fock_matrices_unrestricted
@@ -841,6 +844,33 @@ class LinearSolver:
         if density_memory is not None:
             self._ri_batch_memory = max(getattr(self, '_ri_batch_memory', 0),
                                         density_memory * ndens)
+
+    def release_ri(self):
+        """
+        Releases the RI set the solver formed for its solve: the RI-JK B
+        vectors or the RI-J driver, and the fallback of either. Its results
+        are kept; a solver computed again sets up its RI anew. The CPHF
+        drivers call this once they have taken cphf_results and, where they
+        compute it, omega; after it, compute_omega stops with an error before
+        any work, until compute is run again. A solver whose B vectors are
+        lent out or borrowed (riresponse.lend_ri) is refused. Every rank must
+        call this.
+        """
+
+        check_ri_jk_not_lent(self)
+
+        assert_msg_critical(
+            not self._ri_jk_borrowing,
+            f'{type(self).__name__}.release_ri: its RI-JK B vectors are ' +
+            'borrowed from the driver that computes it (riresponse.lend_ri)')
+
+        release_ri_jk(self)
+        release_ri_j(self)
+
+        # NOTE: the RI-JK B vectors are freed in blocks the allocator may keep
+        # resident, and release_ri_jk does not return them; they are returned
+        # here (release_ri_j returns the RI-J integrals itself).
+        release_free_memory()
 
     def _release_freed_memory(self):
         """
