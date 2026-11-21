@@ -1,5 +1,6 @@
 from mpi4py import MPI
 from pathlib import Path
+import io
 import sys
 
 from veloxchem.veloxchemlib import mpi_master
@@ -64,6 +65,18 @@ class TestStreams:
 
         ostream = OutputStream(sys.stdout)
         assert ostream.get_state()
+
+    def test_stdout_with_unencodable_character(self, monkeypatch):
+
+        raw = io.BytesIO()
+        ascii_stdout = io.TextIOWrapper(raw, encoding='ascii')
+        monkeypatch.setattr(sys, 'stdout', ascii_stdout)
+
+        ostream = OutputStream(sys.stdout)
+        ostream.print_line('SoftwareX 7, 1–5 (2018)')
+        ostream.flush()
+
+        assert b'SoftwareX 7, 1?5 (2018)' in raw.getvalue()
 
     def test_default(self):
 

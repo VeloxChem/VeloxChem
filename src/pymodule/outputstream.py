@@ -177,9 +177,28 @@ class OutputStream:
 
         if self.state:
             for line in self.buffer_lines:
-                self.stream.write(line + '\n')
+                self._write_text(line + '\n')
             self.stream.flush()
             del self.buffer_lines[:]
+
+    def _write_text(self, text):
+        """
+        Writes text to the stream, replacing characters that the stream's
+        encoding cannot represent.
+
+        :param text:
+            The text to write.
+        """
+
+        try:
+            self.stream.write(text)
+        except UnicodeEncodeError as err:
+            # sys.stdout uses the locale's encoding, which can be ASCII (for
+            # example LC_ALL=C with PYTHONUTF8=0); file streams are opened
+            # with UTF-8 and do not reach this branch.
+            self.stream.write(
+                text.encode(err.encoding, errors='replace').decode(
+                    err.encoding))
 
     @staticmethod
     def header(line, width):
