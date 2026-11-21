@@ -1647,6 +1647,13 @@ class TddftGradientDriver(GradientDriver):
                             'TddftGradientDriver: response did not converge')
         self._rsp_results = rsp_results
 
+        # NOTE: the analytical gradient that follows (an optimization step)
+        # reads the response's results and the type of its solver, and a
+        # numerical gradient computes the response again, which sets up the
+        # RI anew. The response's RI set is released so that the orbital
+        # response (CPHF) decides RI or four-center with that memory free.
+        rsp_drv.release_ri()
+
         if self.rank == mpi_master():
             scf_ene = scf_results['scf_energy']
             exc_ene = rsp_results['eigenvalues'][state_deriv_index]

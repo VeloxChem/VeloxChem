@@ -235,6 +235,13 @@ class TddftHessianDriver(HessianDriver):
             "TddftHessianDriver: response did not converge",
         )
 
+        # NOTE: the analytical gradient below reads the response's results
+        # and the type of its solver; the response's RI set is released so
+        # that the orbital response (CPHF) decides RI or four-center with that
+        # memory free. The next displacement computes the response again,
+        # which sets up the RI anew.
+        self.rsp_driver.release_ri()
+
         # Calculate the excited state gradient.
         tddft_gradient_driver = TddftGradientDriver(self.scf_driver)
         tddft_gradient_driver.update_settings(

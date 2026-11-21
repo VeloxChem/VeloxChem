@@ -13,6 +13,8 @@ from veloxchem.linearsolver import LinearSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lrsolver import LinearResponseSolver
+from veloxchem.tddftgradientdriver import TddftGradientDriver
+from veloxchem.tddfthessiandriver import TddftHessianDriver
 from veloxchem.riresponse import lend_ri
 from veloxchem.inputparser import get_random_string_parallel
 from veloxchem.main import main
@@ -129,6 +131,74 @@ class TestResponseReleaseRi:
 
         assert driver._ri_jk_drv is not None
 
+    def record_releases(self, monkeypatch):
+
+        releases = []
+        release_ri = LinearSolver.release_ri
+
+        def recorded_release_ri(solver):
+            releases.append((type(solver).__name__, holds_ri(solver)))
+            release_ri(solver)
+
+        monkeypatch.setattr(LinearSolver, 'release_ri', recorded_release_ri)
+
+        return releases
+
+    def run_scf_and_tda(self):
+
+        molecule, basis = self.get_water()
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = True
+        scf_drv.xcfun = 'blyp'
+        scf_drv.ostream.mute()
+        scf_drv.compute(molecule, basis)
+
+        rsp_solver = self.make_solver(TdaEigenSolver)
+        rsp_results = rsp_solver.compute(molecule, basis, scf_drv.scf_results)
+
+        return molecule, basis, scf_drv, rsp_solver, rsp_results
+
+    def test_compute_energy_releases_the_response(self, monkeypatch):
+
+        molecule, basis, scf_drv, rsp_solver, rsp_results = (
+            self.run_scf_and_tda())
+
+        releases = self.record_releases(monkeypatch)
+
+        # NOTE: an optimization step computes the energy, and with it the
+        # response, before the gradient.
+        grad_drv = TddftGradientDriver(scf_drv)
+        grad_drv.ostream.mute()
+        grad_drv.state_deriv_index = [1]
+        energy = grad_drv.compute_energy(molecule, basis, scf_drv,
+                                         rsp_solver, rsp_results)
+
+        assert releases == [('TdaEigenSolver', True)]
+        assert not holds_ri(rsp_solver)
+
+        if scf_drv.rank == mpi_master():
+            ref_energy = (scf_drv.scf_results['scf_energy'] +
+                          rsp_results['eigenvalues'][0])
+            assert abs(energy - ref_energy) < 1.0e-8
+
+    def test_tddft_hessian_gradient_releases_the_response(self, monkeypatch):
+
+        molecule, basis, scf_drv, rsp_solver, _ = self.run_scf_and_tda()
+
+        releases = self.record_releases(monkeypatch)
+
+        hess_drv = TddftHessianDriver(scf_drv, rsp_solver)
+        hess_drv.ostream.mute()
+        hess_drv.state_deriv_index = [1]
+        hess_drv.compute_gradient(molecule, basis)
+
+        # NOTE: the response's set before the orbital response, and the
+        # orbital response's after its solve
+        # (TddftGradientDriver.compute_analytical).
+        assert releases == [('TdaEigenSolver', True),
+                            ('TddftOrbitalResponse', True)]
+
     input_lines = {
         'gradient_task': """
             @jobs
@@ -189,14 +259,7 @@ class TestResponseReleaseRi:
 
     def run_input(self, monkeypatch, lines):
 
-        releases = []
-        release_ri = LinearSolver.release_ri
-
-        def recorded_release_ri(solver):
-            releases.append((type(solver).__name__, holds_ri(solver)))
-            release_ri(solver)
-
-        monkeypatch.setattr(LinearSolver, 'release_ri', recorded_release_ri)
+        releases = self.record_releases(monkeypatch)
 
         here = Path(__file__).parent
         random_string = get_random_string_parallel()
