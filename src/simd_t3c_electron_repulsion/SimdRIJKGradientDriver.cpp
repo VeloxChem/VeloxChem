@@ -19,6 +19,10 @@
 #include <set>
 #include <string>
 
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
+
 #include "DenseIndexFunc.hpp"
 #include "ErrorHandler.hpp"
 #include "OpenMPFunc.hpp"
@@ -742,6 +746,13 @@ CSimdRIJKGradientDriver::mpi_local_densities(const CMolecule        &molecule,
                              fit.densities_beta);
     }
 
+    // NOTE: the batch of half transformed vectors is freed here as in
+    // mpi_local_densities_general, and returned for the same reason.
+
+#ifdef __GLIBC__
+    malloc_trim(0);
+#endif
+
     return fit;
 }
 
@@ -825,6 +836,21 @@ CSimdRIJKGradientDriver::mpi_local_densities_general(const CMolecule        &mol
 
     _local_densities_for_general(bq_vectors, basis, aux_basis, left, right, fit.functions,
                                  fit.naux, budget, fit.densities);
+
+    // NOTE: forming the fitted densities frees the batch of half transformed
+    // vectors and the buffers of every thread, in blocks small enough that the
+    // allocator keeps them rather than handing them back. Kept, they stayed
+    // resident while the caller formed the panels, which were allocated beside
+    // them, and the peak was no longer what peak_memory_general answers: for the
+    // TDDFT gradient of two guanine molecules (C12H14N10O2) in def2-SVPD with
+    // def2-universal-jkfit, one rank of 12 threads, a density of rank 316 grew
+    // the peak by 6.8 GB, against 6.1 GB predicted for rank 344 (5.6 GB before
+    // the margin), and by 4.9 GB with the blocks returned. They are returned
+    // here.
+
+#ifdef __GLIBC__
+    malloc_trim(0);
+#endif
 
     return fit;
 }
