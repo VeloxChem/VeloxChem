@@ -1,130 +1,122 @@
 # Benchmarks
 
-The measurements this project makes, the data they produced, and the scripts which
-produce it. A table in `BENCHMARKS.md` should be rendered from a file here rather
-than typed by hand.
+Cases that are run again to check that performance and results have not
+regressed. Each case is an ordinary VeloxChem input file, run through the
+command line (`python -m veloxchem`) twice: with `ri: yes` and with `ri: no`.
+The four-center row is the reference for the RI row's results and the
+baseline for its speedup, and both are taken in the same run on the same
+machine.
 
 ```
 benchmarks/
-  geometries/   the molecules, read by name
-  scripts/      scfbench.py, the suites, render.py
-  data/scf/     one file per run, rendered beside itself
+  cases/<suite>/*.inp   the cases; the first comment line describes each
+  geometries/           the molecules the cases read with xyzfile:
+  run.py                runs cases and writes results/<run id>.json
+  compare.py            summarizes one run, or compares two
+  results/              not tracked
 ```
 
-## The rules this exists to enforce
+## Suites
 
-**Never invent a benchmark.** A suite says which molecules, bases, methods and
-functionals are measured. Re-running a benchmark means running an existing suite
-again, not choosing a grid. Ask before starting any run: they take the machine for
-an hour or two and its memory with it.
+| suite | cases | four-center wall time, 12 cores (rough) |
+| --- | --- | --- |
+| `quick` | caffeine and a nitroxide radical in def2-SVP: SCF (HF, B3LYP, BLYP, CAM-B3LYP, UKS), SCF gradient (RI-JK, RI-J, UKS), TDA, RPA | 10 min |
+| `standard` | diffuse and triple-zeta SCF and gradient, TDA of a 70-atom molecule, TPA transition, reduced TPA, 3PA transition, optimization (closed and open shell) | 1 to 1.5 h |
 
-**One file per run, never appended to.** A run is one suite, one machine, one
-commit. That is what makes every ratio inside a file comparable: the `full` row a
-speedup is measured against was taken minutes away from the row it is compared
-with, on the same machine, at the same commit.
+The RI rows take a fraction of that. `python benchmarks/run.py --list` prints
+every case.
 
-`BENCHMARKS.md` had three vintages of the same caffeine row in three sections, with
-nothing to say which was current, and two of them disagreed by a factor of three.
-Comparing against the stale one turned a 1.4x into a 3.9x. Hence the format.
-
-**Speedups are computed when a table is rendered, never stored.** A stored ratio
-goes stale the moment one of its two columns is measured again.
-
-## Running a suite
+## Running
 
 ```sh
-source ~/Environments/vlxenv/bin/activate
-source veloxchem.sh
-OMP_NUM_THREADS=14 python benchmarks/scripts/scf_laptop.py --machine m4max
+export OMP_NUM_THREADS=12
+python benchmarks/run.py quick                       # both variants
+python benchmarks/run.py quick standard --ri yes     # RI rows only
+python benchmarks/run.py benchmarks/cases/quick/scf_hf.inp
+python benchmarks/run.py quick --launcher 'mpirun -n 2'
+python benchmarks/run.py quick --repeat 3            # smallest wall time counts
 ```
 
-`--molecule` picks the geometry, `--bases` a subset of the pairs, `--quick` the two
-smallest for checking the wiring. The json is rewritten after every row, so a run
-stopped early leaves a file which is still valid.
+Run on an otherwise idle machine and set `OMP_NUM_THREADS`; the runner warns
+when it is unset and when a BLAS library in the process serves fewer threads
+than it asks for. Reinstall after changing the code: the runner warns when the
+build commit printed in the output is not the checked-out commit (only for a
+build configured with `ENABLE_COMMIT_HASH`).
 
-## Running on a node
+Each variant runs as its own process in a fresh directory,
+`results/<run id>/<suite>/<case>/<variant>/`, so no checkpoint file of an
+earlier run is read as a restart, and a killed case costs one row and not the
+run. The input and the output are kept there; checkpoint and h5 files are
+removed unless `--keep-files` is given.
 
-`scf_node.py` measures one molecule in one basis by the four methods, because on a
-node a grid of eight bases is a day. The ranks and the threads are whatever the
-launcher gave and are recorded rather than chosen.
+## Comparing
 
 ```sh
-srun --mpi=pmix -N 2 --ntasks-per-node 8 --cpus-per-task 32 \
-     --export=ALL,OMP_NUM_THREADS=32,OMP_PROC_BIND=spread,OMP_PLACES=cores,\
-LD_PRELOAD=<...>/openblas/lib/libopenblas.so \
-     python benchmarks/scripts/scf_node.py --machine epyc9755 \
-            --molecule tagrisso --basis def2-tzvp
+python benchmarks/compare.py results/RUN.json              # RI against four-center
+python benchmarks/compare.py results/BASE.json results/NEW.json
 ```
 
-`--molecule` takes a name in `geometries/` or a path to an xyz, so a molecule on the
-cluster needs no copy into the repo. `--basis` picks the fitting set by the pairing
-rule unless `--aux` overrides it. B3LYP is the default functional; `--functional HF`
-for Hartree-Fock. One rank per NUMA domain is the design point: 8 x 32 on one node,
-16 x 32 on two.
+With one run, each case's RI row is set against its four-center row: speedup,
+peak memory of each, and the largest difference of each result. The
+differences are the error of the fitting and are reported, not judged.
 
-**VeloxChem's own output is kept**, one file per calculation under `--outdir`, with
-`timing` on. The iteration table and the per-iteration breakdown are in there and
-nowhere else. They stay on the machine the job ran on and are not tracked: they are
-large and cannot be regenerated.
+With two runs, each row of the new run is set against the same case and variant
+of the base run. Results outside the tolerances in `compare.py` fail; wall time
+and peak memory are reported as new/base ratios and marked above 10 % growth
+(`--time-tol`, `--mem-tol`). Ratios are only meaningful between runs with the
+same machine, threads, ranks and launcher, and the differences are printed
+first. `compare.py` exits with 1 when a result fails or a row has a problem.
 
-Three things the script refuses or complains about, because each fails looking like
-something else:
+## What a row records
 
-| | |
-| --- | --- |
-| the launcher asked for more tasks than the communicator has | srun without `--mpi=pmix` starts one singleton per task instead of failing, and the job measures a fraction of what it was asked to |
-| a BLAS serves fewer threads than the rank was given | it does not refuse them; it warns once per thread and dies later somewhere unrelated. The module's OpenBLAS is `MAX_THREADS=48` |
-| threadpoolctl is missing | not fatal, but then no BLAS is recorded **and numpy's pool is not resized**, which on the node is the difference between 105 and 3500 Gflop/s |
+- the exit code, the wall time of each repetition, and the peak resident set
+  size (the largest process on this host: with `mpirun`, the largest rank);
+- the results, from the final h5 file where it holds them (SCF energy,
+  excitation energies, oscillator and TPA strengths, TPA cross sections,
+  optimization energies and steps) and from the output where it does not (the
+  last molecular gradient, the 3PA strengths). Transition moments are not
+  recorded: their sign follows the phase of the response vectors;
+- the solver stages, iterations and times the output prints, and its warnings;
+- the RI flags of the SCF (`ri`, `ri_jk`, `ri_coulomb`, `ri_fallback`).
 
-`--force` measures anyway. Never cap numpy with `OPENBLAS_NUM_THREADS`: every
-OpenBLAS in the process reads it, the driver's included, and setting it above a
-library's compiled ceiling is what causes the crash above.
+A row has a problem when the process failed, no results were read, or an RI row
+did not use RI: the SCF reports a fallback in the h5 file, and the gradient and
+response drivers in a warning that names the four-center integrals. Such a row
+measured the four-center path and its timings say nothing about RI.
 
-`scripts/test_node.py` covers that branch with a stub, because the machine the code
-is written on has no threadpoolctl and the machine it matters on does. Run it
-directly or under pytest; the repository's own pytest run does not collect it.
+Every run records the commit, whether tracked files were modified, the build
+commit, the veloxchem version and path, the machine and CPU, the launcher, the
+`OMP_*`, `OPENBLAS_*`, `MKL_*` and `VLX_*` environment, and the BLAS libraries
+with their thread counts (when threadpoolctl is installed).
 
-Then render it, which writes the markdown and the pdf beside the data:
+## Rules
 
-```sh
-python benchmarks/scripts/render.py benchmarks/data/scf/<run>.json
-```
+- **A run is never appended to.** One file is one set of cases, one machine,
+  one commit. The runner refuses a run id that exists.
+- **Ratios are computed when compared, never stored.** A stored ratio goes
+  stale when either of its rows is measured again.
+- **Results are local.** Timings belong to a machine, so runs are not tracked;
+  keep a base run of your machine and compare against it.
 
-`--functional HF` narrows it, `--out -` prints instead of writing, `--no-pdf` skips
-the pdf. The pdfs are not tracked; they are regenerated from the json in a second.
+## Adding a case
 
-## What an SCF record holds
+Put an input file in a suite directory, with a first comment line that says
+what it measures. Use `xyzfile:` with a name from `geometries/` (or a file
+beside the case), and do not set `ri`: the runner adds it. A case should stay
+meaningful as the code changes. A measurement that answers one design question
+belongs with that question, not here.
 
-Per calculation: molecule, atoms, basis, nao, fitting set, naux, occupied orbitals,
-method, the ri mode **read back from the driver**, functional, convergence
-threshold, energy, iterations, and the time split four ways --
+## Geometries
 
-| field | what it is |
-| --- | --- |
-| `ri_setup` | the metric and the B vectors, formed once before the first build |
-| `fock_2e_total` | the two-electron build, summed over the iterations |
-| `fock_xc_total` | the quadrature, summed the same way |
-| `remainder` | the wall clock less the three above |
+`caffeine.xyz` (24 atoms), `nitroxide.xyz` (a nitronyl nitroxide radical,
+C7H13N2O2, 24 atoms, doublet) and `tagrisso.xyz` (osimertinib, 70 atoms). Their
+sources are not recorded.
 
-The split matters. On tagrisso at def2-svpd, 199 seconds of the conventional
-route's 357 are B vectors, and the simd route forms the same thing in 17 -- while
-the two differ by only 2.9x on the builds. Before the setup had a column of its own
-it sat inside the remainder and neither number could be seen.
+## History
 
-The methods are `full` (four centre, no approximation), `ri_jk_conventional`,
-`ri_jk_simd` (which asks for `automatic` and records what it got), and
-`ri_jk_simd_direct`.
-
-## Provenance
-
-Every file records the commit, whether the tree was dirty, the veloxchem version,
-the machine and its cpu, the ranks and threads, and every BLAS the process loaded
-with its thread count. A number whose origin is not identifiable is not evidence:
-two of this year's wrong conclusions came from comparing runs whose configurations
-differed in a way nobody had written down.
-
-## The geometries
-
-`caffeine.xyz` and `tagrisso.xyz` for now. Their provenance is not recorded -- they
-came from a working directory, not a citable source. Anything added here should
-carry where it came from.
+The scripts, data and notes that measured the SIMD integral and RI drivers
+during their development (`BENCHMARKS.md`, `benchmarks/scripts/`,
+`benchmarks/data/`) were removed after commit `150f4f5a26`. They describe the
+code as it was in September 2026, compare paths that no longer exist
+(conventional and direct RI-JK), and set driver attributes that were renamed
+or removed. Read them with `git show 150f4f5a26:BENCHMARKS.md`.

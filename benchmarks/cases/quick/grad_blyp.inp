@@ -1,0 +1,15 @@
+# Caffeine, BLYP, def2-SVP: closed-shell SCF gradient with a pure functional (RI-J).
+@jobs
+task: gradient
+@end
+
+@method settings
+xcfun: blyp
+basis: def2-svp
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end

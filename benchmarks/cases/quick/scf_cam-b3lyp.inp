@@ -1,0 +1,15 @@
+# Caffeine, CAM-B3LYP, def2-SVP: closed-shell SCF with a range-separated functional (RI-JK).
+@jobs
+task: scf
+@end
+
+@method settings
+xcfun: cam-b3lyp
+basis: def2-svp
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end
