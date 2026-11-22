@@ -18,7 +18,8 @@ class TestRiJkAtomLimit:
     basis set of at most double-zeta valence without diffuse functions, from
     256 atoms on in a triple-zeta one without diffuse functions, and from 512
     atoms on in any basis set; force_ri keeps RI-JK, and RI-J is not
-    limited."""
+    limited. A calculation that falls back for the number of atoms keeps the
+    two-level DIIS, which RI otherwise replaces by plain DIIS."""
 
     @staticmethod
     def is_orbital_basis(fname):
@@ -86,7 +87,7 @@ class TestRiJkAtomLimit:
             assert not scf_drv._ri_jk_exceeds_atom_limit(molecule, basis)
 
     @staticmethod
-    def run_scf(basis_label, xcfun_label, force_ri=False, ri=True):
+    def get_water(basis_label):
 
         molecule = Molecule.read_str(
             """
@@ -96,6 +97,12 @@ class TestRiJkAtomLimit:
             """,
             units='angstrom')
         basis = MolecularBasis.read(molecule, basis_label, ostream=None)
+
+        return molecule, basis
+
+    def run_scf(self, basis_label, xcfun_label, force_ri=False, ri=True):
+
+        molecule, basis = self.get_water(basis_label)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ri = ri
@@ -180,3 +187,104 @@ class TestRiJkAtomLimit:
         assert scf_drv._uses_ri_coulomb()
         assert not scf_drv._ri_fallback
         assert not any('The molecule has' in w for w in warnings)
+
+    @staticmethod
+    def record_scf_steps(monkeypatch):
+
+        steps = []
+        comp_diis = scfdriver.ScfDriver._comp_diis
+
+        def recorded_comp_diis(scf_drv, molecule, ao_basis, den_mat, profiler):
+            comp_diis(scf_drv, molecule, ao_basis, den_mat, profiler)
+            steps.append((ao_basis.get_label(), scf_drv._ri_drv is not None))
+
+        monkeypatch.setattr(scfdriver.ScfDriver, '_comp_diis',
+                            recorded_comp_diis)
+
+        return steps
+
+    def test_atom_fallback_keeps_two_level_diis(self, monkeypatch):
+
+        # NOTE: the limit of def2-svp lowered to the 3 atoms of water. The
+        # valence basis of the first step has no basis set category, and its
+        # limit of 512 atoms is not reached.
+        monkeypatch.setattr(scfdriver, '_RI_JK_FALLBACK_ATOMS_DOUBLE_ZETA', 3)
+
+        steps = self.record_scf_steps(monkeypatch)
+
+        scf_drv, _, _, warnings = self.run_scf('def2-svp', 'b3lyp')
+
+        assert scf_drv._ri_fallback
+        assert scf_drv.acc_type == 'L2_DIIS'
+        assert scf_drv._acc_type_used == 'L2_DIIS'
+        # NOTE: each step and whether it held an RI driver after it.
+        assert steps == [('DEF2-SVP(VALENCE)', False), ('DEF2-SVP', False)]
+        assert len([w for w in warnings if 'The molecule has 3 atoms' in w
+                   ]) == 1
+
+        # NOTE: the energy and the iterations are those of the four-center
+        # integrals, which take the two-level DIIS by default.
+        four_center = self.run_scf('def2-svp', 'b3lyp', ri=False)[0]
+        assert four_center._acc_type_used == 'L2_DIIS'
+
+        if scf_drv.rank == mpi_master():
+            assert abs(scf_drv.get_scf_energy() -
+                       four_center.get_scf_energy()) < 1.0e-8
+            assert len(scf_drv.history) == len(four_center.history)
+
+    def test_ri_keeps_plain_diis(self, monkeypatch):
+
+        steps = self.record_scf_steps(monkeypatch)
+
+        scf_drv, _, _, _ = self.run_scf('def2-svp', 'b3lyp')
+
+        assert scf_drv._uses_ri_jk()
+        assert scf_drv.acc_type == 'L2_DIIS'
+        assert scf_drv._acc_type_used == 'DIIS'
+        assert steps == [('DEF2-SVP', True)]
+
+    def test_force_ri_and_memory_fallback_keep_plain_diis(self, monkeypatch):
+
+        molecule, basis = self.get_water('def2-svp')
+
+        # NOTE: a budget of 1 kB, which the RI set does not fit in. The
+        # memory fallback is decided after the accelerator is chosen.
+        mem_drv = ScfRestrictedDriver()
+        mem_drv.ri = True
+        mem_drv.xcfun = 'b3lyp'
+        mem_drv.ri_memory_budget = 1.0e-6
+        mem_drv.ostream.mute()
+        mem_drv.compute(molecule, basis)
+
+        assert mem_drv._ri_fallback
+        assert mem_drv._acc_type_used == 'DIIS'
+
+        monkeypatch.setattr(scfdriver, '_RI_JK_FALLBACK_ATOMS_DOUBLE_ZETA', 3)
+
+        scf_drv = self.run_scf('def2-svp', 'b3lyp', force_ri=True)[0]
+
+        assert scf_drv._uses_ri_jk()
+        assert scf_drv._acc_type_used == 'DIIS'
+
+    def test_driver_used_again(self, monkeypatch):
+
+        molecule, basis = self.get_water('def2-svp')
+
+        # NOTE: RI settings read from input, which run the sanity check before
+        # compute.
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ostream.mute()
+        scf_drv.update_settings({}, {'xcfun': 'b3lyp', 'ri': 'yes'})
+
+        assert scf_drv.ri_jk
+        assert scf_drv.acc_type == 'L2_DIIS'
+
+        scf_drv.compute(molecule, basis)
+        assert scf_drv._uses_ri_jk()
+        assert scf_drv._acc_type_used == 'DIIS'
+
+        monkeypatch.setattr(scfdriver, '_RI_JK_FALLBACK_ATOMS_DOUBLE_ZETA', 3)
+
+        scf_drv.compute(molecule, basis)
+        assert scf_drv._ri_fallback
+        assert scf_drv._acc_type_used == 'L2_DIIS'

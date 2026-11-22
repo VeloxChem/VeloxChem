@@ -171,6 +171,8 @@ class ScfDriver:
 
         # scf accelerator
         self.acc_type = 'L2_DIIS'
+        # NOTE: the accelerator a calculation runs, set by compute.
+        self._acc_type_used = None
         self.max_err_vecs = 10
         self.max_iter = 50
         self._first_step = False
@@ -284,6 +286,9 @@ class ScfDriver:
         # by the gradients to say why they find none.
         self._ri_released = False
         self._ri_fallback = False
+        # NOTE: whether RI-JK falls back for the number of atoms, set by
+        # compute and read by _comp_diis.
+        self._ri_jk_atom_fallback = False
         self._ri_rss_at_setup = 0
         self._ri_memory_check = None
 
@@ -864,6 +869,30 @@ class ScfDriver:
             if self.acc_type.upper() == 'L2_DIIS':
                 self.acc_type = 'DIIS'
 
+        # NOTE: the accelerator of this calculation is set here and not
+        # written into acc_type: whether RI is used depends on the molecule
+        # (_ri_jk_exceeds_atom_limit), and a driver that used RI on one
+        # molecule would otherwise keep plain DIIS for one that falls back.
+        self._acc_type_used = self.acc_type.upper()
+
+        # NOTE: RI takes plain DIIS, as the first step of the two-level DIIS
+        # would form the metric and the B vectors for the valence basis too.
+        # The number of atoms is checked here, with the basis set of the
+        # calculation: a molecule whose atoms reach the RI-JK limit falls back
+        # to the four-center integrals and keeps the two-level DIIS. The
+        # memory fallback is decided in _comp_diis, after the auxiliary basis
+        # is read and the memory predicted, and a calculation that falls back
+        # for memory keeps plain DIIS.
+        fock_type = self._get_2e_fock_build_params()[0]
+        use_ri_coulomb = self.ri_coulomb and fock_type == 'j'
+        use_ri_jk = self.ri_jk and fock_type != 'j'
+
+        self._ri_jk_atom_fallback = (
+            use_ri_jk and self._ri_jk_exceeds_atom_limit(molecule, basis))
+
+        if use_ri_coulomb or (use_ri_jk and not self._ri_jk_atom_fallback):
+            self._acc_type_used = 'DIIS'
+
         if self._uses_custom_initial_guess():
             if self.restart and self.rank == mpi_master():
                 self._ref_mol_orbs = MolecularOrbitals.read_hdf5(
@@ -1147,7 +1176,7 @@ class ScfDriver:
                 self.ostream.print_blank()
 
         # DIIS method
-        if self.acc_type.upper() == 'DIIS':
+        if self._acc_type_used == 'DIIS':
             den_mat = self._prepare_initial_density(
                 self._gen_single_step_initial_density, molecule, basis,
                 min_basis)
@@ -1158,7 +1187,7 @@ class ScfDriver:
             self._comp_diis(molecule, basis, den_mat, profiler)
 
         # two level DIIS method
-        elif self.acc_type.upper() == 'L2_DIIS':
+        elif self._acc_type_used == 'L2_DIIS':
 
             # first step: temporarily use a looser threshold and fewer
             # iterations for the reduced-basis calculation. Restore the
@@ -1924,13 +1953,19 @@ class ScfDriver:
         use_ri_coulomb = self.ri_coulomb and fock_type == 'j'
         use_ri_jk = self.ri_jk and fock_type != 'j'
 
-        # NOTE: the number of atoms is checked before the auxiliary basis is
-        # read and the memory is predicted, and a molecule whose atoms reach
-        # the limit falls back without either. It is the same on every rank, as the
-        # molecule and the basis set are.
+        # NOTE: the number of atoms is checked in compute, with the basis set
+        # of the calculation, before the accelerator is chosen. In the first
+        # step of the two-level DIIS ao_basis is the valence basis, whose label
+        # "<name>(Valence)" has no basis set category and would be given the
+        # limit of any basis set. A molecule whose atoms reach the limit falls
+        # back without reading the auxiliary basis or predicting the memory.
+        # The decision is the same on every rank, as the molecule and the basis
+        # set are. The warning is printed outside the first step, once for the
+        # calculation.
         if use_ri_jk:
-            self._ri_fallback = self._ri_jk_exceeds_atom_limit(
-                molecule, ao_basis)
+            if not self._first_step:
+                self._print_ri_jk_atom_limit_warning(molecule, ao_basis)
+            self._ri_fallback = self._ri_jk_atom_fallback
             if self._ri_fallback:
                 self._ri_drv = None
                 self._ri_aux_atoms = []
@@ -3575,8 +3610,8 @@ class ScfDriver:
         """
         Checks whether RI-JK falls back to the four-center integrals for the
         number of atoms of the molecule, an empirical default set for speed
-        (see _RI_JK_FALLBACK_ATOMS), and prints a warning where the limit is
-        reached. force_ri keeps RI-JK.
+        (see _RI_JK_FALLBACK_ATOMS). force_ri keeps RI-JK. The warning is
+        printed by _print_ri_jk_atom_limit_warning.
 
         :param molecule:
             The molecule, whose atoms (ghost atoms included) are counted.
@@ -3587,11 +3622,27 @@ class ScfDriver:
             True if RI-JK falls back.
         """
 
+        limit = self._get_ri_jk_atom_limit(ao_basis)[0]
+
+        return molecule.number_of_atoms() >= limit and not self.force_ri
+
+    def _print_ri_jk_atom_limit_warning(self, molecule, ao_basis):
+        """
+        Prints a warning where the atoms of the molecule reach the RI-JK limit
+        (_ri_jk_exceeds_atom_limit), saying whether RI-JK falls back or
+        force_ri keeps it.
+
+        :param molecule:
+            The molecule, whose atoms (ghost atoms included) are counted.
+        :param ao_basis:
+            The AO basis set.
+        """
+
         natoms = molecule.number_of_atoms()
         limit, basis_text = self._get_ri_jk_atom_limit(ao_basis)
 
         if natoms < limit:
-            return False
+            return
 
         where = ('' if basis_text is None else f' in {basis_text}')
 
@@ -3601,19 +3652,14 @@ class ScfDriver:
         if self.force_ri:
             self.ostream.print_warning(
                 f'{limit_text}; force_ri is set, so RI-JK is used.')
-            self.ostream.print_blank()
-            self.ostream.flush()
-            return False
-
-        self.ostream.print_warning(
-            f'{limit_text}, so the Fock matrices are formed from the ' +
-            'four-center integrals. To use RI-JK all the same, set the ' +
-            'attribute force_ri = True of the SCF driver, or add the line ' +
-            'force_ri: yes under @method settings of the input file.')
+        else:
+            self.ostream.print_warning(
+                f'{limit_text}, so the Fock matrices are formed from the ' +
+                'four-center integrals. To use RI-JK all the same, set the ' +
+                'attribute force_ri = True of the SCF driver, or add the line ' +
+                'force_ri: yes under @method settings of the input file.')
         self.ostream.print_blank()
         self.ostream.flush()
-
-        return True
 
     def _uses_ri_jk(self):
         """
@@ -4863,10 +4909,10 @@ class ScfDriver:
             The string with type of SCF convergence accelerator.
         """
 
-        if self.acc_type.upper() == 'DIIS':
+        if self._acc_type_used == 'DIIS':
             return 'Direct Inversion of Iterative Subspace'
 
-        if self.acc_type.upper() == 'L2_DIIS':
+        if self._acc_type_used == 'L2_DIIS':
             return 'Two Level Direct Inversion of Iterative Subspace'
 
         return 'Undefined'

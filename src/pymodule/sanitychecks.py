@@ -439,14 +439,6 @@ def dft_and_ri_sanity_check(obj, method_flag='compute',
     obj.ri_coulomb = not use_ri_jk
     obj.ri_jk = use_ri_jk
 
-    if hasattr(obj, 'acc_type'):
-        # NOTE: RI takes plain DIIS, as the first step of the two-level DIIS
-        # would form the metric and the B vectors for the valence basis too. A
-        # run that falls back to the four-center integrals also keeps plain
-        # DIIS, as the fallback is decided after this.
-        if obj.acc_type.upper() == 'L2_DIIS':
-            obj.acc_type = 'DIIS'
-
     # NOTE: ri_auxiliary_basis is left as set. None takes the auxiliary basis
     # set of the RI kind (get_ri_auxiliary_basis) each time, also for a driver
     # used again with another functional.
