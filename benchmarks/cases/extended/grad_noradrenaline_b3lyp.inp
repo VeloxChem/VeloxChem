@@ -1,0 +1,15 @@
+# Noradrenaline, B3LYP, def2-TZVPD (552 basis functions): SCF gradient (RI-JK).
+@jobs
+task: gradient
+@end
+
+@method settings
+xcfun: b3lyp
+basis: def2-tzvpd
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: noradrenaline.xyz
+@end

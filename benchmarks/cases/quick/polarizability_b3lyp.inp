@@ -1,0 +1,20 @@
+# Caffeine, B3LYP, def2-SVP: linear response polarizability at two frequencies (RI-JK).
+@jobs
+task: response
+@end
+
+@method settings
+xcfun: b3lyp
+basis: def2-svp
+@end
+
+@response
+property: polarizability
+frequencies: 0.0, 0.05
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end

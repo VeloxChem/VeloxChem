@@ -45,6 +45,7 @@ SCHEMA = 1
 # transition dipoles and transition moments change sign with the phase.
 H5_SCALARS = {
     'scf_energy': 'scf/scf_energy',
+    'c6': 'rsp/c6',
 }
 H5_FLAGS = {
     'ri': 'scf/ri',
@@ -61,7 +62,13 @@ H5_ARRAYS = {
     'tpa_strengths_circular': 'rsp/tpa_strengths/circular',
     'tpa_cross_sections': 'rsp/cross_sections',
     'opt_energies': 'opt/opt_energies',
+    'vib_frequencies': 'vib/vib_frequencies',
+    'ir_intensities': 'vib/ir_intensities',
 }
+# NOTE: a dictionary of linear response functions <<A;B>>(w), keyed by the
+# two operator components and the frequency; read into a dictionary of real
+# and imaginary parts.
+H5_RESPONSE_FUNCTIONS = 'rsp/response_functions'
 
 RE_BUILD = re.compile(r'\(build commit (\w+)\)')
 RE_CONVERGED = re.compile(
@@ -69,24 +76,53 @@ RE_CONVERGED = re.compile(
 RE_TIME_SPENT = re.compile(r'\*\*\* Time spent in (.+?): ([\d.]+) sec')
 RE_TOTAL = re.compile(r'Total execution time is ([\d.]+) sec')
 RE_WARNING = re.compile(r'^\s*(?:\* Warning \*|\*\*\* Warning:)\s*(.*?)\s*$')
-RE_GRADIENT_ROW = re.compile(
-    r'^\s*([A-Z][a-z]?)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)\s*$')
-RE_3PA_ROW = re.compile(r'^\s*(\d+)\s+([\d.]+) eV\s+(-?[\d.]+) a\.u\.\s*$')
+RE_POLGRAD_ATOM = re.compile(r'\*\* Atom #(\d+): (\w+) \*\*')
+
+# NOTE: the result tables read from the output, as (title, result key, row
+# pattern, values of a row). A table starts at its title and ends at the
+# next title, a "Time spent" line or the end of the output. A title seen
+# again starts the table again, so the last one is kept (an optimization
+# prints a gradient at every step). The polarizability gradient is printed
+# per atom and only for components above 1e-6 in magnitude, so it is read
+# into a dictionary keyed by atom, component and frequency.
+OUTPUT_TABLES = (
+    ('Analytical Gradient (Hartree/Bohr)', 'gradient',
+     re.compile(r'^\s*[A-Z][a-z]?\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)'
+                r'\s+(-?\d+\.\d+)\s*$'),
+     lambda m: [float(g) for g in m.groups()]),
+    ('3PA Strength (Linear Polarization)', '3pa_strengths_linear',
+     re.compile(r'^\s*\d+\s+[\d.]+ eV\s+(-?[\d.]+) a\.u\.\s*$'),
+     lambda m: [float(m.group(1))]),
+    ('3PA Strength (Circular Polarization)', '3pa_strengths_circular',
+     re.compile(r'^\s*\d+\s+[\d.]+ eV\s+(-?[\d.]+) a\.u\.\s*$'),
+     lambda m: [float(m.group(1))]),
+    ('SHG hyperpolarizability', 'shg_beta',
+     re.compile(r'^\s*beta\s+[\d.]+\s+(-?[\d.]+)\s+(-?[\d.]+)j\s*$'),
+     lambda m: [float(m.group(1)), float(m.group(2))]),
+    ('THG Summary', 'thg_gamma',
+     re.compile(r'^\s*[\d.]+ eV\s+(-?[\d.]+)\s+(-?[\d.]+)\s+[\d.]+\s*$'),
+     lambda m: [float(m.group(1)), float(m.group(2))]),
+    ('Analytical Polarizability Gradients', 'polarizability_gradient',
+     re.compile(r'^\s*(d<<\w;\w>>/d\w)\s+([\d.]+)\s+(-?[\d.]+)\s*$'), None),
+)
 RE_RI_KEY = re.compile(r'^\s*ri\s*:', re.IGNORECASE | re.MULTILINE)
 RE_XYZFILE = re.compile(r'^(\s*xyzfile\s*:\s*)(\S+)\s*$',
                         re.IGNORECASE | re.MULTILINE)
+RE_VALUE = re.compile(r'^\s*[\w ]+?\s*:\s*(\S+)\s*$', re.MULTILINE)
+RE_KILLED = re.compile(r'signal 9|\bkilled\b|out of memory|oom', re.IGNORECASE)
 
 
 def find_cases(names):
     """
-    Resolves suite names and input files to a list of case files.
+    Resolves suite names, directories and input files to a list of cases.
 
     :param names:
-        Suite names (directories under cases/) or paths to .inp files.
+        Suite names (directories under cases/), paths to directories of
+        .inp files, or paths to .inp files.
 
     :return:
         A list of (suite, path) pairs, in the order given and sorted within
-        a suite.
+        a suite. The suite of a case is the name of its directory.
     """
 
     found = []
@@ -95,16 +131,31 @@ def find_cases(names):
         if path.suffix == '.inp' and path.is_file():
             found.append((path.resolve().parent.name, path.resolve()))
             continue
-        suite = CASES / name
+        suite = path if path.is_dir() else CASES / name
         if not suite.is_dir():
-            sys.exit(f'run.py: no suite or input file named {name}; '
-                     f'suites: {", ".join(list_suites())}')
-        found.extend((name, p) for p in sorted(suite.glob('*.inp')))
+            sys.exit(f'run.py: no suite, directory or input file named '
+                     f'{name}; suites: {", ".join(list_suites())}')
+        suite = suite.resolve()
+        found.extend((suite.name, p) for p in sorted(suite.glob('*.inp')))
     return found
 
 
 def list_suites():
     return sorted(p.name for p in CASES.iterdir() if p.is_dir())
+
+
+def geometry_folders(case_path):
+    """
+    The folders a geometry named by a case is looked up in, in order: the
+    folder of the case, a geometries/ folder beside it or beside one of its
+    two parent folders, and benchmarks/geometries.
+    """
+
+    folders = [case_path.parent]
+    for parent in list(case_path.parents)[:3]:
+        folders.append(parent / 'geometries')
+    folders.append(GEOMETRIES)
+    return folders
 
 
 def describe(path):
@@ -121,8 +172,9 @@ def prepare_input(case_path, ri, workdir):
     Writes the input of one variant of a case into its working directory.
 
     Adds `ri: yes` or `ri: no` to the @method settings group and copies each
-    geometry named by `xyzfile:` beside the input. A geometry is looked up
-    beside the case file first and then in geometries/.
+    geometry named by `xyzfile:` beside the input, from the first of
+    geometry_folders that has it. Any other value that names a file in the
+    folder of the case (point charges, parameter files) is copied as well.
 
     :return:
         The path of the written input.
@@ -135,7 +187,7 @@ def prepare_input(case_path, ri, workdir):
 
     def copy_geometry(match):
         name = match.group(2)
-        for folder in (case_path.parent, GEOMETRIES):
+        for folder in geometry_folders(case_path):
             source = folder / name
             if source.is_file():
                 shutil.copy(source, workdir / Path(name).name)
@@ -144,10 +196,18 @@ def prepare_input(case_path, ri, workdir):
 
     text = RE_XYZFILE.sub(copy_geometry, text)
 
+    for match in RE_VALUE.finditer(text):
+        name = match.group(1)
+        source = case_path.parent / name
+        if '/' not in name and source.is_file() and source != case_path:
+            shutil.copy(source, workdir / name)
+
     ri_line = f'ri: {"yes" if ri else "no"}'
     lines = text.splitlines()
     for i, line in enumerate(lines):
-        if ' '.join(line.split()).lower() == '@method settings':
+        # NOTE: the input parser names a group by its words joined with '_',
+        # so '@method settings' and '@method_settings' are one group.
+        if '_'.join(line.lower().split()) == '@method_settings':
             lines.insert(i + 1, ri_line)
             break
     else:
@@ -203,6 +263,9 @@ def read_h5(path):
         for key, name in H5_ARRAYS.items():
             if name in h5:
                 record['results'][key] = np.ravel(h5[name][()]).tolist()
+        if H5_RESPONSE_FUNCTIONS in h5:
+            record['results']['response_functions'] = read_response_functions(
+                h5[H5_RESPONSE_FUNCTIONS])
 
     energies = record['results'].pop('opt_energies', None)
     if energies:
@@ -212,14 +275,36 @@ def read_h5(path):
     return record
 
 
+def read_response_functions(group):
+    """
+    The response functions of an h5 group as {'x,y,0.3000 re': value, ...}.
+
+    Each entry holds a key, (operator component, operator component,
+    frequency), and a complex value. The frequency is printed to four
+    decimals, so that 0.36 and 0.36000000000000004 give one key.
+    """
+
+    values = {}
+    for entry in group.values():
+        parts = [entry['__key__'][k][()] for k in sorted(entry['__key__'])]
+        parts = [
+            p.decode() if isinstance(p, bytes) else f'{float(p):.4f}'
+            for p in parts
+        ]
+        value = complex(entry['__value__'][()])
+        label = ','.join(parts)
+        values[f'{label} re'] = value.real
+        values[f'{label} im'] = value.imag
+    return dict(sorted(values.items()))
+
+
 def read_output(path):
     """
     What the output text holds that the h5 file does not.
 
     The stages are the solver summaries ("... converged in N iterations.
     Time: T sec") and the "Time spent in ..." lines, summed by label. The
-    gradient is the last "Analytical Gradient" table; the 3PA strengths are
-    the two "3PA Strength" tables.
+    results are the tables of OUTPUT_TABLES.
     """
 
     record = {'stages': {}, 'warnings': {}, 'results': {}}
@@ -239,11 +324,10 @@ def read_output(path):
         if iterations is not None:
             stage['iterations'] += iterations
 
-    gradient = None
-    tpa3 = {}
-    i = 0
-    while i < len(lines):
-        line = lines[i]
+    tables = {}
+    table = None
+    atom = None
+    for line in lines:
 
         match = RE_BUILD.search(line)
         if match and 'build_commit' not in record:
@@ -257,6 +341,7 @@ def read_output(path):
         match = RE_TIME_SPENT.search(line)
         if match:
             add_stage(f'Time spent in {match.group(1)}', float(match.group(2)))
+            table = None
 
         match = RE_TOTAL.search(line)
         if match:
@@ -267,37 +352,28 @@ def read_output(path):
             text = match.group(1)
             record['warnings'][text] = record['warnings'].get(text, 0) + 1
 
-        if 'Analytical Gradient (Hartree/Bohr)' in line:
-            # NOTE: the rows follow a title, a rule, the column labels and
-            # blank lines; the table ends at the first line after a row that
-            # is not one.
-            gradient = []
-            i += 1
-            while i < len(lines):
-                match = RE_GRADIENT_ROW.match(lines[i])
-                if match:
-                    gradient.append([float(match.group(k)) for k in (2, 3, 4)])
-                elif gradient:
-                    break
-                i += 1
+        title = next((t for t in OUTPUT_TABLES if t[0] in line), None)
+        if title is not None:
+            table = title
+            tables[table[1]] = {} if table[3] is None else []
+            continue
+        if table is None:
             continue
 
-        if '3PA Strength (Linear Polarization)' in line:
-            tpa3['3pa_strengths_linear'] = []
-            current = tpa3['3pa_strengths_linear']
-        elif '3PA Strength (Circular Polarization)' in line:
-            tpa3['3pa_strengths_circular'] = []
-            current = tpa3['3pa_strengths_circular']
-        elif tpa3:
-            match = RE_3PA_ROW.match(line)
+        _, key, pattern, values = table
+        if values is None:
+            match = RE_POLGRAD_ATOM.search(line)
             if match:
-                current.append(float(match.group(3)))
+                atom = f'{match.group(1)} {match.group(2)}'
+                continue
+        match = pattern.match(line)
+        if match and values is None:
+            tables[key][f'{atom} {match.group(1)} {match.group(2)}'] = float(
+                match.group(3))
+        elif match:
+            tables[key].extend(values(match))
 
-        i += 1
-
-    if gradient:
-        record['results']['gradient'] = np.ravel(gradient).tolist()
-    record['results'].update(tpa3)
+    record['results'].update({k: v for k, v in tables.items() if v})
 
     return record
 
@@ -314,7 +390,39 @@ def clean(workdir, stem):
                 path.unlink()
 
 
-def run_case(suite, case_path, ri, rundir, launcher, repeat, keep_files):
+def memory_limit_prefix(limit):
+    """
+    The command that runs a process under a memory limit, without swap: a
+    transient systemd scope of the user (Linux with systemd only). The
+    program reads the limit through the control group, as it reads one set
+    by a batch system.
+    """
+
+    if shutil.which('systemd-run') is None:
+        sys.exit('run.py: --memory-limit needs systemd-run (Linux)')
+    return [
+        'systemd-run', '--user', '--scope', '--quiet', '-p',
+        f'MemoryMax={limit}', '-p', 'MemorySwapMax=0'
+    ]
+
+
+def was_killed(rc, log_path):
+    """
+    Whether a process was killed rather than ended: exit code 137 or signal
+    9, or a launcher's message about a killed task or the memory running out
+    in the log of standard output and error.
+    """
+
+    if rc in (137, -9):
+        return True
+    try:
+        return bool(RE_KILLED.search(log_path.read_text(errors='replace')))
+    except OSError:
+        return False
+
+
+def run_case(suite, case_path, ri, rundir, launcher, repeat, keep_files,
+             memory_limit):
     """Runs one variant of one case, repeat times, and returns its record."""
 
     variant = 'ri' if ri else 'four_center'
@@ -323,10 +431,13 @@ def run_case(suite, case_path, ri, rundir, launcher, repeat, keep_files):
         'case': case_path.stem,
         'description': describe(case_path),
         'variant': variant,
+        'memory_limit': memory_limit,
         'walls': [],
         'peak_rss': [],
         'exit_codes': [],
+        'killed': False,
     }
+    prefix = memory_limit_prefix(memory_limit) if memory_limit else []
 
     for rep in range(repeat):
         workdir = rundir / suite / case_path.stem / variant
@@ -336,15 +447,17 @@ def run_case(suite, case_path, ri, rundir, launcher, repeat, keep_files):
 
         inp = prepare_input(case_path, ri, workdir)
         out = workdir / f'{case_path.stem}.out'
-        command = launcher + [
+        command = prefix + launcher + [
             sys.executable, '-m', 'veloxchem', inp.name, out.name
         ]
 
-        rc, wall, rss = run_process(command, workdir, os.environ.copy(),
-                                    workdir / f'{case_path.stem}.log')
+        log = workdir / f'{case_path.stem}.log'
+        rc, wall, rss = run_process(command, workdir, os.environ.copy(), log)
         record['walls'].append(round(wall, 3))
         record['peak_rss'].append(rss)
         record['exit_codes'].append(rc)
+        if rc != 0 and was_killed(rc, log):
+            record['killed'] = True
 
         # NOTE: the results, stages and warnings are read from the first
         # repetition; later ones only add a wall time and a peak memory.
@@ -366,35 +479,48 @@ def run_case(suite, case_path, ri, rundir, launcher, repeat, keep_files):
             break
 
     record['wall'] = min(record['walls'])
-    record['problems'] = problems(record, ri)
+    record['problems'], record['notes'] = problems(record, ri, memory_limit)
     return record
 
 
-def problems(record, ri):
+def problems(record, ri, memory_limit):
     """
-    What makes a record unusable as a measurement of its variant.
+    What makes a record unusable as a measurement of its variant, and what
+    is worth noting about it.
 
     An ri row that fell back to the four-center integrals measured the
     four-center path; the SCF reports that in the h5 file, and the gradient
     and response drivers in a warning that names the four-center integrals.
+    Under a memory limit a fallback is what the limit is there to bring
+    about: it is a note, and a killed process is the problem.
+
+    :return:
+        (problems, notes), two lists of strings.
     """
 
     found = []
-    if any(rc != 0 for rc in record['exit_codes']):
+    if record['killed']:
+        found.append(f'killed (exit code {record["exit_codes"][-1]})')
+    elif any(rc != 0 for rc in record['exit_codes']):
         found.append(f'exit code {record["exit_codes"]}')
     if not record.get('results'):
         found.append('no results read')
+
+    fallbacks = []
     flags = record.get('flags', {})
     if ri:
         if flags and not (flags.get('ri_jk') or flags.get('ri_coulomb')):
             found.append('ri asked for, the SCF used neither RI-J nor RI-JK')
         if flags.get('ri_fallback'):
-            found.append('the SCF fell back to the four-center integrals')
+            fallbacks.append('the SCF fell back to the four-center integrals')
         if any('four-center' in w for w in record.get('warnings', {})):
-            found.append('a step fell back to the four-center integrals')
+            fallbacks.append('a step fell back to the four-center integrals')
     elif flags.get('ri'):
         found.append('ri: no asked for, the SCF has ri set')
-    return found
+
+    if memory_limit:
+        return found, fallbacks
+    return found + fallbacks, []
 
 
 def git(*args):
@@ -498,8 +624,13 @@ def main():
         description='Run benchmark cases with and without RI.')
     parser.add_argument('targets',
                         nargs='*',
-                        help='suite names (directories under cases/) or .inp '
-                        'files')
+                        help='suite names (directories under cases/), '
+                        'directories of .inp files, or .inp files')
+    parser.add_argument('--memory-limit',
+                        default=None,
+                        help='run each process under this memory limit, e.g. '
+                        '8G (systemd-run); an RI fallback is then a note and '
+                        'a killed process the problem')
     parser.add_argument('--ri',
                         choices=('both', 'yes', 'no'),
                         default='both',
@@ -530,13 +661,16 @@ def main():
     args = parser.parse_args()
 
     if args.list or not args.targets:
-        for suite in list_suites():
-            print(suite)
-            for path in sorted((CASES / suite).glob('*.inp')):
-                print(f'  {path.stem:28s} {describe(path)}')
+        listed = find_cases(args.targets or list_suites())
+        for i, (suite, path) in enumerate(listed):
+            if i == 0 or listed[i - 1][0] != suite:
+                print(suite)
+            print(f'  {path.stem:32s} {describe(path)}')
         return
 
     cases = find_cases(args.targets)
+    if args.memory_limit:
+        memory_limit_prefix(args.memory_limit)
     launcher = shlex.split(args.launcher)
     variants = {'both': (True, False), 'yes': (True,), 'no': (False,)}[args.ri]
 
@@ -551,6 +685,7 @@ def main():
     rundir.mkdir(parents=True)
 
     info = provenance(args.machine, args.launcher)
+    info['memory_limit'] = args.memory_limit
     check_provenance(info)
     print(f'run.py: {len(cases)} cases x {len(variants)} variants at '
           f'{info["commit"]}{" (dirty)" if info["dirty"] else ""}, '
@@ -569,11 +704,13 @@ def main():
     for suite, case_path in cases:
         for ri in variants:
             record = run_case(suite, case_path, ri, rundir, launcher,
-                              args.repeat, args.keep_files)
+                              args.repeat, args.keep_files, args.memory_limit)
             document['rows'].append(record)
             json_path.write_text(json.dumps(document, indent=1) + '\n')
 
             status = '; '.join(record['problems']) or 'ok'
+            if record['notes']:
+                status += f' ({"; ".join(record["notes"])})'
             print(
                 f'{suite}/{case_path.stem:28s} {record["variant"]:12s} '
                 f'{record["wall"]:9.1f} s '

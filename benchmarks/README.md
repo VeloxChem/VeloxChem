@@ -20,11 +20,39 @@ benchmarks/
 
 | suite | cases | four-center wall time, 12 cores (rough) |
 | --- | --- | --- |
-| `quick` | caffeine and a nitroxide radical in def2-SVP: SCF (HF, B3LYP, BLYP, CAM-B3LYP, UKS), SCF gradient (RI-JK, RI-J, UKS), TDA, RPA | 10 min |
-| `standard` | diffuse and triple-zeta SCF and gradient, TDA of a 70-atom molecule, TPA transition, reduced TPA, 3PA transition, optimization (closed and open shell) | 1 to 1.5 h |
+| `quick` | caffeine and a nitroxide radical in def2-SVP: SCF (HF, B3LYP, BLYP, CAM-B3LYP, TPSSh, UKS), SCF gradient (RI-JK, RI-J, UKS), TDA, RPA, polarizability | 10 min |
+| `standard` | diffuse and triple-zeta SCF and gradient, TDA of a 70-atom molecule, unrestricted TDA, TDDFT gradient, CPP, SHG, THG, TPA transition, reduced TPA, 3PA transition, optimization (closed and open shell) | 1.5 to 2 h |
+| `extended` | Hessian and IR, polarizability gradient, excited-state optimization; noradrenaline in def2-TZVPD (RPA, TPA, gradient); a triplet guanine dimer (UHF, UKS); a TDDFT gradient with RI-J | overnight |
 
-The RI rows take a fraction of that. `python benchmarks/run.py --list` prints
-every case.
+The RI rows take a fraction of that (`extended`: about 45 min); `--ri yes`
+runs them alone. `python benchmarks/run.py --list` prints every case.
+
+Whether an RI row fits depends on the memory of the machine. RI-JK for a
+60-atom water cluster in def2-SVPD (780 basis functions) was predicted to need
+7.4 GB a rank with B3LYP and 14.6 GB with CAM-B3LYP (two ranks, 12.8 GB
+available to each), and the CAM-B3LYP run fell back to the four-center
+integrals. A row that fell back is reported as a problem, not as a measurement
+of RI.
+
+## Cases kept elsewhere
+
+`run.py` also takes a directory of input files from anywhere, for cases that
+are not kept in the repository (larger molecules, cluster layouts). A geometry
+named by `xyzfile:` is looked up beside the case, then in a `geometries/`
+folder beside it or beside one of its two parent folders, then in
+`benchmarks/geometries/`. Any other value in the input that names a file
+beside the case (point charges, parameter files) is copied with it.
+
+```sh
+python benchmarks/run.py path/to/suite --ri yes --launcher srun
+python benchmarks/run.py path/to/suite --ri yes --memory-limit 8G
+```
+
+`--memory-limit` runs each process under a memory limit without swap, through
+a transient systemd scope (Linux with systemd); the program reads the limit as
+it reads one set by a batch system. Under a limit a fallback to the
+four-center integrals is what the limit is meant to bring about, so it is
+reported as a note, and a killed process is the problem.
 
 ## Running
 
@@ -73,9 +101,11 @@ first. `compare.py` exits with 1 when a result fails or a row has a problem.
   size (the largest process on this host: with `mpirun`, the largest rank);
 - the results, from the final h5 file where it holds them (SCF energy,
   excitation energies, oscillator and TPA strengths, TPA cross sections,
+  linear response functions, C6, harmonic frequencies and IR intensities,
   optimization energies and steps) and from the output where it does not (the
-  last molecular gradient, the 3PA strengths). Transition moments are not
-  recorded: their sign follows the phase of the response vectors;
+  last molecular gradient, the 3PA strengths, the SHG beta, the THG gamma, the
+  polarizability gradient). Transition moments are not recorded: their sign
+  follows the phase of the response vectors;
 - the solver stages, iterations and times the output prints, and its warnings;
 - the RI flags of the SCF (`ri`, `ri_jk`, `ri_coulomb`, `ri_fallback`).
 
@@ -104,13 +134,21 @@ Put an input file in a suite directory, with a first comment line that says
 what it measures. Use `xyzfile:` with a name from `geometries/` (or a file
 beside the case), and do not set `ri`: the runner adds it. A case should stay
 meaningful as the code changes. A measurement that answers one design question
-belongs with that question, not here.
+belongs with that question, not here. A case is kept in the repository only
+when its molecule can be published; others are run from a directory elsewhere
+(see "Cases kept elsewhere").
 
 ## Geometries
 
-`caffeine.xyz` (24 atoms), `nitroxide.xyz` (a nitronyl nitroxide radical,
-C7H13N2O2, 24 atoms, doublet) and `tagrisso.xyz` (osimertinib, 70 atoms). Their
-sources are not recorded.
+| file | molecule | atoms |
+| --- | --- | --- |
+| `caffeine.xyz` | caffeine | 24 |
+| `nitroxide.xyz` | a nitronyl nitroxide radical, C7H13N2O2 (doublet) | 24 |
+| `noradrenaline.xyz` | noradrenaline, C8H11NO3 | 23 |
+| `guanine-2.xyz` | a guanine dimer, C12H14N10O2 | 38 |
+| `tagrisso.xyz` | osimertinib | 70 |
+
+Their sources are not recorded.
 
 ## History
 

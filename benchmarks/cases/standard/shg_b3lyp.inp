@@ -1,0 +1,21 @@
+# Caffeine, B3LYP, def2-SVP: second-harmonic generation, 2 frequencies (quadratic response, RI-JK).
+@jobs
+task: response
+@end
+
+@method settings
+xcfun: b3lyp
+basis: def2-svp
+@end
+
+@response
+property: shg
+frequencies: 0.05, 0.06
+damping: 0.002278
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end

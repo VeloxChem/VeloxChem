@@ -1,0 +1,21 @@
+# Caffeine, B3LYP, def2-SVP: third-harmonic generation, 1 frequency (cubic response with a functional, RI-JK).
+@jobs
+task: response
+@end
+
+@method settings
+xcfun: b3lyp
+basis: def2-svp
+@end
+
+@response
+property: thg
+frequencies: 0.05
+damping: 0.002278
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end

@@ -1,0 +1,15 @@
+# Caffeine, TPSSh, def2-SVP: closed-shell SCF with a meta-GGA hybrid functional (RI-JK).
+@jobs
+task: scf
+@end
+
+@method settings
+xcfun: tpssh
+basis: def2-svp
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end

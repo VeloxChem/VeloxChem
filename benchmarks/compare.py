@@ -27,7 +27,9 @@ import numpy as np
 # NOTE: (absolute, relative) tolerances for a result of the same variant in
 # two runs: a difference is accepted when it is at most atol + rtol * |base|.
 # Energies and gradients are in Hartree and Hartree/Bohr; excitation and
-# photon energies in Hartree; the strengths in the units the output prints.
+# photon energies in Hartree; vibrational frequencies in cm-1; response
+# functions, hyperpolarizabilities and polarizability gradients in atomic
+# units; the strengths and intensities in the units the output prints.
 TOLERANCES = {
     'scf_energy': (1.0e-6, 0.0),
     'opt_final_energy': (1.0e-6, 0.0),
@@ -40,6 +42,13 @@ TOLERANCES = {
     'tpa_cross_sections': (0.0, 1.0e-3),
     '3pa_strengths_linear': (1.0e-2, 1.0e-3),
     '3pa_strengths_circular': (1.0e-2, 1.0e-3),
+    'response_functions': (1.0e-3, 1.0e-4),
+    'c6': (0.0, 1.0e-4),
+    'shg_beta': (1.0e-2, 1.0e-3),
+    'thg_gamma': (1.0e-1, 1.0e-3),
+    'polarizability_gradient': (1.0e-4, 1.0e-3),
+    'vib_frequencies': (0.5, 0.0),
+    'ir_intensities': (5.0e-2, 1.0e-3),
 }
 
 # NOTE: counts that may change between runs without being wrong; a change is
@@ -54,6 +63,28 @@ def load(path):
     return document, rows
 
 
+def aligned(a, b):
+    """
+    Two results as arrays of one shape, or None where they cannot be.
+
+    A dictionary (response functions, the polarizability gradient) is
+    aligned on the union of its keys, with 0 for a key one run lacks: the
+    output prints a polarizability gradient component only above 1e-6 in
+    magnitude, so a component near that bound can be printed in one run and
+    not in the other.
+    """
+
+    if isinstance(a, dict) and isinstance(b, dict):
+        keys = sorted(set(a) | set(b))
+        a = [a.get(k, 0.0) for k in keys]
+        b = [b.get(k, 0.0) for k in keys]
+    a = np.atleast_1d(np.asarray(a, dtype=float))
+    b = np.atleast_1d(np.asarray(b, dtype=float))
+    if a.shape != b.shape:
+        return None
+    return a, b
+
+
 def difference(a, b):
     """
     The largest absolute difference, and the same divided by the largest
@@ -62,10 +93,10 @@ def difference(a, b):
     1e-30 in one run and 1e-31 in the other.
     """
 
-    a = np.atleast_1d(np.asarray(a, dtype=float))
-    b = np.atleast_1d(np.asarray(b, dtype=float))
-    if a.shape != b.shape:
+    pair = aligned(a, b)
+    if pair is None:
         return None, None
+    a, b = pair
     diff = float(np.abs(a - b).max(initial=0.0))
     scale = float(np.abs(b).max(initial=0.0))
     return diff, (diff / scale if scale > 0 else 0.0)
@@ -73,10 +104,10 @@ def difference(a, b):
 
 def within(key, a, b):
     atol, rtol = TOLERANCES[key]
-    a = np.atleast_1d(np.asarray(a, dtype=float))
-    b = np.atleast_1d(np.asarray(b, dtype=float))
-    if a.shape != b.shape:
+    pair = aligned(a, b)
+    if pair is None:
         return False
+    a, b = pair
     return bool(np.all(np.abs(a - b) <= atol + rtol * np.abs(b)))
 
 
@@ -99,6 +130,7 @@ def print_provenance_diff(base, new):
             'cpu': p['machine'].get('cpu'),
             'launcher': p.get('launcher'),
             'OMP_NUM_THREADS': p.get('env', {}).get('OMP_NUM_THREADS'),
+            'memory_limit': p.get('memory_limit'),
             'veloxchem': p.get('veloxchem'),
             'commit': p.get('commit'),
             'dirty': p.get('dirty'),
@@ -108,7 +140,7 @@ def print_provenance_diff(base, new):
     for key in a:
         mark = '' if a[key] == b[key] else '   <-- differs'
         print(f'  {key:16s} {str(a[key]):30s} {str(b[key]):30s}{mark}')
-    for key in ('host', 'cpu', 'launcher', 'OMP_NUM_THREADS'):
+    for key in ('host', 'cpu', 'launcher', 'OMP_NUM_THREADS', 'memory_limit'):
         if a[key] != b[key]:
             print('  The machine or its configuration differs: the time and '
                   'memory ratios do not measure the code alone.')
@@ -161,6 +193,8 @@ def summarize(document, rows):
             if r and r['problems']:
                 failed = True
                 print(f'    {r["variant"]}: {"; ".join(r["problems"])}')
+            if r and r.get('notes'):
+                print(f'    {r["variant"]} (noted): {"; ".join(r["notes"])}')
 
     return failed
 
@@ -222,6 +256,7 @@ def regress(base_doc, base, new_doc, new, time_tol, mem_tol):
         if row['problems']:
             failed = True
             notes.extend(row['problems'])
+        notes.extend(f'noted: {n}' for n in row.get('notes', []))
 
         print(f'{name:36s} {key[2]:12s} {wall:6.2f}{wall_mark} '
               f'{memory:6.2f}{mem_mark} {iterations:>9s}  '

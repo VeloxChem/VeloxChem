@@ -1,0 +1,24 @@
+# Guanine-2 (38 atoms), BLYP, def2-SVPD: TDDFT gradient of S1, RPA with 5 states (RI-J).
+@jobs
+task: gradient
+@end
+
+@method settings
+xcfun: blyp
+basis: def2-svpd
+@end
+
+@response
+property: absorption
+nstates: 5
+@end
+
+@gradient
+state_deriv_index: 1
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: guanine-2.xyz
+@end
