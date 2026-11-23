@@ -1,4 +1,4 @@
-# Caffeine, B3LYP, def2-SVP: reduced two-photon absorption, 5 frequencies (RI-JK).
+# Caffeine, B3LYP, def2-SVP: two-photon absorption, 5 frequencies (RI-JK).
 @jobs
 task: response
 @end
@@ -10,7 +10,6 @@ basis: def2-svp
 
 @response
 property: tpa
-tpa_type: reduced
 frequencies: 0.05-0.15 (0.025)
 @end
 

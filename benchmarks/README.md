@@ -18,14 +18,15 @@ benchmarks/
 
 ## Suites
 
-| suite | cases | four-center wall time, 12 cores (rough) |
-| --- | --- | --- |
-| `quick` | caffeine and a nitroxide radical in def2-SVP: SCF (HF, B3LYP, BLYP, CAM-B3LYP, TPSSh, UKS), SCF gradient (RI-JK, RI-J, UKS), TDA, RPA, polarizability | 10 min |
-| `standard` | diffuse and triple-zeta SCF and gradient, TDA of a 70-atom molecule, unrestricted TDA, TDDFT gradient, CPP, SHG, THG, TPA transition, reduced TPA, 3PA transition, optimization (closed and open shell) | 1.5 to 2 h |
-| `extended` | Hessian and IR, polarizability gradient, excited-state optimization; noradrenaline in def2-TZVPD (RPA, TPA, gradient); a triplet guanine dimer (UHF, UKS); a TDDFT gradient with RI-J | overnight |
+| suite | cases | both variants | RI only |
+| --- | --- | --- | --- |
+| `quick` | caffeine and a nitroxide radical in def2-SVP: SCF (HF, B3LYP, BLYP, CAM-B3LYP, TPSSh, UKS), SCF gradient (RI-JK, RI-J, UKS), TDA, RPA, polarizability | 10 to 15 min | 3 min |
+| `standard` | diffuse and triple-zeta SCF and gradient, TDA of a 70-atom molecule, unrestricted TDA, TDDFT gradient, CPP, SHG, THG, TPA transition, TPA, 3PA transition, optimization (closed and open shell) | 1.5 to 2 h | 20 to 25 min |
+| `extended` | Hessian and IR, polarizability gradient, excited-state optimization; noradrenaline in def2-TZVPD (RPA, TPA, gradient); a triplet guanine dimer (UHF, UKS); a TDDFT gradient with RI-J | 7 to 8 h | 45 min |
 
-The RI rows take a fraction of that (`extended`: about 45 min); `--ri yes`
-runs them alone. `python benchmarks/run.py --list` prints every case.
+Times measured on a 12th Gen Intel Core i9-12900K with 12 threads, one rank
+(2026-11-22). `--ri yes` runs the RI rows alone. `python benchmarks/run.py
+--list` prints every case.
 
 Whether an RI row fits depends on the memory of the machine. RI-JK for a
 60-atom water cluster in def2-SVPD (780 basis functions) was predicted to need
