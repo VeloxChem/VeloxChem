@@ -3672,187 +3672,1324 @@ class EvbDataProcessing:
         ax.grouped_bar(to_plot, colors=colors, tick_labels=tick_labels)
         ax.legend()
 
+    # ---- contribution plots (plot_profiles / plot_parameters) -------------
+
+    _DIRECTIONS = {'both': -1, 'forward': 0, 'backward': 1}
+    _GEOMETRY_KINDS = ('distance', 'angle', 'dihedral')
+
+    # The trajectory analysis calls the atoms of the reacting fragment
+    # (REA_*/SYS* force groups) 'fragment', both as a group label and as an
+    # atom class of nb_rest; the plots call them this.
+    _FRAGMENT_NAME = 'reacting atoms'
+
+    # settings['difference_to'] value for the profile pooled over every chain
+    _POOLED_ALL = 'all chains (pooled)'
+    # settings['difference_to'] value for the mean of the per-chain profiles
+    # (all frames of each chain, both directions)
+    _ENTIRE_RUN = 'entire run (mean of chains)'
+
     @staticmethod
-    def plot_force_decomp(results, dif_to=0):
-        from IPython.display import clear_output
-        from IPython.display import display
-        import matplotlib.pyplot as plt
-        import ipywidgets as widgets
+    def _contrib_fg_names(result, key='E1_fg_names'):
+        names = result.get(key, result.get('E1_fg_names'))
+        if names is not None:
+            return names.split(',')
+        return [fg.name for fg in EvbForceGroup]
 
-        lam = results['Lambda']
-        bins = results['coordinate_bins']
+    @staticmethod
+    def _contrib_frame_labels(result, key, n_frames):
+        # Replica_frame / Direction_frame, or zeros when the run has none
+        if key in result:
+            return np.asarray(result[key], dtype=int)
+        return np.zeros(n_frames, dtype=int)
+
+    @staticmethod
+    def _contrib_analysis_names(result):
+        analysis = result.get('trajectory_analysis')
+        if analysis is None:
+            return []
+        return analysis['names'].split(',')
+
+    @staticmethod
+    def _contrib_term_columns(result):
+        """{'label/quantity': (E1 column, E2 column)}: the energy columns of
+        the trajectory analysis that exist for both PES systems."""
+        index = {
+            n: i for i, n in enumerate(
+                EvbDataProcessing._contrib_analysis_names(result))
+        }
+        pairs = {}
+        for column, i in index.items():
+            parts = column.split('/')
+            if len(parts) < 3 or parts[1] != 'E1':
+                continue
+            partner = '/'.join([parts[0], 'E2'] + parts[2:])
+            if partner in index:
+                pairs['/'.join([parts[0]] + parts[2:])] = (i, index[partner])
+        return pairs
+
+    @staticmethod
+    def _contrib_geometry_columns(result):
+        return {
+            column: i for i, column in enumerate(
+                EvbDataProcessing._contrib_analysis_names(result))
+            if len(column.split('/')) == 2 and column.split('/')[1] in
+            EvbDataProcessing._GEOMETRY_KINDS
+        }
+
+    @staticmethod
+    def _contrib_group_name(label):
+        # display name of a trajectory-analysis group
+        return (EvbDataProcessing._FRAGMENT_NAME
+                if label == 'fragment' else label)
+
+    @staticmethod
+    def _contrib_catalogue(results, replica_labels=None):
+        """What the contribution plots can select in these results: chains
+        (one per configuration x replica, by display label), force groups
+        (nonzero in some configuration, FROZEN left out), decompositions,
+        trajectory-analysis terms ('label/quantity'), geometry columns, and a
+        description per analysis group."""
+
+        import json
+
+        replica_labels = replica_labels or {}
         config_results = results['configuration_results']
-
         missing_fg = [
             name for name, result in config_results.items()
             if 'E1_fg' not in result or 'E2_fg' not in result
         ]
         assert_msg_critical(
             not missing_fg,
-            "plot_force_decomp requires force-group contributions "
-            "(E1_fg/E2_fg), which are not present for configuration(s): "
-            f"{missing_fg}. Run EvbDriver.compute_force_groups() and "
-            "EvbDriver.compute_energy_profiles() again before plotting.")
+            "Contribution plots need force-group energies (E1_fg/E2_fg), "
+            f"which are not present for configuration(s): {missing_fg}. "
+            "Run EvbDriver.compute_force_groups() and load the results "
+            "again.")
 
-        def fg_names(result):
-            names = result.get('E1_fg_names')
-            if names is not None:
-                return names.split(',')
-            return [fg.name for fg in EvbForceGroup]
-
-        # relevant_column = []
-        relevant_fgs = []
-        relevant_decomps = []
-
-        dp = EvbDataProcessing()
-        dp.Lambda_frame = results["Lambda_frame"]
-        dp.Lambda = lam
-        dp.Lambda_indices = results["Lambda_indices"]
-        dp.alpha = results['alpha']
-        dp.H12 = results['H12']
-
-        for result in config_results.values():
-            for i, name in enumerate(fg_names(result)):
-                if name == EvbForceGroup.FROZEN.name:
+        n_frames = len(results['Lambda_frame'])
+        force_groups, decompositions, terms, geometry = [], [], [], []
+        chains, metadata = {}, {}
+        for name, result in config_results.items():
+            for i, fg in enumerate(EvbDataProcessing._contrib_fg_names(result)):
+                if fg == EvbForceGroup.FROZEN.name or fg in force_groups:
                     continue
                 if not np.all(result['E1_fg'][i] == 0) or not np.all(
                         result['E2_fg'][i] == 0):
-                    if name not in relevant_fgs:
-                        relevant_fgs.append(name)
-        if dif_to == 0:
-            print(
-                "Differences are taken with respect to the first configuration in the results dictionary, unless specified with the dif_to argument."
+                    force_groups.append(fg)
+            if 'decompositions' in result:
+                for d in result['decompositions']['names']:
+                    if d not in decompositions:
+                        decompositions.append(d)
+            for key in EvbDataProcessing._contrib_term_columns(result):
+                if key not in terms:
+                    terms.append(key)
+            for key in EvbDataProcessing._contrib_geometry_columns(result):
+                if key not in geometry:
+                    geometry.append(key)
+            for r in np.unique(
+                    EvbDataProcessing._contrib_frame_labels(
+                        result, 'Replica_frame', n_frames)):
+                r = int(r)
+                label = (f"{name} "
+                         f"{replica_labels.get(name, {}).get(r, f'r{r}')}")
+                assert_msg_critical(label not in chains,
+                                    f"Two chains are labelled {label!r}")
+                chains[label] = (name, r)
+            meta_file = (result.get('trajectory_analysis')
+                         or {}).get('metadata_file')
+            if meta_file and not metadata:
+                try:
+                    with Path(meta_file).open('r') as file:
+                        metadata = json.load(file)
+                except OSError:
+                    metadata = {}
+
+        fragment_name = EvbDataProcessing._FRAGMENT_NAME
+
+        def atom_summary(atoms):
+            residues = {}
+            for atom in atoms:
+                key = f"{atom['resname']}{atom['resid']}"
+                residues.setdefault(key, []).append(atom['name'])
+            return '; '.join(f"{res} {' '.join(names)}"
+                             for res, names in residues.items())
+
+        descriptions = {}
+        for entry in metadata.get('residues', []):
+            label, atoms = entry['label'], entry.get('atoms', [])
+            if label == 'fragment':
+                descriptions[label] = (
+                    f"{fragment_name} (the EVB fragment, {len(atoms)} atoms: "
+                    f"{atom_summary(atoms)})")
+            else:
+                what = {
+                    'fragment part': "reacting atoms of a cut residue",
+                    'rest part': "the rest of a cut residue",
+                    'group': "atom group",
+                }.get(entry.get('kind'), "whole residue")
+                descriptions[label] = (
+                    f"{label} ({what}, {len(atoms)} atoms: "
+                    f"{atom_summary(atoms)})"
+                    if entry.get('kind') in ('fragment part', 'rest part') else
+                    f"{label} ({what}, {len(atoms)} atoms)")
+        for entry in metadata.get('cuts', []):
+            descriptions[entry['label']] = (
+                f"{entry['label']} (bonded terms across the cut of "
+                f"{entry['residue']}, atoms on both sides)")
+        if metadata.get('class_pairs'):
+            descriptions['classes'] = (
+                "classes (NonbondedForce energy between pairs of atom "
+                "classes, PME-consistent)")
+        for entry in metadata.get('terms', []):
+            atoms = entry.get('atoms', [])
+            descriptions[entry['label']] = (
+                f"{entry['label']} ({entry.get('kind', 'term')}: " +
+                ' – '.join(f"{a['resname']}{a['resid']} {a['name']}"
+                           for a in atoms) + ")")
+        descriptions.setdefault(
+            'fragment', f"{fragment_name} (the EVB fragment: the atoms of the "
+            "reacting force groups)")
+
+        # display (group, quantity) of every term, and back
+        term_display = {}
+        for key in terms:
+            label, quantity = key.split('/', 1)
+            term_display[key] = (
+                EvbDataProcessing._contrib_group_name(label),
+                EvbDataProcessing._contrib_term_text(quantity))
+
+        return {
+            'chains': chains,
+            'force_groups': force_groups,
+            'decompositions': decompositions,
+            'terms': terms,
+            'term_display': term_display,
+            'term_key': {v: k for k, v in term_display.items()},
+            'geometry': geometry,
+            'descriptions': descriptions,
+        }
+
+    @staticmethod
+    def _contrib_term_text(quantity):
+        return quantity.replace('/fragment/',
+                                f'/{EvbDataProcessing._FRAGMENT_NAME}/')
+
+    @staticmethod
+    def _contrib_term_meaning(quantity):
+        """One line on what a trajectory-analysis quantity holds (the
+        conventions of TrajectoryAnalysis.json)."""
+        parts = quantity.split('/')
+        kind = parts[-1]
+        how = {
+            'coul': "Coulomb",
+            'lj': "Lennard-Jones",
+        }.get(kind, kind)
+        pairwise = {
+            'coul': "plain Coulomb at the minimum image, no cutoff",
+            'lj': "with the system's cutoff and switch, no dispersion "
+            "correction",
+        }.get(kind, "")
+        if parts[0] == 'bonded' and len(parts) == 1:
+            return "Bonded energy of the tracked term itself."
+        if parts[0] == 'bonded':
+            return (f"Bonded energy ({kind} terms) with every atom in the "
+                    "group; terms shared with other residues are not "
+                    "counted.")
+        if parts[0] == 'restraint':
+            return "Restraint energy on these atoms."
+        if parts[0] in ('coul', 'lj'):
+            return (f"{how} energy of the atom pair as the Hamiltonian counts "
+                    "it (exceptions, soft-core)" +
+                    (", plain Coulomb at the minimum image." if kind == 'coul'
+                     else "."))
+        if parts[0] == 'nb_internal':
+            return (f"{how} energy between atoms inside the group, pairwise, "
+                    f"{pairwise}.")
+        if '~' in parts[0]:
+            first, second = parts[0].split('~', 1)
+            if first == second:
+                return (f"{how} energy of the NonbondedForce inside class "
+                        f"{first} (all other classes off), PME-consistent.")
+            return (f"{how} energy of the NonbondedForce between classes "
+                    f"{first} and {second}: E(both on) - E({first} on) - "
+                    f"E({second} on), PME-consistent; the class pairs add "
+                    "up to the NonbondedForce energy.")
+        if parts[0] == 'nb_rest' and len(parts) == 2:
+            return (f"{how} energy of the group with the rest of the system, "
+                    "PME-consistent total (soft-core pairs crossing the "
+                    "boundary included).")
+        if parts[0] == 'nb_rest':
+            partner = {
+                'protein': "the protein atoms",
+                'fragment': "the reacting atoms",
+                EvbDataProcessing._FRAGMENT_NAME: "the reacting atoms",
+                'water': "the water",
+                'ions': "the ions",
+                'other': "all other atoms",
+            }.get(parts[1], parts[1])
+            if parts[1].startswith('fragment:'):
+                partner = f"the reacting atoms of {parts[1][9:]}"
+            return (f"Part of nb_rest/{kind} with {partner}: {how}, pairwise, "
+                    f"{pairwise}; does not add up exactly to nb_rest/{kind}.")
+        return quantity
+
+    @staticmethod
+    def contribution_settings(results, replica_labels=None):
+        """The default settings of plot_profiles and plot_parameters for these
+        results, as a dictionary to edit (print it with
+        print_contribution_settings):
+
+        - 'chains': {chain: bool}, one entry per configuration x replica,
+          labelled '<configuration> <replica label>'; every chain is drawn
+          on its own, any combination. Default: all.
+        - 'pool_chains': also draw one profile from all selected chains
+          together (black). Default: False.
+        - 'directions': {'both', 'forward', 'backward': bool}. Default: both.
+        - 'difference_to': the chain the EVB differences are taken against
+          (same direction); 'all chains (pooled)' for the profile pooled
+          over every chain (selected or not), same direction; or 'entire run
+          (mean of chains)' for the mean of the EVB profiles of every chain,
+          each from all its frames (both directions), the same reference for
+          every direction. Default: the first chain.
+        - 'force_groups': {name: bool}, summed into E1/E2. Default: all,
+          which gives the PES energies.
+        - 'term_mode': 'subtract' or 'add', what the selected
+          trajectory-analysis terms do to the force-group sum.
+        - 'terms': {group: {quantity: bool}}, trajectory-analysis terms per
+          tracked pair, torsion or group. Default: none.
+        - 'decompositions': {name: bool}, NB_decompositions to subtract
+          (only when present).
+        - 'geometry': {column: bool}, geometry columns of the second figure.
+          Default: all.
+        - 'show_frames': every frame of the geometry figure as a dot.
+
+        :param results:
+            The results dictionary (compute() output) with force groups.
+        :param replica_labels:
+            Optional {configuration name: {replica: label}} for the chain
+            names (otherwise 'r<replica>').
+
+        :return:
+            The settings dictionary.
+        """
+
+        cat = EvbDataProcessing._contrib_catalogue(results, replica_labels)
+        terms = {}
+        for key in cat['terms']:
+            group, quantity = cat['term_display'][key]
+            terms.setdefault(group, {})[quantity] = False
+        settings = {
+            'chains': {label: True for label in cat['chains']},
+            'pool_chains': False,
+            'directions': {
+                'both': True,
+                'forward': False,
+                'backward': False
+            },
+            'difference_to': next(iter(cat['chains'])),
+            'force_groups': {name: True for name in cat['force_groups']},
+            'term_mode': 'subtract',
+            'terms': terms,
+            'geometry': {name: True for name in cat['geometry']},
+            'show_frames': True,
+        }
+        if cat['decompositions']:
+            settings['decompositions'] = {
+                name: False for name in cat['decompositions']
+            }
+        return settings
+
+    @staticmethod
+    def format_contribution_settings(results, settings=None,
+                                     replica_labels=None):
+        """The settings as commented Python source ('settings = {...}'), to
+        read, or to copy into a cell and edit."""
+
+        cat = EvbDataProcessing._contrib_catalogue(results, replica_labels)
+        s = EvbDataProcessing._contrib_merge(
+            EvbDataProcessing.contribution_settings(results, replica_labels),
+            settings or {})
+        lines = ["settings = {"]
+
+        def block(key, comment, entries):
+            lines.append(f"    # {comment}")
+            lines.append(f"    {key!r}: {{")
+            for k, v in entries.items():
+                lines.append(f"        {k!r}: {v!r},")
+            lines.append("    },")
+
+        block('chains', "configuration x replica; each selected chain is "
+              "drawn on its own", s['chains'])
+        lines.append(f"    'pool_chains': {s['pool_chains']!r},  # also one "
+                     "profile from all selected chains together (black)")
+        lines.append(f"    'directions': {s['directions']!r},")
+        lines.append(f"    'difference_to': {s['difference_to']!r},  # EVB "
+                     "differences against this chain (same direction), "
+                     f"{EvbDataProcessing._POOLED_ALL!r} (same direction) "
+                     f"or {EvbDataProcessing._ENTIRE_RUN!r}")
+        block('force_groups', "force groups summed into E1/E2 (all True = "
+              "the PES energies)", s['force_groups'])
+        lines.append(f"    'term_mode': {s['term_mode']!r},  # 'subtract': "
+                     "remove the selected terms from the force-group sum; "
+                     "'add': add them")
+        lines.append("    # trajectory-analysis terms per tracked pair, "
+                     "torsion or group (meanings below)")
+        lines.append("    'terms': {")
+        groups = {
+            EvbDataProcessing._contrib_group_name(label): label
+            for label in dict.fromkeys(k.split('/')[0] for k in cat['terms'])
+        }
+        for group, entries in s['terms'].items():
+            label = groups.get(group, group)
+            lines.append(f"        # {cat['descriptions'].get(label, label)}")
+            lines.append(f"        {group!r}: {{")
+            for quantity, value in entries.items():
+                lines.append(f"            {quantity!r}: {value!r},")
+            lines.append("        },")
+        lines.append("    },")
+        if 'decompositions' in s:
+            block('decompositions', "NB_decompositions subtracted from "
+                  "E1/E2", s['decompositions'])
+        block('geometry', "geometry columns of the second figure",
+              s['geometry'])
+        lines.append(f"    'show_frames': {s['show_frames']!r},  # every "
+                     "frame of the geometry figure as a dot")
+        lines.append("}")
+
+        quantities = list(
+            dict.fromkeys(q for entries in s['terms'].values()
+                          for q in entries))
+        if quantities:
+            lines.append("")
+            lines.append("# Term meanings (E1 column into E1, E2 column into "
+                         "E2). Do not select overlapping terms together:")
+            lines.append("# nb_rest/coul|lj already hold the nb_rest/<partner>"
+                         " parts, and the nb_rest of two tracked groups both")
+            lines.append("# hold their mutual interaction. Profiles of parts "
+                         "of the energy do not sum to the full profile.")
+            for q in quantities:
+                lines.append(f"#   {q}: "
+                             f"{EvbDataProcessing._contrib_term_meaning(q)}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def print_contribution_settings(results, settings=None,
+                                    replica_labels=None):
+        """Prints format_contribution_settings (the defaults when settings
+        is None)."""
+
+        print(
+            EvbDataProcessing.format_contribution_settings(
+                results, settings, replica_labels))
+
+    @staticmethod
+    def _contrib_merge(defaults, settings):
+        # defaults updated by settings: dictionaries of switches entry by
+        # entry (one level down for 'terms'), everything else replaced
+        unknown = [k for k in settings if k not in defaults]
+        assert_msg_critical(
+            not unknown, f"Unknown contribution settings {unknown}; known: "
+            f"{list(defaults)}")
+        merged = {}
+        for key, default in defaults.items():
+            value = settings.get(key, default)
+            if key == 'terms':
+                bad = [g for g in value if g not in default]
+                assert_msg_critical(
+                    not bad, f"settings['terms']: unknown groups {bad}; "
+                    f"known: {list(default)}")
+                merged[key] = {}
+                for group, entries in default.items():
+                    given = value.get(group, {})
+                    bad = [q for q in given if q not in entries]
+                    assert_msg_critical(
+                        not bad, f"settings['terms'][{group!r}]: unknown "
+                        f"terms {bad}; known: {list(entries)}")
+                    merged[key][group] = {**entries, **given}
+            elif isinstance(default, dict):
+                bad = [k for k in value if k not in default]
+                assert_msg_critical(
+                    not bad, f"settings[{key!r}]: unknown entries {bad}; "
+                    f"known: {list(default)}")
+                merged[key] = {**default, **value}
+            else:
+                merged[key] = value
+        return merged
+
+    @staticmethod
+    def _contrib_prepare(results, settings, replica_labels):
+        """What plot_profiles and plot_parameters share: the catalogue, the
+        merged settings, the selected chains, the per-frame replica and
+        direction labels and one colour per chain."""
+
+        import matplotlib.pyplot as plt
+
+        cat = EvbDataProcessing._contrib_catalogue(results, replica_labels)
+        s = EvbDataProcessing._contrib_merge(
+            EvbDataProcessing.contribution_settings(results, replica_labels),
+            settings or {})
+        chains = [c for c, on in s['chains'].items() if on]
+        assert_msg_critical(chains, "No chain selected")
+
+        lambda_frame = np.asarray(results['Lambda_frame'], dtype=float)
+        n_frames = len(lambda_frame)
+        config_results = results['configuration_results']
+        frame_rep, frame_dir = {}, {}
+        for name in dict.fromkeys(conf for conf, _ in cat['chains'].values()):
+            frame_rep[name] = EvbDataProcessing._contrib_frame_labels(
+                config_results[name], 'Replica_frame', n_frames)
+            frame_dir[name] = EvbDataProcessing._contrib_frame_labels(
+                config_results[name], 'Direction_frame', n_frames)
+
+        # a distinct colour per selected chain (tab10 without its grey, which
+        # the zero and turn lines use); with more chains than colours the
+        # colours repeat and every chain gets a marker, one marker per round
+        # of colours
+        palette = [
+            c for i, c in enumerate(plt.get_cmap('tab10').colors) if i != 7
+        ]
+        markers = ['o', 's', '^', 'D', 'v', 'P', 'X', '*']
+        use_markers = len(chains) > len(palette)
+        chain_style = {}
+        for i, chain in enumerate(chains):
+            chain_style[chain] = {
+                'color': palette[i % len(palette)],
+                'marker': (markers[(i // len(palette)) % len(markers)]
+                           if use_markers else None),
+            }
+        chain_style['pooled'] = {'color': 'k', 'marker': None}
+
+        return {
+            'cat': cat,
+            'settings': s,
+            'chains': chains,
+            'lambda_frame': lambda_frame,
+            'config_results': config_results,
+            'frame_rep': frame_rep,
+            'frame_dir': frame_dir,
+            'chain_style': chain_style,
+        }
+
+    @staticmethod
+    def _contrib_line_style(style, n_points):
+        """Plot keywords for a chain's line: its colour and, when it has one,
+        its marker on about ten of the points."""
+
+        return {
+            'color': style['color'],
+            'marker': style['marker'],
+            'markevery': max(1, n_points // 10),
+            'ms': 4,
+        }
+
+    @staticmethod
+    def _contrib_legend(ax, n_entries, columns):
+        """A legend inside the panel while short, below it when it would cover
+        the curves. Call after tight_layout, which would otherwise shrink the
+        panels to make room (the notebook crops inline figures to their
+        contents, so a legend below is shown in full)."""
+
+        if n_entries <= 8:
+            ax.legend(fontsize=6)
+        else:
+            ax.legend(fontsize=6,
+                      loc='upper center',
+                      bbox_to_anchor=(0.5, -0.2),
+                      ncol=columns)
+
+    @staticmethod
+    def plot_profiles(results,
+                      settings=None,
+                      replica_labels=None,
+                      fep=True,
+                      evb=True,
+                      evb_difference=True,
+                      gap_hysteresis=True):
+        """FEP and EVB profiles from a selection of energy contributions, per
+        chain (configuration x replica) and per sweep direction, as one plain
+        matplotlib figure with one panel per switched-on argument.
+
+        E1 and E2 (the reactant and product PES energies of every frame) are
+        rebuilt from the settings (see contribution_settings): the sum of
+        the selected force groups (E1_fg/E2_fg), minus the selected
+        decompositions, and minus (term_mode 'subtract') or plus ('add') the
+        selected trajectory-analysis terms (the 'label/E1/...' column goes
+        into E1, the 'label/E2/...' column into E2). All force groups and
+        nothing else = the PES energies; no force groups with term_mode
+        'add' = only the selected terms. The FEP and analytical EVB profiles
+        are recomputed from these energies, with the results' alpha (added to
+        E2) and H12, by unreweighted MBAR/BAR on the mapping potentials (as
+        _calculate_fg_profiles), so they need not match a reweighted
+        headline profile. A profile from part of the energy shows how that
+        part changes along the reaction coordinate; free energies are not
+        additive, so the parts do not sum to the full profile.
+
+        :param results:
+            The results dictionary (compute() output) with force groups, and
+            optionally 'trajectory_analysis' per configuration.
+        :param settings:
+            The settings dictionary (contribution_settings); entries left out
+            keep their defaults. The geometry entries and show_frames are not
+            used here (plot_parameters).
+        :param replica_labels:
+            Optional {configuration name: {replica: label}}; must be the same
+            as for contribution_settings, since it names the chains.
+        :param fep:
+            The FEP panel: Delta G_FEP against lambda.
+        :param evb:
+            The EVB panel: Delta G_EVB against the energy gap, with the
+            barrier and reaction free energy in the legend.
+        :param evb_difference:
+            The EVB profiles minus the reference of settings['difference_to']:
+            a chain or all chains pooled (same direction), or the mean
+            profile of the entire run.
+        :param gap_hysteresis:
+            Per chain, the forward minus backward mean of E2 - E1 per lambda
+            window.
+
+        :return:
+            The panels' Axes (one per switched-on panel, in the order of
+            the arguments; .figure is the figure), or None when every panel
+            is switched off. Axes, not the figure, so that a notebook cell
+            ending in this call shows the plot once.
+        """
+
+        import matplotlib.pyplot as plt
+
+        prep = EvbDataProcessing._contrib_prepare(results, settings,
+                                                  replica_labels)
+        cat, s, chains = prep['cat'], prep['settings'], prep['chains']
+        lambda_frame, config_results = (prep['lambda_frame'],
+                                        prep['config_results'])
+        frame_rep, frame_dir = prep['frame_rep'], prep['frame_dir']
+        chain_style = prep['chain_style']
+
+        panels = [
+            p for p, on in (('fep', fep), ('evb', evb),
+                            ('evb_difference', evb_difference),
+                            ('gap_hysteresis', gap_hysteresis)) if on
+        ]
+        if not panels:
+            return None
+        need_profiles = bool({'fep', 'evb', 'evb_difference'} & set(panels))
+
+        lam = np.asarray(results['Lambda'], dtype=float)
+        bins = np.asarray(results['coordinate_bins'], dtype=float)
+        lambda_indices = np.asarray(results['Lambda_indices'], dtype=int)
+
+        directions = [
+            EvbDataProcessing._DIRECTIONS[d]
+            for d, on in s['directions'].items() if on
+        ]
+        force_groups = [n for n, on in s['force_groups'].items() if on]
+        terms = [
+            cat['term_key'][(g, q)] for g, entries in s['terms'].items()
+            for q, on in entries.items() if on
+        ]
+        decompositions = [
+            n for n, on in s.get('decompositions', {}).items() if on
+        ]
+        reference = s['difference_to']
+        pooled_reference = reference == EvbDataProcessing._POOLED_ALL
+        entire_reference = reference == EvbDataProcessing._ENTIRE_RUN
+        assert_msg_critical(
+            pooled_reference or entire_reference
+            or reference in cat['chains'],
+            f"settings['difference_to']: unknown chain {reference!r}; use a "
+            f"chain, {EvbDataProcessing._POOLED_ALL!r} or "
+            f"{EvbDataProcessing._ENTIRE_RUN!r}")
+        assert_msg_critical(s['term_mode'] in ('subtract', 'add'),
+                            "settings['term_mode'] is 'subtract' or 'add'")
+        assert_msg_critical(directions or not need_profiles,
+                            "No direction selected")
+
+        dp = EvbDataProcessing(ostream=OutputStream(None))
+        dp.Lambda = lam
+        dp.Lambda_indices = lambda_indices
+        dp.alpha = results['alpha']
+        dp.H12 = results['H12']
+
+        direction_names = {-1: 'both', 0: 'forward', 1: 'backward'}
+        direction_styles = {-1: '-', 0: '--', 1: ':'}
+
+        def selected_energies(name, result):
+            E = []
+            for state in ('1', '2'):
+                name_to_idx = {
+                    n: i for i, n in enumerate(
+                        EvbDataProcessing._contrib_fg_names(
+                            result, f'E{state}_fg_names'))
+                }
+                rows = [name_to_idx[n] for n in force_groups if n in name_to_idx]
+                E.append(
+                    np.sum(np.asarray(result[f'E{state}_fg'],
+                                      dtype=float)[rows],
+                           axis=0))
+            E1, E2 = E
+            if decompositions:
+                decomps = result.get('decompositions')
+                assert_msg_critical(
+                    decomps is not None
+                    and all(n in decomps['names'] for n in decompositions),
+                    f"{name}: no decomposition data for {decompositions}")
+                rows = [list(decomps['names']).index(n) for n in decompositions]
+                E1 = E1 - np.sum(decomps['E1'][rows], axis=0)
+                E2 = E2 - np.sum(decomps['E2'][rows], axis=0)
+            if terms:
+                columns = EvbDataProcessing._contrib_term_columns(result)
+                missing = [t for t in terms if t not in columns]
+                assert_msg_critical(
+                    not missing,
+                    f"{name}: no trajectory-analysis columns for {missing}")
+                sign = 1.0 if s['term_mode'] == 'add' else -1.0
+                values = result['trajectory_analysis']['values']
+                for t in terms:
+                    i1, i2 = columns[t]
+                    E1 = E1 + sign * values[:, i1]
+                    E2 = E2 + sign * values[:, i2]
+            return E1, E2
+
+        # per configuration: energies, computed once; the reference chain(s)
+        # only when the difference panel needs them
+        energy_chains = list(chains)
+        if 'evb_difference' in panels:
+            energy_chains += (list(cat['chains'])
+                              if pooled_reference or entire_reference else
+                              [reference])
+        energies = {}
+        for chain in energy_chains:
+            name = cat['chains'][chain][0]
+            if name not in energies:
+                energies[name] = selected_energies(name, config_results[name])
+
+        def frames(chain, direction):
+            # (E1, E2, lambda indices, lambda per frame, T) of a chain
+            name, r = cat['chains'][chain]
+            mask = frame_rep[name] == r
+            if direction != -1:
+                mask &= frame_dir[name] == direction
+            E1, E2 = energies[name]
+            return (E1[mask], E2[mask], lambda_indices[mask],
+                    lambda_frame[mask], config_results[name]['Temp_set'])
+
+        def pooled_frames(chain_list, direction):
+            # the frames of several chains together
+            parts = [frames(chain, direction) for chain in chain_list]
+            temps = {float(p[4]) for p in parts}
+            assert_msg_critical(
+                len(temps) == 1, "Pooled chains have different "
+                f"temperatures {sorted(temps)}")
+            return (*[np.concatenate([p[i] for p in parts]) for i in range(4)],
+                    parts[0][4])
+
+        def profile(label, E1, E2, li, lf, temp):
+            missing = np.setdiff1d(np.arange(len(lam)), li)
+            if len(missing) > 0:
+                print(f"{label}: no frames at lambda {lam[missing]}, skipped")
+                return None
+            assert_msg_critical(
+                np.all(np.isfinite(E1)) and np.all(np.isfinite(E2)),
+                f"{label}: non-finite energies in the selection (frames the "
+                "trajectory analysis skipped?)")
+            # _calculate_Eg_V_dE reads the per-frame lambda from the instance
+            dp.Lambda_frame = lf
+            E2_shifted, _, _, _ = dp._calculate_Eg_V_dE(
+                E1, E2, dp.alpha, dp.H12)
+            dGfep, _ = dp._calculate_dGfep(E1, E2_shifted, temp, li)
+            dGevb, _, _ = dp._dGevb_analytical(dGfep, lam, dp.H12, bins)
+            (dGevb, barrier, free_energy, _, _, i_rea, i_pro,
+             i_ts) = dp._get_free_energies(dGevb, bins, fitting=False)
+            return dGfep, dGevb, barrier, free_energy, (i_rea, i_ts, i_pro)
+
+        def window_gap_hysteresis(E1, E2, li, dirs):
+            # <E2 - E1> forward minus backward per lambda window
+            gap = E2 - E1
+            out = np.full(len(lam), np.nan)
+            for k in range(len(lam)):
+                at = li == k
+                fwd, bwd = gap[at & (dirs == 0)], gap[at & (dirs == 1)]
+                if len(fwd) > 0 and len(bwd) > 0:
+                    out[k] = np.mean(fwd) - np.mean(bwd)
+            return out
+
+        fig, axes = plt.subplots(1,
+                                 len(panels),
+                                 figsize=(5.5 * len(panels), 4.5),
+                                 squeeze=False)
+        ax = dict(zip(panels, axes[0]))
+        if 'fep' in ax:
+            ax['fep'].set_title("FEP")
+            ax['fep'].set_xlabel(r"$\lambda$")
+            ax['fep'].set_ylabel(r"$\Delta G_{FEP}$ (kJ/mol)")
+            ax['fep'].set_xlim(0, 1)
+        if 'evb' in ax:
+            ax['evb'].set_title("EVB")
+            ax['evb'].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
+            ax['evb'].set_ylabel(r"$\Delta G_{EVB}$ (kJ/mol)")
+            ax['evb'].set_xlim(bins[0], bins[-1])
+        if 'evb_difference' in ax:
+            ax['evb_difference'].set_title(f"EVB difference to {reference}")
+            ax['evb_difference'].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
+            ax['evb_difference'].set_ylabel(
+                r"$\Delta G_{EVB}$ difference (kJ/mol)")
+            ax['evb_difference'].set_xlim(bins[0], bins[-1])
+        if 'gap_hysteresis' in ax:
+            ax['gap_hysteresis'].set_title(
+                "Gap hysteresis per window, per chain")
+            ax['gap_hysteresis'].set_xlabel(r"$\lambda$")
+            ax['gap_hysteresis'].set_ylabel(
+                r"$\langle E_2-E_1\rangle_{fwd} - "
+                r"\langle E_2-E_1\rangle_{bwd}$ (kJ/mol)")
+            ax['gap_hysteresis'].set_xlim(0, 1)
+            ax['gap_hysteresis'].axhline(0, color='grey', lw=0.8)
+
+        entire_profile = None
+        if 'evb_difference' in panels and entire_reference:
+            # mean of the per-chain profiles, each from all its frames
+            chain_profiles = [
+                profile(f"{chain} (entire run)", *frames(chain, -1))
+                for chain in cat['chains']
+            ]
+            chain_profiles = [p[1] for p in chain_profiles if p is not None]
+            assert_msg_critical(chain_profiles,
+                                f"{reference}: no chain has every window")
+            entire_profile = np.mean(chain_profiles, axis=0)
+
+        curves = {}
+        for d in (directions if need_profiles else []):
+            for chain in chains:
+                out = profile(f"{chain} {direction_names[d]}",
+                              *frames(chain, d))
+                if out is not None:
+                    curves[(chain, d)] = out
+            if s['pool_chains'] and len(chains) > 1:
+                out = profile(f"pooled {direction_names[d]}",
+                              *pooled_frames(chains, d))
+                if out is not None:
+                    curves[('pooled', d)] = out
+            if 'evb_difference' not in ax or entire_reference:
+                continue
+            if pooled_reference:
+                out = profile(f"{reference} {direction_names[d]}",
+                              *pooled_frames(list(cat['chains']), d))
+                if out is not None:
+                    curves[(reference, d, 'reference')] = out
+            elif reference not in chains:
+                out = profile(f"{reference} {direction_names[d]}",
+                              *frames(reference, d))
+                if out is not None:
+                    curves[(reference, d, 'reference')] = out
+
+        n_curves = 0
+        for key, out in curves.items():
+            if len(key) == 3:
+                continue  # reference only, for the differences
+            chain, d = key
+            dGfep, dGevb, barrier, free_energy, idx = out
+            ls = direction_styles[d]
+            style = EvbDataProcessing._contrib_line_style(
+                chain_style[chain], len(bins))
+            lw = 1.8 if chain == 'pooled' else 1.0
+            label = (f"{chain} {direction_names[d]}: "
+                     f"‡ {barrier:.1f}, ΔG0 {free_energy:.1f}")
+            n_curves += 1
+            if 'fep' in ax:
+                ax['fep'].plot(lam,
+                               dGfep,
+                               ls,
+                               lw=lw,
+                               **EvbDataProcessing._contrib_line_style(
+                                   chain_style[chain], len(lam)))
+            if 'evb' in ax:
+                ax['evb'].plot(bins, dGevb, ls, lw=lw, label=label, **style)
+                if np.isfinite(barrier):
+                    # reactant, TS and product: black-edged, so they are not
+                    # taken for the chain markers
+                    ax['evb'].plot(bins[list(idx)],
+                                   dGevb[list(idx)],
+                                   'o',
+                                   color=style['color'],
+                                   mec='k',
+                                   mew=0.6,
+                                   ms=4)
+            if 'evb_difference' in ax:
+                if entire_reference:
+                    ref = entire_profile
+                else:
+                    ref = curves.get((reference, d),
+                                     curves.get((reference, d, 'reference')))
+                    ref = None if ref is None else ref[1]
+                if ref is not None:
+                    ax['evb_difference'].plot(bins,
+                                              dGevb - ref,
+                                              ls,
+                                              lw=lw,
+                                              label=(None if 'evb' in ax else
+                                                     label),
+                                              **style)
+
+        if 'gap_hysteresis' in ax:
+            for chain in chains:
+                name, r = cat['chains'][chain]
+                mask = frame_rep[name] == r
+                E1, E2 = energies[name]
+                ax['gap_hysteresis'].plot(lam,
+                                          window_gap_hysteresis(
+                                              E1[mask], E2[mask],
+                                              lambda_indices[mask],
+                                              frame_dir[name][mask]),
+                                          '-',
+                                          lw=1,
+                                          color=chain_style[chain]['color'],
+                                          marker=(chain_style[chain]['marker']
+                                                  or 'o'),
+                                          ms=3,
+                                          label=chain)
+
+        # the curve legend goes on the EVB panel, else on the difference
+        # panel (the FEP panel has no legend: same colours and styles)
+        fig.tight_layout()
+        legend_panel = ('evb' if 'evb' in ax else
+                        'evb_difference' if 'evb_difference' in ax else None)
+        if legend_panel and ax[legend_panel].get_legend_handles_labels()[0]:
+            EvbDataProcessing._contrib_legend(ax[legend_panel], n_curves, 2)
+        if 'gap_hysteresis' in ax and len(ax['gap_hysteresis'].lines) > 1:
+            EvbDataProcessing._contrib_legend(
+                ax['gap_hysteresis'],
+                len(ax['gap_hysteresis'].lines) - 1, 3)
+        return axes[0]
+
+    @staticmethod
+    def plot_parameters(results, settings=None, replica_labels=None):
+        """The geometry columns of the trajectory analysis (distances and
+        dihedrals) per chain, against the frames in sampling order: the
+        forward sweep (lambda 0 -> 1) followed by the backward sweep (lambda
+        1 -> 0), with each window's mean and, with settings['show_frames'],
+        every frame as a dot. Dihedrals are drawn within 180 degrees of their
+        circular mean per chain, so a population near +-180 is not split.
+
+        :param results:
+            The results dictionary (compute() output) with
+            'trajectory_analysis' per configuration.
+        :param settings:
+            The settings dictionary (contribution_settings); this plot uses
+            'chains', 'geometry' and 'show_frames'.
+        :param replica_labels:
+            Optional {configuration name: {replica: label}}; must be the same
+            as for contribution_settings, since it names the chains.
+
+        :return:
+            The Axes, one per geometry column (.figure is the figure), or
+            None when no selected geometry column is present.
+        """
+
+        import matplotlib.pyplot as plt
+
+        prep = EvbDataProcessing._contrib_prepare(results, settings,
+                                                  replica_labels)
+        cat, s, chains = prep['cat'], prep['settings'], prep['chains']
+        lambda_frame, config_results = (prep['lambda_frame'],
+                                        prep['config_results'])
+        frame_rep, frame_dir = prep['frame_rep'], prep['frame_dir']
+        chain_style = prep['chain_style']
+        geometry = [n for n, on in s['geometry'].items() if on]
+
+        def window_segments(lam_sub, dir_sub):
+            # start and end (exclusive) of each run of frames of one window
+            change = np.flatnonzero((np.diff(lam_sub) != 0)
+                                    | (np.diff(dir_sub) != 0)) + 1
+            starts = np.concatenate(([0], change))
+            ends = np.concatenate((change, [len(lam_sub)]))
+            return starts, ends
+
+        def window_means(y, starts, ends, circular):
+            means = []
+            for a, b in zip(starts, ends):
+                seg = y[a:b]
+                seg = seg[np.isfinite(seg)]
+                if len(seg) == 0:
+                    means.append(np.nan)
+                elif circular:
+                    means.append(
+                        np.degrees(
+                            np.angle(np.mean(np.exp(1j * np.radians(seg))))))
+                else:
+                    means.append(np.mean(seg))
+            return np.array(means)
+
+        present = [
+            g for g in geometry if any(
+                g in EvbDataProcessing._contrib_geometry_columns(
+                    config_results[cat['chains'][c][0]]) for c in chains)
+        ]
+        if not present:
+            return None
+        n_rows = len(present)
+        fig, axes = plt.subplots(n_rows,
+                                 1,
+                                 figsize=(18, 2.2 * n_rows + 0.8),
+                                 sharex=True,
+                                 squeeze=False)
+        axes = axes[:, 0]
+        axes[0].set_title("Per chain in sampling order: forward λ 0→1, then "
+                          "backward λ 1→0 (grey line); " +
+                          ("dots = frames, line = window mean"
+                           if s['show_frames'] else "line = window mean"))
+        for ax, column in zip(axes, present):
+            unit = 'nm' if column.endswith('distance') else 'deg'
+            ax.set_ylabel(f"{column}\n({unit})", fontsize=8)
+        axes[-1].set_xlabel("λ of the window starting at the tick (frames in "
+                            "sampling order)")
+        axis_set = False
+        for chain in chains:
+            name, r = cat['chains'][chain]
+            result = config_results[name]
+            columns = EvbDataProcessing._contrib_geometry_columns(result)
+            if not columns:
+                continue
+            values = result['trajectory_analysis']['values']
+            m = frame_rep[name] == r
+            lam_sub, dir_sub = lambda_frame[m], frame_dir[name][m]
+            starts, ends = window_segments(lam_sub, dir_sub)
+            centres = (starts + ends - 1) / 2
+            x = np.arange(m.sum())
+            style = chain_style[chain]
+            for k, (ax, column) in enumerate(zip(axes, present)):
+                if column not in columns:
+                    continue
+                y = values[m, columns[column]]
+                circular = not column.endswith('distance')
+                means = window_means(y, starts, ends, circular)
+                if circular:
+                    # angles within 180 degrees of the series' circular
+                    # mean, so that a population near +-180 is not split
+                    # over the panel
+                    centre = window_means(y, [0], [len(y)], True)[0]
+                    y = (y - centre + 180) % 360 - 180 + centre
+                    means = (means - centre + 180) % 360 - 180 + centre
+                if s['show_frames']:
+                    ax.plot(x,
+                            y,
+                            '.',
+                            ms=0.6,
+                            alpha=0.25,
+                            color=style['color'],
+                            rasterized=True)
+                ax.plot(centres,
+                        means,
+                        '-',
+                        lw=1.2,
+                        label=chain if k == 0 else None,
+                        **EvbDataProcessing._contrib_line_style(
+                            style, len(centres)))
+            if not axis_set:
+                # lambda of the window at its first frame, about ten ticks,
+                # and a line where the backward sweep starts
+                step = max(1, len(starts) // 12)
+                ticks = list(starts[::step])
+                if len(starts) - 1 - (len(ticks) - 1) * step > step // 2:
+                    ticks.append(starts[-1])
+                elif starts[-1] not in ticks:
+                    ticks[-1] = starts[-1]
+                axes[-1].set_xticks(ticks, [f"{lam_sub[t]:.2f}" for t in ticks])
+                turn = np.flatnonzero(dir_sub == 1)
+                if len(turn) > 0:
+                    for ax in axes:
+                        ax.axvline(turn[0], color='grey', lw=0.8)
+                axis_set = True
+        if axes[0].get_legend_handles_labels()[0]:
+            axes[0].legend(fontsize=7, ncol=6)
+        fig.tight_layout()
+        return axes
+
+    @staticmethod
+    def plot_contributions(results, settings=None, replica_labels=None):
+        """plot_profiles (all four panels) and plot_parameters together.
+
+        :return:
+            (plot_profiles Axes, plot_parameters Axes or None).
+        """
+
+        return (EvbDataProcessing.plot_profiles(results, settings,
+                                                replica_labels),
+                EvbDataProcessing.plot_parameters(results, settings,
+                                                  replica_labels))
+
+    @staticmethod
+    def plot_force_decomp(results,
+                          settings=None,
+                          replica_labels=None,
+                          show_frames=None):
+        """Selection form for plot_profiles and plot_parameters.
+
+        Displays checkboxes and lists (ipywidgets) for every entry of the
+        settings dictionary (see contribution_settings): the chains (one per
+        configuration x replica, any combination), pooling, directions, the
+        reference chain, force groups, the add/subtract switch, the
+        trajectory-analysis terms, decompositions, geometry columns and
+        frame dots. It returns an EvbContributionSelector and draws nothing:
+        run `selector.plot()` in a later cell to plot the current selection
+        as ordinary matplotlib figures; `selector.settings()` gives it as a
+        settings dictionary. If the front end fails to show the form, run
+        the cell again, or use the dictionary directly
+        (print_contribution_settings, plot_profiles, plot_parameters).
+
+        :param results:
+            The results dictionary (compute() output) with force groups.
+        :param settings:
+            Initial settings (contribution_settings; entries left out keep
+            their defaults).
+        :param replica_labels:
+            Optional {configuration name: {replica: label}} for the chain
+            names.
+        :param show_frames:
+            Overrides settings['show_frames'] when given.
+
+        :return:
+            The EvbContributionSelector.
+        """
+
+        import html
+        from IPython.display import display
+        import ipywidgets as widgets
+
+        cat = EvbDataProcessing._contrib_catalogue(results, replica_labels)
+        s = EvbDataProcessing._contrib_merge(
+            EvbDataProcessing.contribution_settings(results, replica_labels),
+            settings or {})
+        if show_frames is not None:
+            s['show_frames'] = bool(show_frames)
+        fragment_name = EvbDataProcessing._FRAGMENT_NAME
+
+        def checkbox(value, description, tooltip=None):
+            return widgets.Checkbox(value,
+                                    description=description,
+                                    tooltip=tooltip,
+                                    indent=False,
+                                    layout=widgets.Layout(width='auto'))
+
+        def grid(boxes, width='220px', columns=5):
+            return widgets.GridBox(
+                boxes,
+                layout=widgets.Layout(
+                    grid_template_columns=f"repeat({columns}, {width})",
+                    grid_gap="5px",
+                ),
             )
-        print(
-            f"Static forces stay present over the whole reaction, although their parameters might change"
-        )
-        print(
-            f"Dynamic forces either appear or disappear over the course of the reaction",
-            flush=True)
-        for result in config_results.values():
-            if 'decompositions' in result.keys():
-                for name in result['decompositions']['names']:
-                    if name not in relevant_decomps:
-                        relevant_decomps.append(name)
-        fg_checkboxes = [
-            widgets.Checkbox(
-                True,
-                description=fg_name,
-            ) for fg_name in relevant_fgs
-        ]
 
-        decomp_checkboxes = [
-            widgets.Checkbox(
-                False,
-                description=decomp,
-            ) for decomp in relevant_decomps
-        ]
-        checkboxes = fg_checkboxes + decomp_checkboxes
-        plot_output = widgets.Output()
+        def on_off(boxes):
+            # 'all on' / 'all off' buttons for a list of checkboxes
+            buttons = []
+            for text, value in (('all on', True), ('all off', False)):
+                button = widgets.Button(description=text,
+                                        layout=widgets.Layout(width='80px'))
 
-        def update_plot(change=None):
-            # x = np.linspace(0, 10, 500)
-            with plot_output:
-                fig1, ax1 = plt.subplots(1, 3, figsize=(18, 4))
-                fig2, ax2 = plt.subplots(1, 1, figsize=(18, 4))
+                def set_all(_, value=value):
+                    for box in boxes:
+                        box.value = value
 
-                ax1[0].set_title("FEP")
-                ax1[0].set_xlabel(r"$\lambda$")
-                ax1[0].set_ylabel(r"$\Delta G_{FEP}$ (kJ/mol)")
-                ax1[0].set_xlim(0, 1)
-                ax1[1].set_title("EVB")
-                ax1[1].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
-                ax1[1].set_ylabel(r"$\Delta G_{EVB}$ (kJ/mol)")
-                ax1[1].set_xlim(bins[0], bins[-1])
-                ax1[2].set_title("EVB difference")
-                ax1[2].set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
-                ax1[2].set_ylabel(r"$\Delta G_{EVB}$ difference (kJ/mol)")
-                ax1[2].set_xlim(bins[0], bins[-1])
-                ax2.set_title("E1/E2")
-                ax2.set_xlabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
-                ax2.set_ylabel(r"$\Delta \mathcal{E}$ (kJ/mol)")
-                evbs = []
+                button.on_click(set_all)
+                buttons.append(button)
+            return widgets.HBox(buttons)
 
-                for name, result in config_results.items():
-                    clear_output(wait=True)
+        def boxes_for(entries):
+            return {k: checkbox(v, k) for k, v in entries.items()}
 
-                    # Each result gets its own name->index lookup: two
-                    # configurations being compared here may have been built
-                    # under different EvbForceGroup numberings (or even
-                    # different sets of force groups), so a shared/global
-                    # index list would silently misalign one of them.
-                    name_to_idx = {n: i for i, n in enumerate(fg_names(result))}
-                    fg_to_sum = []
-                    for fg_name, cb in zip(relevant_fgs, fg_checkboxes):
-                        if cb.value and fg_name in name_to_idx:
-                            fg_to_sum.append(name_to_idx[fg_name])
-                    E1_fg = np.sum(result['E1_fg'][fg_to_sum], axis=0)
-                    E2_fg = np.sum(result['E2_fg'][fg_to_sum], axis=0)
-
-                    if 'decompositions' in result.keys():
-
-                        decomp_to_sum = []
-                        for i, cb in enumerate(decomp_checkboxes):
-                            if cb.value:
-                                decomp_to_sum.append(i)
-                        E1_decomp = np.sum(
-                            result['decompositions']['E1'][decomp_to_sum],
-                            axis=0)
-                        E2_decomp = np.sum(
-                            result['decompositions']['E2'][decomp_to_sum],
-                            axis=0)
-                        # todo does the minus sign here work?
-                        E1 = E1_fg - E1_decomp
-                        E2 = E2_fg - E2_decomp
-                    else:
-                        E1 = E1_fg
-                        E2 = E2_fg
-
-                    E2_shifted, V, dE, Eg = dp._calculate_Eg_V_dE(
-                        E1,
-                        E2,
-                        dp.alpha,
-                        dp.H12,
-                    )
-                    dGfep, _ = dp._calculate_dGfep(E1, E2_shifted,
-                                                   result['Temp_set'])
-                    dGevb, shift, fepxi = dp._dGevb_analytical(
-                        dGfep,
-                        lam,
-                        dp.H12,
-                        bins,
-                    )
-                    dGevb, _, _, min_arg, max_arg, _, _, _ = dp._get_free_energies(
-                        dGevb, bins, fitting=False)
-                    evbs.append(dGevb)
-                    ax1[0].plot(lam, dGfep)
-
-                    ax1[1].plot(bins, dGevb, label=name)
-
-                    ax2.plot(E1 - np.min(E1), label=f'rea {name}', alpha=0.7)
-                    ax2.plot(E2 - np.min(E2), label=f'pro {name}', alpha=0.7)
-                for i, (name, evb) in enumerate(zip(config_results.keys(),
-                                                    evbs)):
-
-                    dif = evb - evbs[dif_to]
-                    ax1[2].plot(bins, dif)
-
-                fig1.legend()
-                fig2.legend()
-                plt.show()
-
-        recalculate_button = widgets.Button(description="Recalculate")
-        recalculate_button.on_click(update_plot)
-
-        # Layout in 5x5 grid
-        grid = widgets.GridBox(
-            checkboxes,
-            layout=widgets.Layout(
-                grid_template_columns="repeat(5, 220px)",
-                grid_gap="5px",
-            ),
+        chain_boxes = boxes_for(s['chains'])
+        direction_boxes = boxes_for(s['directions'])
+        fg_boxes = boxes_for(s['force_groups'])
+        decomp_boxes = boxes_for(s.get('decompositions', {}))
+        geometry_boxes = boxes_for(s['geometry'])
+        pool_box = checkbox(s['pool_chains'],
+                            'pool the selected chains (black)')
+        frames_box = checkbox(s['show_frames'], 'frames as dots (geometry)')
+        reference = widgets.Dropdown(options=list(cat['chains']) +
+                                     [EvbDataProcessing._POOLED_ALL,
+                                      EvbDataProcessing._ENTIRE_RUN],
+                                     value=s['difference_to'],
+                                     description='Difference to')
+        term_mode = widgets.ToggleButtons(
+            options=['subtract', 'add'],
+            value=s['term_mode'],
+            description='Selected terms:',
+            tooltips=[
+                'remove the selected terms from the force-group sum',
+                'add the selected terms to the force-group sum'
+            ],
         )
 
-        # Initial display
-        display(grid, recalculate_button, plot_output)
-        update_plot()  # initial empty plot
+        groups = {
+            EvbDataProcessing._contrib_group_name(label): label
+            for label in dict.fromkeys(k.split('/')[0] for k in cat['terms'])
+        }
+        term_boxes, panels, titles = {}, [], []
+        for group, entries in s['terms'].items():
+            boxes = []
+            for quantity, value in entries.items():
+                box = checkbox(value, quantity,
+                               EvbDataProcessing._contrib_term_meaning(quantity))
+                term_boxes[(group, quantity)] = box
+                boxes.append(box)
+            title = cat['descriptions'].get(groups.get(group, group), group)
+            panels.append(
+                widgets.VBox([
+                    widgets.HTML("<i>" + html.escape(title) + "</i>"),
+                    on_off(boxes),
+                    grid(boxes, '250px')
+                ]))
+            titles.append(title if len(title) <= 90 else title[:87] + '...')
+        accordion = widgets.Accordion(children=panels)
+        for i, title in enumerate(titles):
+            accordion.set_title(i, title)
+
+        help_html = f"""
+<div style="line-height:1.35">
+<b>Selection form.</b> Nothing is plotted here: change the selection, then run
+<code>selector.plot()</code> (a later cell). The same settings as a dictionary:
+<code>selector.settings()</code>; without the form:
+<code>EvbDataProcessing.print_contribution_settings(results)</code> and
+<code>EvbDataProcessing.plot_profiles(results, settings)</code> and
+<code>plot_parameters(results, settings)</code>.
+E1 and E2 (the reactant and product PES energies of every frame) are rebuilt
+from the selection, and the FEP and EVB profiles and the forward − backward
+gap are recomputed from them, with the results' α (added to E2) and H12, by
+unreweighted MBAR.
+<ul>
+<li><b>Chains</b>: one per configuration × replica; every selected chain is
+drawn on its own, and <i>pool</i> adds one profile from all selected chains
+together.</li>
+<li><b>Force groups</b> are summed into E1/E2. All ticked = the full PES
+energies. To isolate one group: <i>all off</i>, then tick it.</li>
+<li><b>Trajectory-analysis terms</b> are parts of the force-group energies of
+one tracked pair, torsion or group (the column from E1 goes into E1, the one
+from E2 into E2). <i>subtract</i> removes the ticked terms from the
+force-group sum (all force groups on + a term = the PES without that
+interaction); <i>add</i> adds them (force groups <i>all off</i> + terms = only
+those terms). Adding a term while its force group is ticked counts it
+twice.</li>
+<li>Overlaps: nb_rest/coul|lj already hold the nb_rest/&lt;partner&gt; parts,
+and the nb_rest of two tracked groups (e.g. {fragment_name} and A:124:ASP) both
+hold their mutual interaction; do not tick overlapping terms together.
+nb_rest/coul is PME-consistent, the per-partner parts are plain Coulomb.
+Hover over a term for its meaning.</li>
+<li>A profile from part of the energy is the EVB analysis of that energy on
+frames sampled with the full Hamiltonian. Free energies are not additive, so
+the parts do not sum to the full profile.</li>
+</ul></div>"""
+
+        parts = [
+            widgets.HTML(help_html),
+            widgets.HTML("<b>Chains</b> (configuration × replica)"),
+            on_off(list(chain_boxes.values())),
+            grid(list(chain_boxes.values()), '160px', 4),
+            widgets.HBox([pool_box, reference]),
+            widgets.HTML("<b>Directions</b>"),
+            grid(list(direction_boxes.values()), '120px', 3),
+            widgets.HTML("<b>Force groups (summed into E1/E2)</b>"),
+            on_off(list(fg_boxes.values())),
+            grid(list(fg_boxes.values())),
+        ]
+        if decomp_boxes:
+            parts += [
+                widgets.HTML("<b>Decompositions (removed from E1/E2)</b>"),
+                on_off(list(decomp_boxes.values())),
+                grid(list(decomp_boxes.values()))
+            ]
+        if term_boxes:
+            parts += [
+                widgets.HTML("<b>Trajectory-analysis terms</b> (per tracked "
+                             "pair, torsion or group; hover for meaning)"),
+                widgets.HBox([term_mode,
+                              on_off(list(term_boxes.values()))]), accordion
+            ]
+        if geometry_boxes:
+            parts += [
+                widgets.HTML("<b>Geometry</b> (second figure)"),
+                on_off(list(geometry_boxes.values())),
+                grid(list(geometry_boxes.values()), '260px', 4), frames_box
+            ]
+        display(widgets.VBox(parts))
+
+        return EvbContributionSelector(
+            results, {
+                'chains': chain_boxes,
+                'pool_chains': pool_box,
+                'directions': direction_boxes,
+                'difference_to': reference,
+                'force_groups': fg_boxes,
+                'term_mode': term_mode,
+                'terms': term_boxes,
+                'decompositions': decomp_boxes,
+                'geometry': geometry_boxes,
+                'show_frames': frames_box,
+            }, replica_labels)
+
+
+class EvbContributionSelector:
+    """
+    The state of the form shown by EvbDataProcessing.plot_force_decomp.
+
+    Instance variables
+        - results: The results dictionary the form was built for.
+        - controls: The form's widgets, by settings entry.
+        - replica_labels: {configuration name: {replica: label}} or None.
+    """
+
+    def __init__(self, results, controls, replica_labels=None):
+        self.results = results
+        self.controls = controls
+        self.replica_labels = replica_labels
+
+    def settings(self):
+        """The form's current state as a settings dictionary
+        (EvbDataProcessing.contribution_settings layout)."""
+
+        c = self.controls
+
+        def values(boxes):
+            return {k: bool(b.value) for k, b in boxes.items()}
+
+        terms = {}
+        for (group, quantity), box in c['terms'].items():
+            terms.setdefault(group, {})[quantity] = bool(box.value)
+        settings = {
+            'chains': values(c['chains']),
+            'pool_chains': bool(c['pool_chains'].value),
+            'directions': values(c['directions']),
+            'difference_to': c['difference_to'].value,
+            'force_groups': values(c['force_groups']),
+            'term_mode': c['term_mode'].value,
+            'terms': terms,
+            'geometry': values(c['geometry']),
+            'show_frames': bool(c['show_frames'].value),
+        }
+        if c['decompositions']:
+            settings['decompositions'] = values(c['decompositions'])
+        return settings
+
+    def print_settings(self):
+        """Prints the current settings as commented Python source."""
+
+        EvbDataProcessing.print_contribution_settings(self.results,
+                                                      self.settings(),
+                                                      self.replica_labels)
+
+    def plot(self):
+        """Plots the current selection (plot_profiles with all panels, then
+        plot_parameters); the figures are shown by the notebook like any
+        other matplotlib figure."""
+
+        self.plot_profiles()
+        self.plot_parameters()
+
+    def plot_profiles(self, **panels):
+        """plot_profiles for the current selection; panels: fep, evb,
+        evb_difference, gap_hysteresis (True or False)."""
+
+        return EvbDataProcessing.plot_profiles(self.results, self.settings(),
+                                               self.replica_labels, **panels)
+
+    def plot_parameters(self):
+        """plot_parameters (geometry) for the current selection."""
+
+        return EvbDataProcessing.plot_parameters(self.results, self.settings(),
+                                                 self.replica_labels)
