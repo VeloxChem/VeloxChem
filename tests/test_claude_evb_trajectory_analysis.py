@@ -34,7 +34,7 @@ from veloxchem.reactionsystembuilder import ReactionSystemBuilder, EvbForceGroup
 from veloxchem.evbdriver import EvbDriver
 from veloxchem.evbfepdriver import EvbFepDriver
 from veloxchem.evbtrajectoryanalysis import (EvbTrajectoryAnalysis,
-                                             ATOM_CLASSES, _parse_force_terms,
+                                             _parse_force_terms,
                                              _filtered_force)
 from veloxchem.errorhandler import VeloxChemError
 from veloxchem.outputstream import OutputStream
@@ -127,13 +127,13 @@ def _values(analysis, systems, positions, box=None):
     return values
 
 
-def _context(system):
+def _context(system, platform=None):
     return mm.Context(system, mm.VerletIntegrator(0.001),
-                      mm.Platform.getPlatformByName(_platform()))
+                      mm.Platform.getPlatformByName(platform or _platform()))
 
 
-def _energy(system, positions, box=None, groups=-1):
-    context = _context(system)
+def _energy(system, positions, box=None, groups=-1, platform=None):
+    context = _context(system, platform)
     if box is not None:
         context.setPeriodicBoxVectors(*[mm.Vec3(*v) for v in box])
     context.setPositions(positions)
@@ -158,17 +158,42 @@ def test_selections(dhla):
     assert an._resolve_atom("A:124:OD2") == od2
     assert an._resolve_atom(("A", 124, "OD2")) == od2
     assert an._resolve_atom(od2) == od2
+    # Asp124 is cut (CB-CG): tracked as its reacting part and the rest
     assert [r["label"] for r in an.residues] == [
-        "A:124:ASP", "A:289:HIS", "B:1:DCE"
+        "A:124:ASP[fragment]", "A:124:ASP[rest]", "A:289:HIS", "B:1:DCE"
+    ]
+    assert [r["kind"] for r in an.residues] == [
+        "fragment part", "rest part", "residue", "residue"
     ]
     asp = next(r for r in dhla.topology.residues() if r.id == "124")
-    assert list(an.residues[0]["atoms"]) == sorted(a.index
-                                                   for a in asp.atoms())
+    asp_atoms = {a.name: a.index for a in asp.atoms()}
+    part, rest = an.residues[0]["atoms"], an.residues[1]["atoms"]
+    assert sorted(list(part) + list(rest)) == sorted(asp_atoms.values())
+    assert sorted(part) == sorted(asp_atoms[n] for n in ("CG", "OD1", "OD2"))
+    assert asp_atoms["CB"] in rest  # the cut's host atom
+    assert [c["label"] for c in an.cuts] == ["A:124:ASP[cut]"]
+    assert list(an.cuts[0]["atoms"]) == sorted(asp_atoms.values())
     # fragment: the carboxylate and DCE, in their own PDB residues
     names = {(a.residue.id, a.name) for a in dhla.topology.atoms()
              if a.index in set(an.fragment_atoms)}
     assert {("124", "OD2"), ("124", "CG"), ("1", "C1")} <= names
     assert ("124", "CA") not in names
+    # one fragment class per residue holding reacting atoms
+    assert an.class_names == ("protein", "fragment:A:124:ASP",
+                              "fragment:B:1:DCE", "water", "ions", "other")
+    for k, residue in ((1, an.residues[0]), (2, an.residues[3])):
+        assert set(np.where(an.atom_classes == k)[0]) == set(
+            residue["atoms"].tolist())
+    assert an.atom_classes[asp_atoms["CB"]] == 0
+    # a residue wholly inside the fragment, and a group, are not split
+    whole = _analysis(dhla, terms=None,
+                      residues=["B:1", {"label": "asp",
+                                        "atoms": list(asp_atoms.values())}])
+    assert [r["label"] for r in whole.residues] == ["B:1:DCE", "asp"]
+    assert whole.cuts == []
+    with pytest.raises(VeloxChemError, match="reserved"):
+        _analysis(dhla, terms=None,
+                  residues=[{"label": "classes", "atoms": ["B:1:C1"]}])
     with pytest.raises(VeloxChemError, match="matches 0 atoms"):
         _analysis(dhla, terms=[["A:124:XX", "B:1:C1"]], residues=None)
     with pytest.raises(VeloxChemError, match="2, 3 or 4 atoms"):
@@ -356,6 +381,18 @@ def test_residue_bonded_against_zeroing(dhla):
                 assert values[f"{base}/{category}"] == pytest.approx(
                     ref, rel=1e-6, abs=1e-6), (base, category)
             assert values[f"{base}/other"] == 0.0
+    # The cut: terms inside Asp124 minus those inside either part
+    cut = an.cuts[0]
+    sides = [set(cut[k].tolist()) for k in ("atoms", "fragment", "rest")]
+    for ham, system in systems.items():
+        base = f"{cut['label']}/{ham}/bonded"
+        for group, category in ((1, "bond"), (2, "angle"), (3, "torsion")):
+            whole, frag, rest = (_energy(_zeroed_bonded(system, s), x,
+                                         groups=1 << group) for s in sides)
+            assert abs(values[f"{base}/{category}"]) > 1e-3, (base, category)
+            assert values[f"{base}/{category}"] == pytest.approx(
+                whole - frag - rest, rel=1e-6, abs=1e-6), (base, category)
+        assert values[f"{base}/other"] == 0.0
 
 
 # ---------------------------------------------------------------------- #
@@ -377,12 +414,13 @@ def test_vacuum_pme_route_equals_pairwise(dhla):
             base = f"{residue['label']}/{ham}/nb_rest"
             for kind in ("coul", "lj"):
                 pairwise = sum(values[f"{base}/{c}/{kind}"]
-                               for c in ATOM_CLASSES)
+                               for c in an.class_names)
                 assert values[f"{base}/{kind}"] == pytest.approx(
                     pairwise, abs=1e-6), (base, kind)
     # His289 holds no fragment atom: its internal energy is the
     # NonbondedForce of the residue alone
-    his = an.residues[1]
+    his = an.residues[2]
+    assert his["label"] == "A:289:HIS"
     nb = copy.deepcopy(next(f for f in dhla.systems["reactant"].getForces()
                             if isinstance(f, mm.NonbondedForce)))
     inside = set(his["atoms"].tolist())
@@ -401,9 +439,66 @@ def test_vacuum_pme_route_equals_pairwise(dhla):
     internal = (values["A:289:HIS/E1/nb_internal/coul"] +
                 values["A:289:HIS/E1/nb_internal/lj"])
     assert internal == pytest.approx(_energy(alone, x), abs=1e-3)
-    # Asp124's fragment class is the substrate (and nothing is water)
-    assert values["A:124:ASP/E1/nb_rest/fragment/coul"] != 0.0
-    assert values["A:124:ASP/E1/nb_rest/water/coul"] == 0.0
+    # The rest of Asp124 sees its own reacting part and the substrate as
+    # separate fragment classes (and nothing is water)
+    for cls in ("fragment:A:124:ASP", "fragment:B:1:DCE"):
+        assert values[f"A:124:ASP[rest]/E1/nb_rest/{cls}/coul"] != 0.0
+    assert values["A:124:ASP[fragment]/E1/nb_rest/fragment:A:124:ASP/coul"] \
+        == 0.0
+    assert values["A:124:ASP[rest]/E1/nb_rest/water/coul"] == 0.0
+
+
+def _nonbonded_only(system):
+    out = mm.System()
+    for i in range(system.getNumParticles()):
+        out.addParticle(system.getParticleMass(i))
+    out.setDefaultPeriodicBoxVectors(*system.getDefaultPeriodicBoxVectors())
+    nb = next(f for f in system.getForces() if isinstance(f, mm.NonbondedForce))
+    out.addForce(copy.deepcopy(nb))
+    return out
+
+
+def _class_pair_sum(an, values, ham, kind):
+    return sum(values[f"classes/{ham}/{a}~{b}/{kind}"]
+               for a, b in an.class_pair_list())
+
+
+def test_vacuum_class_pairs(dhla):
+    """Class pairs sum to the NonbondedForce energy; without a cutoff a
+    class pair equals the pairwise class part of a residue holding the whole
+    class (the substrate), and the parts of the split Asp124."""
+    an = _analysis(dhla, terms=None,
+                   residues=["A:124", "B:1"])
+    an.platform = "Reference"
+    x = _frame(dhla.positions, 8)
+    systems = {"E1": dhla.systems["reactant"], "E_int": dhla.systems[0.5]}
+    values = _values(an, systems, x)
+    assert len(an.class_pair_list()) == 21
+    for ham, system in systems.items():
+        total = (_class_pair_sum(an, values, ham, "coul") +
+                 _class_pair_sum(an, values, ham, "lj"))
+        assert total == pytest.approx(_energy(_nonbonded_only(system), x,
+                                              platform="Reference"),
+                                      abs=1e-6)
+        pairs = {
+            "protein~fragment:B:1:DCE": "B:1:DCE/{}/nb_rest/protein",
+            "protein~fragment:A:124:ASP":
+                "A:124:ASP[fragment]/{}/nb_rest/protein",
+        }
+        for pair, column in pairs.items():
+            for kind in ("coul", "lj"):
+                ref = values[f"{column.format(ham)}/{kind}"]
+                assert abs(ref) > 1e-2, (pair, kind)
+                assert values[f"classes/{ham}/{pair}/{kind}"] == \
+                    pytest.approx(ref, abs=1e-6), (ham, pair, kind)
+        # no water or ions in this system; the fragment pair sits in the
+        # soft-core forces, not the NonbondedForce
+        for pair in ("protein~water", "water~water", "ions~ions"):
+            assert values[f"classes/{ham}/{pair}/coul"] == 0.0
+        assert values[f"classes/{ham}/fragment:A:124:ASP~fragment:B:1:DCE/"
+                      "coul"] == pytest.approx(0.0, abs=1e-9)
+    off = _analysis(dhla, terms=None, residues=["B:1"], class_pairs=False)
+    assert not any(c.startswith("classes/") for c in off.columns)
 
 
 def test_atom_group_equals_its_residue(dhla):
@@ -419,7 +514,7 @@ def test_atom_group_equals_its_residue(dhla):
                      _frame(dhla.positions, 7))
     for column in an.columns:
         if column.startswith("B:1:DCE/E1/"):
-            other = column.replace("B:1:DCE/", "dce/")
+            other = "dce/" + column[len("B:1:DCE/"):]
             assert values[column] == pytest.approx(values[other],
                                                    abs=5e-3), column
 
@@ -443,7 +538,7 @@ def test_e_int_endpoints_and_linear_charges(dhla):
                 abs=1e-4), column
     # the fragment charges are linear in lambda, so is His289's Coulomb
     # energy with the fragment
-    col = "A:289:HIS/E_int/nb_rest/fragment/coul"
+    col = "A:289:HIS/E_int/nb_rest/fragment:B:1:DCE/coul"
     assert v0[col] != pytest.approx(v1[col], abs=1e-3)
     assert vh[col] == pytest.approx(0.5 * (v0[col] + v1[col]), abs=1e-6)
 
@@ -536,7 +631,7 @@ def test_periodic_lj_route_equals_pairwise_without_dispersion(water):
                      water.box)
     for residue in an.residues:
         base = f"{residue['label']}/E1/nb_rest"
-        pairwise = sum(values[f"{base}/{c}/lj"] for c in ATOM_CLASSES)
+        pairwise = sum(values[f"{base}/{c}/lj"] for c in an.class_names)
         assert values[f"{base}/lj"] == pytest.approx(pairwise, abs=2e-3)
 
 
@@ -581,7 +676,7 @@ def test_periodic_lj_route_has_the_dispersion_cross_term(water):
             _dispersion_energy(system, water.positions, water.box, ~inside) -
             _dispersion_energy(system, water.positions, water.box, inside))
         base = f"{residue['label']}/E1/nb_rest"
-        pairwise = sum(values[f"{base}/{c}/lj"] for c in ATOM_CLASSES)
+        pairwise = sum(values[f"{base}/{c}/lj"] for c in an.class_names)
         assert abs(reference) > 1e-3
         assert values[f"{base}/lj"] - pairwise == pytest.approx(reference,
                                                                 abs=2e-3)
@@ -609,11 +704,65 @@ def test_periodic_coulomb_route_is_linear_in_residue_charges(water):
     assert abs(single[f"{base}/coul"]) > 1.0
     assert double[f"{base}/coul"] == pytest.approx(2 * single[f"{base}/coul"],
                                                    abs=5e-3)
-    for cls in ATOM_CLASSES:
+    for cls in an.class_names:
         assert double[f"{base}/{cls}/coul"] == pytest.approx(
             2 * single[f"{base}/{cls}/coul"], abs=1e-9)
     assert double[f"{base}/lj"] == pytest.approx(single[f"{base}/lj"],
                                                  abs=5e-3)
+
+
+def test_periodic_class_pairs(water):
+    """With PME and the dispersion correction, the class pairs sum to
+    OpenMM's NonbondedForce energy (Coulomb and Lennard-Jones separately),
+    and the solute-water pair equals the solute's nb_rest (the system holds
+    nothing else). Doubling the water charges doubles the solute-water
+    Coulomb pair and quadruples the water-water one."""
+    an, solute, _ = _water_analysis(water)
+    system = water.systems["reactant"]
+    frag = f"fragment:{solute.chain.id}:{solute.id}:{solute.name}"
+    assert an.class_names == ("protein", frag, "water", "ions", "other")
+    assert set(np.where(an.atom_classes == 1)[0]) == {
+        a.index for a in solute.atoms()}
+    values = _values(an, {"E1": system}, water.positions, water.box)
+
+    only = _nonbonded_only(system)
+    nb = only.getForce(0)
+    assert nb.getUseDispersionCorrection()
+    total = _energy(only, water.positions, water.box)
+    for i in range(nb.getNumParticles()):
+        q, sig, eps = nb.getParticleParameters(i)
+        nb.setParticleParameters(i, q, sig, 0.0)
+    for k in range(nb.getNumExceptions()):
+        i, j, qq, sig, eps = nb.getExceptionParameters(k)
+        nb.setExceptionParameters(k, i, j, qq, sig, 0.0)
+    coul = _energy(only, water.positions, water.box)
+    assert _class_pair_sum(an, values, "E1", "coul") == pytest.approx(
+        coul, abs=2e-2)
+    assert _class_pair_sum(an, values, "E1", "lj") == pytest.approx(
+        total - coul, abs=2e-2)
+
+    pair = f"classes/E1/{frag}~water"
+    label = f"{solute.chain.id}:{solute.id}:{solute.name}"
+    for kind in ("coul", "lj"):
+        assert abs(values[f"{pair}/{kind}"]) > 1.0
+        assert values[f"{pair}/{kind}"] == pytest.approx(
+            values[f"{label}/E1/nb_rest/{kind}"], abs=5e-3)
+
+    scaled = copy.deepcopy(system)
+    nb = next(f for f in scaled.getForces() if isinstance(f, mm.NonbondedForce))
+    waters = set(np.where(an.atom_classes == 2)[0].tolist())
+    for i in waters:
+        q, sig, eps = nb.getParticleParameters(i)
+        nb.setParticleParameters(i, 2 * q, sig, eps)
+    for k in range(nb.getNumExceptions()):
+        i, j, qq, sig, eps = nb.getExceptionParameters(k)
+        nb.setExceptionParameters(k, i, j, 2**len({i, j} & waters) * qq, sig,
+                                  eps)
+    double = _values(an, {"E1": scaled}, water.positions, water.box)
+    assert double[f"{pair}/coul"] == pytest.approx(
+        2 * values[f"{pair}/coul"], abs=5e-3)
+    ww = "classes/E1/water~water/coul"
+    assert double[ww] == pytest.approx(4 * values[ww], rel=1e-5)
 
 
 # ---------------------------------------------------------------------- #

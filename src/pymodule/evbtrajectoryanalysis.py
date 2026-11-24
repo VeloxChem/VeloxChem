@@ -53,8 +53,13 @@ except ImportError:
 ONE_4PI_EPS0 = 138.93545764438198
 
 HAMILTONIANS = ("E1", "E2", "E_int")
+# The fragment class is split per topology residue ('fragment:A:124:ASP'),
+# in the order of the residues; see EvbTrajectoryAnalysis.class_names
 ATOM_CLASSES = ("protein", "fragment", "water", "ions", "other")
 BONDED_CATEGORIES = ("bond", "angle", "torsion", "other")
+# Label of the class-pair columns, and the separator of the two classes
+CLASS_PAIR_LABEL = "classes"
+CLASS_PAIR_SEPARATOR = "~"
 
 _WATER_RESIDUES = {"HOH", "SOL", "WAT", "TIP3", "TIP3P", "T3P", "SPC", "TIP4"}
 _ION_RESIDUES = {
@@ -103,12 +108,13 @@ class EvbTrajectoryAnalysis:
           the system's own NonbondedForce (PME included), plus the soft-core
           pair forces that cross the residue boundary.
         - nb_rest/<class>/{coul,lj}: the same interaction split over the
-          atom classes protein, fragment (reacting atoms), water, ions and
-          other, pairwise: plain Coulomb at the minimum image of each residue
-          (no cutoff), Lennard-Jones with the system's cutoff and switching
-          function. The Coulomb class parts therefore do not sum to the PME
-          total in nb_rest/coul; the Lennard-Jones parts sum to nb_rest/lj up
-          to the long-range dispersion correction.
+          atom classes (class_names: protein, one fragment class per residue
+          holding reacting atoms, water, ions and other), pairwise: plain
+          Coulomb at the minimum image of each residue (no cutoff),
+          Lennard-Jones with the system's cutoff and switching function. The
+          Coulomb class parts therefore do not sum to the PME total in
+          nb_rest/coul; the Lennard-Jones parts sum to nb_rest/lj up to the
+          long-range dispersion correction.
 
     The interaction of two tracked residues with each other is part of both
     residues' nb_rest, so nb_rest must not be summed over residues. Instead
@@ -116,6 +122,23 @@ class EvbTrajectoryAnalysis:
     reacting atoms, which can reach into protein residues) or a dict with
     'label' and 'atoms'. Groups may overlap; for a group spanning several
     residues, 'internal' means inside the group.
+
+    A selected residue that holds reacting atoms and other atoms (a residue
+    cut by pdb_active_res 'cut', e.g. DhlA Asp124 CG/OD1/OD2) is tracked as
+    two groups, '<residue>[fragment]' (its reacting atoms) and
+    '<residue>[rest]' (the others; the cut's host atom belongs here). The
+    bonded terms with atoms on both sides go to '<residue>[cut]/<H>/bonded/
+    <category>', so no bonded term of the residue is lost.
+
+    With class_pairs, the NonbondedForce energy is also split over pairs of
+    atom classes, consistently with the simulation's electrostatics:
+    classes/<H>/<a>~<b>/{coul,lj} = E(a and b on) - E(a on) - E(b on), and
+    classes/<H>/<a>~<a>/{coul,lj} = E(a on), every other class switched off,
+    exceptions between classes added pairwise, the long-range dispersion
+    correction split analytically. Summed over all pairs (a <= b) they give
+    the NonbondedForce energy exactly. Soft-core pair forces (SYS*) are not
+    in these columns; they are fragment-internal and appear in the nb_rest
+    of the fragment groups.
 
     Instance variables:
         - comm: The MPI communicator.
@@ -125,9 +148,15 @@ class EvbTrajectoryAnalysis:
           systems, as saved with them (force_group_name.json).
         - hamiltonians: The Hamiltonians evaluated, a subset of E1, E2, E_int.
         - terms: The tracked terms, dicts with label, kind and atoms.
-        - residues: The tracked residues, dicts with label and atoms.
+        - residues: The tracked residues and groups, dicts with label, kind
+          ('residue', 'fragment part', 'rest part', 'group') and atoms.
+        - cuts: The residues split into a fragment and a rest part, dicts
+          with label ('<residue>[cut]'), atoms, fragment and rest.
         - fragment_atoms: Particle indices of the reacting fragment.
-        - atom_classes: Class index (into ATOM_CLASSES) of every particle.
+        - class_names: The atom classes: protein, fragment:<residue> per
+          residue holding reacting atoms, water, ions and other.
+        - atom_classes: Class index (into class_names) of every particle.
+        - class_pairs: Whether the class-pair columns are computed.
         - columns: The output column names, in order.
         - periodic: Whether the frames carry a periodic box.
         - platform: OpenMM platform name, or None for OpenMM's choice.
@@ -143,6 +172,7 @@ class EvbTrajectoryAnalysis:
                  hamiltonians=HAMILTONIANS,
                  platform=None,
                  platform_properties=None,
+                 class_pairs=True,
                  comm=None,
                  ostream=None):
         """
@@ -164,13 +194,18 @@ class EvbTrajectoryAnalysis:
         :param residues:
             Tracked residues: 'chain:resid' strings or (chain, resid) tuples;
             also 'fragment' (the reacting atoms) or an atom group {'label':
-            name, 'atoms': [atom selections]}. Groups may overlap.
+            name, 'atoms': [atom selections]}. Groups may overlap. A residue
+            holding reacting atoms and other atoms is split (see above).
         :param hamiltonians:
             The Hamiltonians to evaluate, a subset of ('E1', 'E2', 'E_int').
         :param platform:
             OpenMM platform name, or None.
         :param platform_properties:
             OpenMM platform properties, or None.
+        :param class_pairs:
+            Whether to split the NonbondedForce energy over pairs of atom
+            classes (PME-consistent; n(n+1)/2 extra energy evaluations per
+            kind for n non-empty classes).
         """
 
         assert_msg_critical('openmm' in sys.modules,
@@ -216,14 +251,17 @@ class EvbTrajectoryAnalysis:
             f"The topology has {self.n_atoms} atoms but the system has "
             f"{reference_system.getNumParticles()} particles")
 
+        self.class_pairs = bool(class_pairs)
         self.fragment_atoms = self._fragment_atoms(reference_system)
         self.terms = self._resolve_terms(terms)
+        self.cuts = []
         self.residues = self._resolve_residues(residues)
         assert_msg_critical(
-            len(self.terms) + len(self.residues) > 0,
-            "EvbTrajectoryAnalysis needs at least one term or residue to track")
+            len(self.terms) + len(self.residues) > 0 or self.class_pairs,
+            "EvbTrajectoryAnalysis needs at least one term or residue to "
+            "track, or class_pairs")
 
-        self.atom_classes = self._classify_atoms()
+        self.class_names, self.atom_classes = self._classify_atoms()
 
         # Per-residue images: every topology residue is moved as a whole to
         # the image nearest the tracked residue
@@ -339,11 +377,20 @@ class EvbTrajectoryAnalysis:
         if residues is None:
             return []
         resolved = []
+        fragment = set(self.fragment_atoms.tolist())
+
+        def add(label, kind, atoms):
+            resolved.append({
+                "label": label,
+                "kind": kind,
+                "atoms": np.array(sorted(atoms), dtype=int),
+            })
+
         for selection in residues:
             if isinstance(selection, str) and selection == "fragment":
-                label, atoms = "fragment", self.fragment_atoms.tolist()
                 assert_msg_critical(
-                    len(atoms) > 0, "The systems have no reacting fragment")
+                    len(fragment) > 0, "The systems have no reacting fragment")
+                add("fragment", "group", fragment)
             elif isinstance(selection, dict):
                 assert_msg_critical(
                     set(selection) == {"label", "atoms"},
@@ -353,15 +400,36 @@ class EvbTrajectoryAnalysis:
                 assert_msg_critical(
                     len(atoms) > 0 and len(set(atoms)) == len(atoms),
                     f"Atom group {label!r} is empty or names an atom twice")
+                add(label, "group", atoms)
             else:
                 residue = self._resolve_residue(selection)
                 label = f"{residue.chain.id}:{residue.id}:{residue.name}"
-                atoms = [a.index for a in residue.atoms()]
-            resolved.append({"label": label, "atoms": np.array(sorted(atoms))})
-        labels = [r["label"] for r in resolved]
+                atoms = {a.index for a in residue.atoms()}
+                inside = atoms & fragment
+                if not inside or inside == atoms:
+                    add(label, "residue", atoms)
+                    continue
+                # A residue cut by the reacting fragment (pdb_active_res
+                # 'cut'): its reacting atoms sit in REA_*/SYS* force groups,
+                # the rest in the protein's, so it is tracked as two parts
+                rest = atoms - inside
+                add(f"{label}[fragment]", "fragment part", inside)
+                add(f"{label}[rest]", "rest part", rest)
+                self.cuts.append({
+                    "label": f"{label}[cut]",
+                    "residue": label,
+                    "atoms": np.array(sorted(atoms), dtype=int),
+                    "fragment": np.array(sorted(inside), dtype=int),
+                    "rest": np.array(sorted(rest), dtype=int),
+                })
+        labels = ([r["label"] for r in resolved] +
+                  [c["label"] for c in self.cuts])
         assert_msg_critical(
             len(set(labels)) == len(labels),
             f"A residue or group is selected twice: {labels}")
+        assert_msg_critical(
+            CLASS_PAIR_LABEL not in labels,
+            f"'{CLASS_PAIR_LABEL}' is reserved for the class-pair columns")
         return resolved
 
     def _fragment_atoms(self, system):
@@ -383,7 +451,14 @@ class EvbTrajectoryAnalysis:
         return np.array(sorted(atoms), dtype=int)
 
     def _classify_atoms(self):
-        classes = np.empty(self.n_atoms, dtype=int)
+        """The class names and the class index of every particle. The
+        reacting atoms get one class per topology residue,
+        'fragment:<chain>:<resid>:<resname>', so that e.g. the substrate and
+        the reacting part of a cut residue can be told apart."""
+
+        fragment = set(self.fragment_atoms.tolist())
+        base = []
+        fragment_residues = []
         for residue in self.topology.residues():
             names = {a.name for a in residue.atoms()}
             if residue.name.upper() in _WATER_RESIDUES:
@@ -395,9 +470,24 @@ class EvbTrajectoryAnalysis:
             else:
                 cls = "other"
             for atom in residue.atoms():
-                classes[atom.index] = ATOM_CLASSES.index(cls)
-        classes[self.fragment_atoms] = ATOM_CLASSES.index("fragment")
-        return classes
+                if atom.index in fragment:
+                    label = (f"fragment:{residue.chain.id}:{residue.id}:"
+                             f"{residue.name}")
+                    if label not in fragment_residues:
+                        fragment_residues.append(label)
+                    base.append((atom.index, label))
+                else:
+                    base.append((atom.index, cls))
+
+        names = ["protein"] + fragment_residues + ["water", "ions", "other"]
+        assert_msg_critical(
+            len(set(names)) == len(names),
+            f"Atom class names are not unique: {names}")
+        position = {name: k for k, name in enumerate(names)}
+        classes = np.empty(self.n_atoms, dtype=int)
+        for index, name in base:
+            classes[index] = position[name]
+        return tuple(names), classes
 
     # ------------------------------------------------------------------ #
     # Columns
@@ -424,12 +514,30 @@ class EvbTrajectoryAnalysis:
                     f"{base}/nb_internal/coul", f"{base}/nb_internal/lj",
                     f"{base}/nb_rest/coul", f"{base}/nb_rest/lj"
                 ]
-                for cls in ATOM_CLASSES:
+                for cls in self.class_names:
                     columns += [
                         f"{base}/nb_rest/{cls}/coul",
                         f"{base}/nb_rest/{cls}/lj"
                     ]
+            for cut in self.cuts:
+                columns += [
+                    f"{cut['label']}/{ham}/bonded/{c}"
+                    for c in BONDED_CATEGORIES
+                ]
+            if self.class_pairs:
+                for a, b in self.class_pair_list():
+                    base = f"{CLASS_PAIR_LABEL}/{ham}/{a}{CLASS_PAIR_SEPARATOR}{b}"
+                    columns += [f"{base}/coul", f"{base}/lj"]
         return columns
+
+    def class_pair_list(self):
+        """The class pairs (a, b), a <= b in class order, of the class-pair
+        columns."""
+
+        names = self.class_names
+        return [(names[i], names[j])
+                for i in range(len(names))
+                for j in range(i, len(names))]
 
     # ------------------------------------------------------------------ #
     # Frames
@@ -536,12 +644,20 @@ class EvbTrajectoryAnalysis:
             } for t in self.terms],
             "residues": [{
                 "label": r["label"],
+                "kind": r["kind"],
                 "atoms": [atom_info(i) for i in r["atoms"]],
             } for r in self.residues],
+            "cuts": [{
+                "label": c["label"],
+                "residue": c["residue"],
+                "fragment": [atom_info(i) for i in c["fragment"]],
+                "rest": [atom_info(i) for i in c["rest"]],
+            } for c in self.cuts],
             "atom_classes": {
                 cls: int(np.sum(self.atom_classes == k))
-                for k, cls in enumerate(ATOM_CLASSES)
+                for k, cls in enumerate(self.class_names)
             },
+            "class_pairs": self.class_pairs,
             "units": {
                 "energy": "kJ/mol",
                 "distance": "nm",
@@ -566,6 +682,20 @@ class EvbTrajectoryAnalysis:
                 "minimum image distance.",
                 "nb_rest of two tracked residues both contain their mutual "
                 "interaction: do not sum nb_rest over residues.",
+                "Atom classes: protein, fragment:<chain>:<resid>:<resname> "
+                "(the reacting atoms of that residue), water, ions, other.",
+                "A residue holding reacting atoms and other atoms is tracked "
+                "as <residue>[fragment] and <residue>[rest]; "
+                "<residue>[cut]/<H>/bonded/<category> holds the bonded terms "
+                "with atoms on both sides (every atom in the residue).",
+                f"{CLASS_PAIR_LABEL}/<H>/<a>{CLASS_PAIR_SEPARATOR}<b>/"
+                "{coul,lj}: NonbondedForce energy between atom classes a and "
+                "b (a before b in atom_classes), E(a, b on) - E(a on) - "
+                f"E(b on); <a>{CLASS_PAIR_SEPARATOR}<a>: E(a on) alone. PME "
+                "included, exceptions between classes pairwise, long-range "
+                "dispersion correction split analytically. The sum over all "
+                "pairs is the NonbondedForce energy; soft-core pair forces "
+                "are not included.",
             ],
         }
 
@@ -702,6 +832,7 @@ class _SystemEvaluator:
         self._contexts = []
         self._group_columns = []
         self._nb_layers = []
+        self._class_layer = None
 
         assert_msg_critical(
             system.getNumParticles() == analysis.n_atoms,
@@ -712,6 +843,8 @@ class _SystemEvaluator:
         self._build_term_contexts(system)
         if analysis.residues and self._nb is not None:
             self._build_nonbonded_contexts(system)
+        if analysis.class_pairs and self._nb is not None:
+            self._build_class_contexts(system)
 
     # --- setup ---------------------------------------------------------- #
 
@@ -834,6 +967,8 @@ class _SystemEvaluator:
                                                          []).append(term_index)
 
         residue_sets = [set(r["atoms"].tolist()) for r in analysis.residues]
+        cut_sets = [(set(c["atoms"].tolist()), set(c["fragment"].tolist()))
+                    for c in analysis.cuts]
         atom_class = analysis.atom_classes
 
         parsed_forces = {}
@@ -875,7 +1010,7 @@ class _SystemEvaluator:
                             add(f"{base}/nb_internal/{role}", f_index, t_index)
                         else:
                             partner = next(a for a in atoms if a not in rset)
-                            cls = ATOM_CLASSES[atom_class[partner]]
+                            cls = analysis.class_names[atom_class[partner]]
                             add(f"{base}/nb_rest/{role}", f_index, t_index)
                             add(f"{base}/nb_rest/{cls}/{role}", f_index,
                                 t_index)
@@ -889,6 +1024,19 @@ class _SystemEvaluator:
                                 4: "torsion"
                             }.get(len(atoms), "other")
                             add(f"{base}/bonded/{category}", f_index, t_index)
+
+                if nb_role or role == "restraint":
+                    continue
+                for cut, (cut_set, frag_set) in zip(analysis.cuts, cut_sets):
+                    if (atom_set <= cut_set and atom_set & frag_set
+                            and atom_set - frag_set):
+                        category = {
+                            2: "bond",
+                            3: "angle",
+                            4: "torsion"
+                        }.get(len(atoms), "other")
+                        add(f"{cut['label']}/{ham}/bonded/{category}",
+                            f_index, t_index)
 
         if skipped:
             analysis.ostream.print_warning(
@@ -1039,15 +1187,46 @@ class _SystemEvaluator:
         """
 
         n_res = len(self.analysis.residues)
-        nb = self._nb
-        if (not nb.getUseDispersionCorrection() or self._method
-                not in (mm.NonbondedForce.CutoffPeriodic,
-                        mm.NonbondedForce.Ewald, mm.NonbondedForce.PME)):
+        if not self._has_dispersion():
             return np.zeros(n_res)
 
-        rc = self.cutoff
+        coefficients = np.zeros(n_res)
+        for k, residue in enumerate(self.analysis.residues):
+            idx = residue["atoms"]
+            types, counts = self._lj_types(residue["others"])
+            g = self._dispersion_g(self.sig[idx][:, None],
+                                   types[None, :, 0],
+                                   self.eps[idx][:, None],
+                                   types[None, :, 1])
+            coefficients[k] = np.sum(g * counts[None, :])
+        return self._dispersion_prefactor() * coefficients
+
+    def _has_dispersion(self):
+        return bool(self._nb.getUseDispersionCorrection() and self._method
+                    in (mm.NonbondedForce.CutoffPeriodic,
+                        mm.NonbondedForce.Ewald, mm.NonbondedForce.PME))
+
+    def _dispersion_prefactor(self):
+        # 8 pi N^2 over OpenMM's number of interactions N (N + 1) / 2
         n = len(self.q)
-        prefactor = 8.0 * np.pi * n * n / (n * (n + 1) / 2.0)
+        return 8.0 * np.pi * n * n / (n * (n + 1) / 2.0)
+
+    def _lj_types(self, atoms):
+        """The distinct (sig, eps) of the atoms, and their counts."""
+        return np.unique(np.column_stack([self.sig[atoms], self.eps[atoms]]),
+                         axis=0,
+                         return_counts=True)
+
+    def _dispersion_g(self, sig_a, sig_b, eps_a, eps_b):
+        """Per pair of Lennard-Jones types (broadcast), the pair term of
+        NonbondedForceImpl::calcDispersionCorrection before the prefactor:
+        eps sig^12 / (9 rc^9) - eps sig^6 / (3 rc^3) + eps X(sig)."""
+
+        rc = self.cutoff
+        sig = 0.5 * (sig_a + sig_b)
+        eps = np.sqrt(eps_a * eps_b)
+        s6 = sig**6
+        g = eps * (s6 * s6 / (9.0 * rc**9) - s6 / (3.0 * rc**3))
         if self.switch is not None:
             nodes, weights = np.polynomial.legendre.leggauss(64)
             rs = self.switch
@@ -1055,23 +1234,70 @@ class _SystemEvaluator:
             w = 0.5 * (rc - rs) * weights
             x = (r - rs) / (rc - rs)
             off = 1.0 - (1.0 - 6.0 * x**5 + 15.0 * x**4 - 10.0 * x**3)
-        coefficients = np.zeros(n_res)
-        for k, residue in enumerate(self.analysis.residues):
-            idx = residue["atoms"]
-            others = residue["others"]
-            classes, counts = np.unique(np.column_stack(
-                [self.sig[others], self.eps[others]]),
-                                        axis=0,
-                                        return_counts=True)
-            sig = 0.5 * (self.sig[idx][:, None] + classes[None, :, 0])
-            eps = np.sqrt(self.eps[idx][:, None] * classes[None, :, 1])
-            s6 = sig**6
-            g = eps * (s6 * s6 / (9.0 * rc**9) - s6 / (3.0 * rc**3))
-            if self.switch is not None:
-                lj = (sig[..., None] / r)**12 - (sig[..., None] / r)**6
-                g += eps * np.sum(w * lj * off * r * r, axis=-1)
-            coefficients[k] = prefactor * np.sum(g * counts[None, :])
-        return coefficients
+            lj = (sig[..., None] / r)**12 - (sig[..., None] / r)**6
+            g = g + eps * np.sum(w * lj * off * r * r, axis=-1)
+        return g
+
+    def _dispersion_class_coefficients(self):
+        """
+        Per class pair (a <= b, as class_pair_list), its part of OpenMM's
+        long-range dispersion correction times the box volume. OpenMM counts
+        n (n + 1) / 2 pairs within a particle type and n m between two
+        types; split over the classes this gives, for a != b, the sum over
+        i in a, j in b, and for a == b the sum over i <= j in a (i == j
+        included). The parts add up to OpenMM's correction.
+        """
+
+        analysis = self.analysis
+        n_cls = len(analysis.class_names)
+        coefficients = np.zeros((n_cls, n_cls))
+        if not self._has_dispersion():
+            return coefficients
+        types = []
+        for c in range(n_cls):
+            atoms = np.where(analysis.atom_classes == c)[0]
+            types.append(self._lj_types(atoms) if len(atoms) else None)
+        for a in range(n_cls):
+            if types[a] is None:
+                continue
+            ta, na = types[a]
+            for b in range(a, n_cls):
+                if types[b] is None:
+                    continue
+                tb, nb = types[b]
+                g = self._dispersion_g(ta[:, None, 0], tb[None, :, 0],
+                                       ta[:, None, 1], tb[None, :, 1])
+                total = np.sum(g * na[:, None] * nb[None, :])
+                if a == b:
+                    total = 0.5 * (total + np.sum(np.diag(g) * na))
+                coefficients[a, b] = total
+        return self._dispersion_prefactor() * coefficients
+
+    def _build_class_contexts(self, system):
+        """The Coulomb and Lennard-Jones contexts with one switch per atom
+        class, for the class-pair columns."""
+
+        analysis = self.analysis
+        group = analysis.atom_classes
+        names = [
+            f"evb_analysis_class_{c}" for c in range(len(analysis.class_names))
+        ]
+        present = [
+            c for c in range(len(names)) if np.any(group == c)
+        ]
+        # Exceptions between two classes: direct term computed pairwise
+        ex_a, ex_b = group[self._ex[:, 0]], group[self._ex[:, 1]]
+        nonzero = (self._ex_par[:, 0] != 0.0) | (self._ex_par[:, 2] != 0.0)
+        cross = np.where((ex_a != ex_b) & nonzero)[0]
+        self._class_layer = {
+            "switches": names,
+            "present": present,
+            "contexts": self._switch_contexts(system, group, names),
+            "dispersion": self._dispersion_class_coefficients(),
+            "cross_ex": cross,
+            "cross_a": np.minimum(ex_a[cross], ex_b[cross]),
+            "cross_b": np.maximum(ex_a[cross], ex_b[cross]),
+        }
 
     def _context(self, system):
         integrator = mm.VerletIntegrator(0.001)
@@ -1165,6 +1391,9 @@ class _SystemEvaluator:
             values[f"{term['label']}/{ham}/coul"] += coul
             values[f"{term['label']}/{ham}/lj"] += lj
 
+        if self._class_layer is not None:
+            self._evaluate_class_pairs(positions, box, values)
+
         if not analysis.residues:
             return
 
@@ -1193,7 +1422,7 @@ class _SystemEvaluator:
                 for name in switches:
                     context.setParameter(name, 1.0)
 
-        n_classes = len(ATOM_CLASSES)
+        n_classes = len(analysis.class_names)
         for k, residue in enumerate(analysis.residues):
             base = f"{residue['label']}/{ham}"
 
@@ -1248,7 +1477,7 @@ class _SystemEvaluator:
                                                        box[2, 2])
             values[f"{base}/nb_rest/lj"] += totals[k, 1]
 
-            for c, cls in enumerate(ATOM_CLASSES):
+            for c, cls in enumerate(analysis.class_names):
                 values[f"{base}/nb_rest/{cls}/coul"] += coul[c]
                 values[f"{base}/nb_rest/{cls}/lj"] += lj[c]
 
@@ -1262,12 +1491,75 @@ class _SystemEvaluator:
                 np.sum(ONE_4PI_EPS0 * par[:, 0] / d))
             values[f"{base}/nb_internal/lj"] += float(np.sum(lj_int))
 
+    def _evaluate_class_pairs(self, positions, box, values):
+        """Adds the class-pair columns: E(a, b on) - E(a on) - E(b on) and
+        E(a on) in the class-switched contexts, plus the exceptions between
+        classes and the split dispersion correction."""
+
+        analysis = self.analysis
+        layer = self._class_layer
+        switches, present = layer["switches"], layer["present"]
+        names = analysis.class_names
+        n_cls = len(names)
+        energy = np.zeros((2, n_cls, n_cls))
+
+        for c, kind in enumerate(("coul", "lj")):
+            context = layer["contexts"][kind]
+            self._set_frame(context, positions, box)
+            for name in switches:
+                context.setParameter(name, 0.0)
+            alone = {}
+            for a in present:
+                context.setParameter(switches[a], 1.0)
+                alone[a] = self._energy(context)
+                context.setParameter(switches[a], 0.0)
+                energy[c, a, a] = alone[a]
+            for i, a in enumerate(present):
+                context.setParameter(switches[a], 1.0)
+                for b in present[i + 1:]:
+                    context.setParameter(switches[b], 1.0)
+                    energy[c, a, b] = (self._energy(context) - alone[a] -
+                                       alone[b])
+                    context.setParameter(switches[b], 0.0)
+                context.setParameter(switches[a], 0.0)
+
+        # Exceptions between classes: their direct term is not in the
+        # switched contexts (the pair stays excluded there)
+        cross = layer["cross_ex"]
+        if len(cross):
+            p1, p2 = self._ex[cross, 0], self._ex[cross, 1]
+            r = np.linalg.norm(_minimum_image(positions[p2] - positions[p1],
+                                              box),
+                               axis=1)
+            par = self._ex_par[cross]
+            ex_c = ONE_4PI_EPS0 * par[:, 0] / r
+            ex_lj = self._lj(par[:, 1], par[:, 2], r, cutoff=False)
+            pair = layer["cross_a"] * n_cls + layer["cross_b"]
+            energy[0] += np.bincount(pair, weights=ex_c,
+                                     minlength=n_cls * n_cls).reshape(
+                                         n_cls, n_cls)
+            energy[1] += np.bincount(pair, weights=ex_lj,
+                                     minlength=n_cls * n_cls).reshape(
+                                         n_cls, n_cls)
+
+        if box is not None:
+            energy[1] += layer["dispersion"] / (box[0, 0] * box[1, 1] *
+                                                box[2, 2])
+
+        ham = self.hamiltonian
+        position = {name: k for k, name in enumerate(names)}
+        for a, b in analysis.class_pair_list():
+            base = (f"{CLASS_PAIR_LABEL}/{ham}/{a}{CLASS_PAIR_SEPARATOR}{b}")
+            values[f"{base}/coul"] += energy[0, position[a], position[b]]
+            values[f"{base}/lj"] += energy[1, position[a], position[b]]
+
     def close(self):
         """Releases the OpenMM contexts."""
 
         self._contexts = []
         self._group_columns = []
         self._nb_layers = []
+        self._class_layer = None
 
 
 # ---------------------------------------------------------------------- #

@@ -984,7 +984,8 @@ class EvbDriver:
                                     trajectory_format=None,
                                     platform=None,
                                     platform_properties=None,
-                                    progress_interval=1000):
+                                    progress_interval=1000,
+                                    class_pairs=True):
         """
         Recompute, from the trajectory already sampled, the energies of chosen
         force-field terms and residues in every frame, for every
@@ -1009,7 +1010,10 @@ class EvbDriver:
         :param residues:
             Tracked residues: 'chain:resid' strings or (chain, resid) tuples;
             also 'fragment' (the reacting atoms) or an atom group {'label':
-            name, 'atoms': [atom selections]}. Groups may overlap.
+            name, 'atoms': [atom selections]}. Groups may overlap. A residue
+            holding reacting and other atoms (a cut residue) is tracked as
+            '<residue>[fragment]' and '<residue>[rest]', with the bonded
+            terms across the cut in '<residue>[cut]'.
         :param hamiltonians:
             Which of 'E1' (reactant PES), 'E2' (product PES) and 'E_int' (the
             integration system of each frame's own lambda) to evaluate.
@@ -1024,6 +1028,9 @@ class EvbDriver:
             OpenMM platform properties.
         :param progress_interval:
             Print progress every this many frames.
+        :param class_pairs:
+            Whether to split the NonbondedForce energy over pairs of atom
+            classes (columns 'classes/<H>/<a>~<b>/{coul,lj}', PME-consistent).
         """
 
         if self.rank != mpi_master():
@@ -1045,11 +1052,12 @@ class EvbDriver:
             self._trajectory_analysis(conf, terms, residues, hamiltonians,
                                       int(frame_stride), trajectory_format,
                                       platform, platform_properties,
-                                      progress_interval)
+                                      progress_interval, class_pairs)
 
     def _trajectory_analysis(self, conf, terms, residues, hamiltonians,
                              frame_stride, trajectory_format, platform,
-                             platform_properties, progress_interval):
+                             platform_properties, progress_interval,
+                             class_pairs=True):
         """One configuration of compute_trajectory_analysis."""
 
         systems = conf.get("systems")
@@ -1118,6 +1126,7 @@ class EvbDriver:
                                          hamiltonians=hamiltonians,
                                          platform=platform,
                                          platform_properties=platform_properties,
+                                         class_pairs=class_pairs,
                                          comm=self.comm,
                                          ostream=self.ostream)
 
