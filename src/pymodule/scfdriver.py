@@ -2286,6 +2286,10 @@ class ScfDriver:
             # choice is taken in one place.
             metric_erf = PackedMatrix()
 
+            # NOTE: the lines saying how each metric was inverted, which are
+            # formed on the master, where the metrics are made, and printed by it.
+            metric_route_lines = []
+
             if self.rank == mpi_master():
                 if range_separated:
                     # NOTE: the two come out of one call, which forms both
@@ -2293,12 +2297,21 @@ class ScfDriver:
                     metric, metric_erf = self._ri_drv.make_metric_rs(
                         molecule, basis_ri, self.ri_metric_threshold,
                         use_inverse_square_root, mode, omega)
+                    metric_route_lines = [
+                        self._get_ri_metric_route_line(
+                            'Full-range (1/r) RI metric', metric),
+                        self._get_ri_metric_route_line(
+                            'Long-range (erf) RI metric', metric_erf),
+                    ]
                 else:
                     # NOTE: make_metric also answers the way of building, which
                     # is the way it was asked for when that is in_memory.
                     metric, _ = self._ri_drv.make_metric(
                         molecule, basis_ri, self.ri_metric_threshold,
                         use_inverse_square_root, mode)
+                    metric_route_lines = [
+                        self._get_ri_metric_route_line('RI metric', metric)
+                    ]
             else:
                 metric = PackedMatrix()
 
@@ -2328,19 +2341,14 @@ class ScfDriver:
             # metrics which peak_memory counts only while the B vectors are formed.
             del metric, metric_erf
 
+            # NOTE: one line per metric, as the full-range and the long-range
+            # metric of a range-separated functional can be inverted differently.
             if range_separated:
-                # NOTE: the attenuated metric is the worse conditioned of the two
-                # by construction, so it is the one likely to have fallen back to
-                # its square root. Which of them did says so in its own warning.
                 self.ostream.print_info(
                     'Range-separated functional: two sets of B vectors at ' +
                     f'omega = {omega:.3f}.')
-                self.ostream.print_info(
-                    'Both metrics inverted through their ' +
-                    f'{self.ri_metric_route}.')
-            else:
-                self.ostream.print_info(
-                    f'Metric inverted through its {self.ri_metric_route}.')
+            for line in metric_route_lines:
+                self.ostream.print_info(line)
 
             self.ostream.print_info('B vectors are held in memory.')
             self.ostream.flush()
@@ -3455,6 +3463,36 @@ class ScfDriver:
             nocc = [max(n, g) for n, g in zip(nocc, guess)]
 
         return sum(nocc)
+
+    def _get_ri_metric_route_line(self, name, metric):
+        """
+        Gets the line saying how an RI-JK metric was inverted.
+
+        :param name:
+            The name of the metric in the line.
+        :param metric:
+            The inverted metric, as make_metric or make_metric_rs returns it.
+
+        :return:
+            The line.
+        """
+
+        # NOTE: the route is read from the type of the matrix returned. The
+        # Cholesky routes (cholesky_inverse, and cholesky_factor for the direct
+        # way) return a lower triangular matrix and inverse_square_root a
+        # symmetric one (PackedLinearAlgebra.cpp). The metric is inverted through
+        # its inverse square root when that is asked for (ri_metric_route
+        # 'eigenvalues') and when the Cholesky factorization asked for fails,
+        # which the driver does not report otherwise: a metric which is not
+        # numerically positive definite has no Cholesky factor.
+        if metric.get_type() == mat_t.lower_triangular:
+            return f'{name} inverted by Cholesky factorization.'
+
+        if self.ri_metric_route == 'cholesky':
+            return (f'{name} inverted by inverse square root, as it has no ' +
+                    'Cholesky factor.')
+
+        return f'{name} inverted by inverse square root.'
 
     def _get_ri_memory_budget(self, ao_basis):
         """
