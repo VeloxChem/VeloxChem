@@ -1757,6 +1757,8 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             if checkpoint_file and isinstance(checkpoint_file, str):
+                checkpoint_t0 = tm.time()
+
                 if self._dft:
                     xc_label = self.xcfun.get_func_label()
                 else:
@@ -1796,8 +1798,9 @@ class ScfDriver:
                                              group_name='method_settings')
 
                 self.ostream.print_blank()
-                self.ostream.print_info('Checkpoint written to file: ' +
-                                        checkpoint_file)
+                self.ostream.print_info(
+                    f'Checkpoint written to file: {checkpoint_file} ' +
+                    f'({tm.time() - checkpoint_t0:.2f} sec).')
                 self.ostream.flush()
 
     def _comp_diis(self, molecule, ao_basis, den_mat, profiler):
@@ -2088,7 +2091,6 @@ class ScfDriver:
                 self.ostream.print_info(
                     'Three-center integrals are held in memory, in ' +
                     f'{self._ri_drv.number_of_parts()} parts.')
-                self.ostream.print_blank()
                 self.ostream.flush()
 
         elif use_ri_jk and not self._ri_fallback:
@@ -2327,10 +2329,33 @@ class ScfDriver:
 
             self.ostream.print_info(
                 f'B vectors for RI done in {tm.time() - ri_prep_t0:.2f} sec.')
-            self.ostream.print_blank()
             self.ostream.flush()
 
         self._ri_setup_time = tm.time() - ri_setup_t0
+
+        uses_ri = (use_ri_coulomb or use_ri_jk) and not self._ri_fallback
+
+        # NOTE: the RI setup is the time from the choice of the auxiliary basis
+        # to the end of the B vectors (RI-JK) or of the three-center integrals
+        # (RI-J), the memory estimate and the metric included.
+        if uses_ri:
+            self.ostream.print_info(
+                f'RI setup done in {self._ri_setup_time:.2f} sec.')
+
+        # NOTE: the SCF setup is the time from diis_start_time, from which the
+        # SCF time printed at the end is counted, to the first Fock build: the
+        # one-electron integrals, the orthogonalization matrix, the screening of
+        # the four-center integrals and the RI setup. The SCF time is this, the
+        # rows of the timing table and the two files written after the
+        # iterations, apart from the dipole moment, the printing and the
+        # convergence checks, which are not timed.
+        if not self._first_step:
+            self.ostream.print_info(
+                f'SCF setup done in {tm.time() - diis_start_time:.2f} sec.')
+
+        if uses_ri or not self._first_step:
+            self.ostream.print_blank()
+            self.ostream.flush()
 
         e_grad = None
 
@@ -2350,7 +2375,14 @@ class ScfDriver:
             else:
                 self._num_iter = i
 
-            profiler.set_timing_key(f'Iteration {self._num_iter:d}')
+            # NOTE: iteration 0 is the Fock build from the initial guess, before
+            # the first DIIS step. It is timed as Preparation, the key under which
+            # the response solvers time the build from their initial trial
+            # vectors.
+            if self._num_iter == 0:
+                profiler.set_timing_key('Preparation')
+            else:
+                profiler.set_timing_key(f'Iteration {self._num_iter:d}')
 
             iter_start_time = tm.time()
 
@@ -2367,6 +2399,8 @@ class ScfDriver:
 
             self._e_gostshyp = e_pr
 
+            # NOTE: ErrVec is timed in two parts, before and after CPCM, which
+            # the profiler adds up.
             profiler.start_timer('ErrVec')
 
             e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, e_pr, kin_mat,
@@ -5184,9 +5218,12 @@ class ScfDriver:
         else:
             potfile_text = ''
 
+        final_h5_t0 = tm.time()
+
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
         write_scf_results_to_hdf5(final_h5_fname, self.scf_results)
 
         self.ostream.print_blank()
-        self.ostream.print_info('SCF results written to file: ' +
-                                final_h5_fname)
+        self.ostream.print_info(
+            f'SCF results written to file: {final_h5_fname} ' +
+            f'({tm.time() - final_h5_t0:.2f} sec).')

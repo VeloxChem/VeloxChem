@@ -52,6 +52,8 @@ class Profiler:
         - start_time: The starting time.
         - timing_dict: The dictionary containing information about timing.
         - timing_key: The key for the timing dictionary.
+        - timer_starts: The start times of the running timers, by timing key
+          and label.
         - memory_usage: The list of tuples with the elapsed time, the
           resident memory of the current process, the peak resident memory
           of the current process so far, the total system memory usage, and
@@ -76,6 +78,7 @@ class Profiler:
 
         self.timing_dict = None
         self.timing_key = None
+        self.timer_starts = None
 
         self.memory_usage = None
         self.pr = None
@@ -103,6 +106,7 @@ class Profiler:
         self.start_time = tm.time()
 
         self.timing_dict = {}
+        self.timer_starts = {}
         self.memory_usage = []
 
         if self.memory_profiling:
@@ -216,7 +220,8 @@ class Profiler:
 
     def start_timer(self, label):
         """
-        Starts the timer for a label.
+        Starts the timer for a label. The times between the starts and stops
+        of a label under one timing key add up.
 
         :param label:
             The label.
@@ -225,7 +230,12 @@ class Profiler:
         key = self.timing_key
 
         if self.timing and (key is not None) and (key in self.timing_dict):
-            self.timing_dict[key][label] = tm.time()
+            # NOTE: the entry is made at the start, as the columns of the
+            # timing table follow the order in which labels enter timing_dict,
+            # and a label such as 'total' is started first and stopped last.
+            if label not in self.timing_dict[key]:
+                self.timing_dict[key][label] = 0.0
+            self.timer_starts[(key, label)] = tm.time()
 
     def stop_timer(self, label):
         """
@@ -238,8 +248,8 @@ class Profiler:
         key = self.timing_key
 
         if self.timing and (key is not None) and (key in self.timing_dict):
-            t0 = self.timing_dict[key][label]
-            self.timing_dict[key][label] = tm.time() - t0
+            t0 = self.timer_starts.pop((key, label))
+            self.timing_dict[key][label] += tm.time() - t0
 
     def add_timing_info(self, label, dt):
         """
