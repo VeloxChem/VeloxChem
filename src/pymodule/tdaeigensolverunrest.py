@@ -394,6 +394,8 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         if self.rank == mpi_master():
             self._print_convergence('{:d} excited states'.format(self.nstates))
 
+            solutions_write_time = 0.0
+
             # final hdf5 file to save response results
             if self.filename is not None:
                 final_h5_fname = f'{self.filename}.h5'
@@ -470,8 +472,10 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                 # write eigenvectors to h5 file
                 if (self.save_solutions and final_h5_fname is not None):
                     eigvec_full = eigvecs[:, s].copy()
+                    write_t0 = tm.time()
                     write_rsp_full_solution_to_hdf5(
                         final_h5_fname, eigvec_full, s, self.nstates)
+                    solutions_write_time += tm.time() - write_t0
 
                 # save excitation details
                 excitation_details.append(
@@ -622,7 +626,8 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
             if (self.save_solutions and final_h5_fname is not None):
                 self.ostream.print_info(
                     'Response solution vectors written to file: ' +
-                    final_h5_fname)
+                    f'{final_h5_fname} ' +
+                    f'(took {solutions_write_time:.2f} sec).')
                 self.ostream.print_blank()
                 self.ostream.flush()
 

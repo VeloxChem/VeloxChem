@@ -1800,7 +1800,7 @@ class ScfDriver:
                 self.ostream.print_blank()
                 self.ostream.print_info(
                     f'Checkpoint written to file: {checkpoint_file} ' +
-                    f'({tm.time() - checkpoint_t0:.2f} sec).')
+                    f'(took {tm.time() - checkpoint_t0:.2f} sec).')
                 self.ostream.flush()
 
     def _comp_diis(self, molecule, ao_basis, den_mat, profiler):
@@ -5279,4 +5279,4 @@ class ScfDriver:
         self.ostream.print_blank()
         self.ostream.print_info(
             f'SCF results written to file: {final_h5_fname} ' +
-            f'({tm.time() - final_h5_t0:.2f} sec).')
+            f'(took {tm.time() - final_h5_t0:.2f} sec).')

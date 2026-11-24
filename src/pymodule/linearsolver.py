@@ -3618,8 +3618,10 @@ class LinearSolver:
         t0 = tm.time()
 
         if self.rank == mpi_master():
+            # NOTE: no ostream, as the arrays are added below and the line
+            # about the file is printed after them.
             success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
-                                     basis, dft_dict, pe_dict, self.ostream)
+                                     basis, dft_dict, pe_dict, None)
         else:
             success = False
         success = self.comm.bcast(success, root=mpi_master())
@@ -3641,9 +3643,9 @@ class LinearSolver:
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
-            checkpoint_text = 'Time spent in writing checkpoint file: '
-            checkpoint_text += f'{(tm.time() - t0):.2f} sec'
-            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_info(
+                f'Checkpoint written to file: {self.checkpoint_file} ' +
+                f'(took {tm.time() - t0:.2f} sec).')
             self.ostream.print_blank()
 
     def _graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):

@@ -756,6 +756,8 @@ class ComplexResponseTdaSolver(LinearSolver):
                     va = {op: v for op, v in zip(self.a_components, a_grad)}
                     rsp_funcs = {}
 
+                    solutions_write_time = 0.0
+
                     # final h5 file for response solutions
                     if self.filename is not None:
                         final_h5_fname = f'{self.filename}.h5'
@@ -777,15 +779,18 @@ class ComplexResponseTdaSolver(LinearSolver):
 
                         # write solutions to h5 file
                         if (self.save_solutions and final_h5_fname is not None):
+                            write_t0 = tm.time()
                             write_rsp_full_solution_to_hdf5(
                                 final_h5_fname, x, op_w_ind, len(solutions))
+                            solutions_write_time += tm.time() - write_t0
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
                     if (self.save_solutions and final_h5_fname is not None):
                         self.ostream.print_info(
                             'Response solution vectors written to file: ' +
-                            final_h5_fname)
+                            f'{final_h5_fname} ' +
+                            f'(took {solutions_write_time:.2f} sec).')
                         self.ostream.print_blank()
                         self.ostream.flush()
 
@@ -1589,8 +1594,10 @@ class ComplexResponseTdaSolver(LinearSolver):
         t0 = tm.time()
 
         if self.rank == mpi_master():
+            # NOTE: no ostream, as the arrays are added below and the line
+            # about the file is printed after them.
             success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
-                                     basis, dft_dict, pe_dict, self.ostream)
+                                     basis, dft_dict, pe_dict, None)
         else:
             success = False
         success = self.comm.bcast(success, root=mpi_master())
@@ -1608,9 +1615,9 @@ class ComplexResponseTdaSolver(LinearSolver):
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
-            checkpoint_text = 'Time spent in writing checkpoint file: '
-            checkpoint_text += f'{(tm.time() - t0):.2f} sec'
-            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_info(
+                f'Checkpoint written to file: {self.checkpoint_file} ' +
+                f'(took {tm.time() - t0:.2f} sec).')
             self.ostream.print_blank()
 
     def _read_checkpoint(self, rsp_vector_labels):
