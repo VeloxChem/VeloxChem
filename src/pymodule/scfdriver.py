@@ -1225,7 +1225,7 @@ class ScfDriver:
         self._level_shift_smooth_alpha = None
         self._level_shift_smooth_beta = None
 
-        profiler.end(self.ostream, scf_flag=True, comm=self.comm)
+        profiler.end(self.ostream, comm=self.comm)
 
         self._print_ri_memory_check()
 
