@@ -1834,6 +1834,18 @@ class ScfDriver:
 
         diis_start_time = tm.time()
 
+        # NOTE: the line which marks where the time printed at the end of this
+        # step starts, in the reduced-basis line or in the SCF finish line.
+        if self._first_step:
+            self.ostream.print_info('Starting Reduced Basis SCF calculation...')
+        elif self._acc_type_used == 'L2_DIIS':
+            self.ostream.print_info('Starting SCF calculation in full basis...')
+            self.ostream.print_blank()
+        else:
+            self.ostream.print_info('Starting SCF calculation...')
+            self.ostream.print_blank()
+        self.ostream.flush()
+
         if self.rank == mpi_master():
             acc_diis = Diis(self.max_err_vecs, self.diis_thresh, self.scf_type)
 
@@ -1876,7 +1888,6 @@ class ScfDriver:
                 self.ostream.print_info(
                     'Point charges one-electron integral computed in' +
                     ' {:.2f} sec.'.format(tm.time() - t0point_charges))
-                self.ostream.print_blank()
 
         linear_dependency = False
 
@@ -1887,7 +1898,9 @@ class ScfDriver:
             eigvals, eigvecs = screened_eigh(S, self.ovl_thresh)
             oao_mat = eigvecs * (1.0 / np.sqrt(eigvals))
 
-            if self.print_level > 1:
+            # NOTE: the reduced-basis step prints neither this nor the
+            # one-electron integrals (_comp_one_ints).
+            if self.print_level > 1 and not self._first_step:
                 self.ostream.print_info('Orthogonalization matrix computed in' +
                                         ' {:.2f} sec.'.format(tm.time() - t0))
                 self.ostream.print_blank()
@@ -2257,6 +2270,10 @@ class ScfDriver:
                 self._ri_drv = None
                 self._ri_aux_atoms = []
 
+        # NOTE: the time of the metric and the B vectors, which is printed as part
+        # of the RI setup, and None where they are not formed.
+        b_vectors_time = None
+
         # NOTE: the metric and the B vectors, which a calculation which fell back
         # to the four-center integrals does not form.
         if use_ri_jk and not self._ri_fallback:
@@ -2326,10 +2343,9 @@ class ScfDriver:
                     f'Metric inverted through its {self.ri_metric_route}.')
 
             self.ostream.print_info('B vectors are held in memory.')
-
-            self.ostream.print_info(
-                f'B vectors for RI done in {tm.time() - ri_prep_t0:.2f} sec.')
             self.ostream.flush()
+
+            b_vectors_time = tm.time() - ri_prep_t0
 
         self._ri_setup_time = tm.time() - ri_setup_t0
 
@@ -2339,23 +2355,26 @@ class ScfDriver:
         # to the end of the B vectors (RI-JK) or of the three-center integrals
         # (RI-J), the memory estimate and the metric included.
         if uses_ri:
-            self.ostream.print_info(
-                f'RI setup done in {self._ri_setup_time:.2f} sec.')
+            valstr = f'RI setup done in {self._ri_setup_time:.2f} sec'
+            if b_vectors_time is not None:
+                valstr += (f', including {b_vectors_time:.2f} sec for the ' +
+                           'metric and the B vectors')
+            self.ostream.print_info(valstr + '.')
+            self.ostream.print_blank()
 
-        # NOTE: the SCF setup is the time from diis_start_time, from which the
-        # SCF time printed at the end is counted, to the first Fock build: the
-        # one-electron integrals, the orthogonalization matrix, the screening of
-        # the four-center integrals and the RI setup. The SCF time is this, the
-        # rows of the timing table and the two files written after the
-        # iterations, apart from the dipole moment, the printing and the
-        # convergence checks, which are not timed.
+        # NOTE: the time from diis_start_time, from which the SCF time printed at
+        # the end is counted, to the first Fock build: the one-electron
+        # integrals, the orthogonalization matrix, the screening of the
+        # four-center integrals and the RI setup. The SCF time is this, the rows
+        # of the timing table and the two files written after the iterations,
+        # apart from the dipole moment, the printing and the convergence checks,
+        # which are not timed.
         if not self._first_step:
             self.ostream.print_info(
-                f'SCF setup done in {tm.time() - diis_start_time:.2f} sec.')
-
-        if uses_ri or not self._first_step:
+                f'SCF has taken {tm.time() - diis_start_time:.2f} sec so far.')
             self.ostream.print_blank()
-            self.ostream.flush()
+
+        self.ostream.flush()
 
         e_grad = None
 
@@ -2363,7 +2382,7 @@ class ScfDriver:
         use_pfon = False
         use_density_damping = False
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and not self._first_step:
             self._print_scf_title()
 
         for i in self._get_scf_range():
@@ -3085,30 +3104,30 @@ class ScfDriver:
 
         # timing printout
 
-        if self.rank == mpi_master() and self.print_level > 1:
+        # NOTE: these lines form one block with the point-charge and
+        # orthogonalization lines printed after them in _comp_diis, and the
+        # orthogonalization line ends the block with a blank line. The
+        # reduced-basis step prints none of them.
+        if (self.rank == mpi_master() and self.print_level > 1 and
+                not self._first_step):
 
             self.ostream.print_info('Overlap matrix computed in' +
                                     ' {:.2f} sec.'.format(ovl_dt))
-            self.ostream.print_blank()
 
             self.ostream.print_info('Kinetic energy matrix computed in' +
                                     ' {:.2f} sec.'.format(kin_dt))
-            self.ostream.print_blank()
 
             self.ostream.print_info('Nuclear potential matrix computed in' +
                                     ' {:.2f} sec.'.format(npot_dt))
-            self.ostream.print_blank()
 
             if self.electric_field is not None:
                 self.ostream.print_info('Electric dipole matrices computed in' +
                                         ' {:.2f} sec.'.format(dipole_dt))
-                self.ostream.print_blank()
 
             if basis.has_ecp():
                 self.ostream.print_info(
                     'Effective core potential matrix computed in ' +
                     '{:.2f} sec.'.format(ecp_dt))
-                self.ostream.print_blank()
 
             self.ostream.flush()
 
@@ -4785,25 +4804,21 @@ class ScfDriver:
         Prints SCF cycles header to output stream.
         """
 
-        if self._first_step:
-            self.ostream.print_info('Starting Reduced Basis SCF calculation...')
-
+        self.ostream.print_blank()
+        if self._dft:
+            ename = '   Kohn-Sham Energy'
         else:
-            self.ostream.print_blank()
-            if self._dft:
-                ename = '   Kohn-Sham Energy'
-            else:
-                ename = 'Hartree-Fock Energy'
+            ename = 'Hartree-Fock Energy'
 
-            valstr = '{} | {} | {} | {} | {} | {}'.format(
-                'Iter.', ename, 'Energy Change',
-                'Gradient Norm', 'Max. Gradient', 'Density Change')
+        valstr = '{} | {} | {} | {} | {} | {}'.format(
+            'Iter.', ename, 'Energy Change',
+            'Gradient Norm', 'Max. Gradient', 'Density Change')
 
-            if self._gostshyp:
-                valstr += ' | Neg. Amp. Points'
+        if self._gostshyp:
+            valstr += ' | Neg. Amp. Points'
 
-            self.ostream.print_header(valstr)
-            self.ostream.print_header(len(valstr) * '-')
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(len(valstr) * '-')
 
     def _print_gostshyp_neg_amp_info(self):
         """
