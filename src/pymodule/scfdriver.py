@@ -2370,18 +2370,6 @@ class ScfDriver:
             self.ostream.print_info(valstr + '.')
             self.ostream.print_blank()
 
-        # NOTE: the time from diis_start_time, from which the SCF time printed at
-        # the end is counted, to the first Fock build: the one-electron
-        # integrals, the orthogonalization matrix, the screening of the
-        # four-center integrals and the RI setup. The SCF time is this, the rows
-        # of the timing table and the two files written after the iterations,
-        # apart from the dipole moment, the printing and the convergence checks,
-        # which are not timed.
-        if not self._first_step:
-            self.ostream.print_info(
-                f'SCF has taken {tm.time() - diis_start_time:.2f} sec so far.')
-            self.ostream.print_blank()
-
         self.ostream.flush()
 
         e_grad = None
@@ -4888,6 +4876,14 @@ class ScfDriver:
             The start time of SCF calculation.
         """
 
+        # NOTE: _comp_diis passes its diis_start_time, which is set before the
+        # one-electron integrals. The time printed is the one-electron
+        # integrals, the orthogonalization matrix, the screening of the
+        # four-center integrals, the RI setup, the rows of the timing table, the
+        # checkpoint written after the iterations and, when the SCF converged,
+        # the results file, apart from the dipole moment, the printing and the
+        # convergence checks, which are not timed. The reduced-basis step writes
+        # neither file.
         if self._first_step:
             valstr = '...done. SCF energy in reduced basis set: '
             valstr += '{:.12f}'.format(self._scf_energy)
