@@ -32,10 +32,12 @@
 
 from os import environ
 from pathlib import Path
+import os
 import sys
 import time as tm
 
 from .veloxchemlib import mpi_master
+from .veloxchemlib import get_number_of_threads
 from .errorhandler import assert_msg_critical
 
 
@@ -442,7 +444,80 @@ class OutputStream:
                 environ['OMP_NUM_THREADS']))
             self.print_blank()
 
+        self.print_blas_threads_info()
+
         return start_time
+
+    def print_blas_threads_info(self):
+        """
+        Prints the threads of each BLAS library loaded in the process, with a
+        warning where a BLAS library runs fewer threads than OpenMP. The BLAS
+        libraries are read with threadpoolctl where it is installed; without
+        it, nothing is printed.
+        """
+
+        if not self.state:
+            return
+
+        n_omp = get_number_of_threads()
+
+        # NOTE: the CPUs the main thread may run on, which the warning below
+        # names where they are fewer than the OpenMP threads. They are not
+        # printed on their own: with OMP_PLACES or OMP_PROC_BIND the main
+        # thread is bound to one place, which a BLAS library that uses OpenMP
+        # is not limited by. os.sched_getaffinity exists on Linux only.
+        n_cpus = None
+        if hasattr(os, 'sched_getaffinity'):
+            n_cpus = len(os.sched_getaffinity(0))
+
+        # NOTE: threadpoolctl is not a dependency of VeloxChem. The lines are
+        # information only, so a library it cannot read leaves them out
+        # rather than stopping the run.
+        try:
+            from threadpoolctl import threadpool_info
+            blas_pools = [
+                pool for pool in threadpool_info()
+                if pool.get('user_api') == 'blas'
+            ]
+        except Exception:
+            blas_pools = []
+
+        fewer = []
+        for pool in blas_pools:
+            name = Path(pool['filepath']).name
+            desc = pool['internal_api']
+            if pool.get('version'):
+                desc += f' {pool["version"]}'
+            if pool.get('threading_layer'):
+                desc += f', {pool["threading_layer"]}'
+            self.print_info(f'BLAS library {name}: {desc}, ' +
+                            f'{pool["num_threads"]} threads.')
+            if pool['num_threads'] < n_omp:
+                fewer.append(f'{name} ({pool["num_threads"]})')
+
+        if blas_pools:
+            self.print_blank()
+
+        # NOTE: the warning is for the dense linear algebra numpy does on the
+        # master rank. A BLAS library which starts its own threads (pthreads)
+        # after OMP_PLACES or OMP_PROC_BIND bound the main thread to one place
+        # sizes them to, and keeps them on, the CPUs of that place; a BLAS
+        # library which uses OpenMP has its threads placed by the OpenMP
+        # runtime instead. One which is not threaded runs one thread.
+        if fewer:
+            warn_msg = ('BLAS libraries with fewer threads than the ' +
+                        f'{n_omp} OpenMP threads: {", ".join(fewer)}. The ' +
+                        'dense linear algebra numpy does on the master rank ' +
+                        '(SCF NewMO and ErrVec, response PreProc and ' +
+                        'PostProc) runs on those threads.')
+            if n_cpus is not None and n_cpus < n_omp:
+                warn_msg += (f' The main thread may run on {n_cpus} CPUs, ' +
+                             'as OMP_PLACES or OMP_PROC_BIND binds it; a ' +
+                             'BLAS library which starts its own threads ' +
+                             '(pthreads) uses only those, one which uses ' +
+                             'OpenMP is not limited by them.')
+            self.print_warning(warn_msg)
+            self.print_blank()
 
     def print_finish_header(self, start_time):
         """
