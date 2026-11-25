@@ -2562,6 +2562,14 @@ class LinearSolver:
         gs_dm_gost = self._gostshyp_gs_density
         tessellation_settings = self._gostshyp_tess_info
 
+        # NOTE: FockComm is the time of the broadcast of the densities and of
+        # the reduction of the Fock matrices. A rank which finishes its share
+        # of the Fock matrices before the others waits for them in the
+        # reduction, unless a collective inside the build (the RI-J fitting)
+        # made it wait there already, so on more than one rank FockComm holds
+        # that wait as well as the transfer.
+        comm_t0 = tm.time()
+
         if comm_rank == mpi_master():
             num_densities = len(dens)
         else:
@@ -2582,6 +2590,9 @@ class LinearSolver:
         # method, and on two ranks it turned the lowest excitation energies of water
         # negative without any complaint.
         dens_factors = comm.bcast(dens_factors, root=mpi_master())
+
+        if profiler is not None:
+            profiler.add_timing_info('FockComm', tm.time() - comm_t0)
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
@@ -2748,8 +2759,13 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockGOST', tm.time() - t0)
 
+        comm_t0 = tm.time()
+
         for idx in range(len(fock_arrays)):
             fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
+
+        if profiler is not None:
+            profiler.add_timing_info('FockComm', tm.time() - comm_t0)
 
         if comm_rank == mpi_master():
             return fock_arrays
@@ -2840,6 +2856,9 @@ class LinearSolver:
         gs_dm_gost = self._gostshyp_gs_density
         tessellation_settings = self._gostshyp_tess_info
 
+        # NOTE: FockComm is timed as in _comp_lr_fock.
+        comm_t0 = tm.time()
+
         if comm_rank == mpi_master():
             num_densities = len(dens_a)
         else:
@@ -2862,6 +2881,9 @@ class LinearSolver:
         # method, and on two ranks it turned the lowest excitation energies of water
         # negative without any complaint.
         dens_factors = comm.bcast(dens_factors, root=mpi_master())
+
+        if profiler is not None:
+            profiler.add_timing_info('FockComm', tm.time() - comm_t0)
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
@@ -3059,11 +3081,16 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockGOST', tm.time() - t0)
 
+        comm_t0 = tm.time()
+
         for idx in range(num_densities):
             fock_arrays[idx * 2 + 0] = comm.reduce(fock_arrays[idx * 2 + 0],
                                                    root=mpi_master())
             fock_arrays[idx * 2 + 1] = comm.reduce(fock_arrays[idx * 2 + 1],
                                                    root=mpi_master())
+
+        if profiler is not None:
+            profiler.add_timing_info('FockComm', tm.time() - comm_t0)
 
         if comm_rank == mpi_master():
             return fock_arrays

@@ -283,6 +283,8 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                 n_trials = self.comm.bcast(n_trials, root=mpi_master())
 
                 if n_trials > 0:
+                    profiler.set_timing_key('Preparation')
+
                     tdens_a = self._get_trans_densities(trial_mat,
                                                         scf_results,
                                                         molecule,
