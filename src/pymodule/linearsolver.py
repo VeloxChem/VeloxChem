@@ -1964,8 +1964,9 @@ class LinearSolver:
 
                         # Note: fak_mo_vec uses full MO coefficients matrix since
                         # it is only for fock_ger/fock_ung in nonlinear response
-                        fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
-                                                          mo]).reshape(norb**2)
+                        if self.nonlinear:
+                            fak_mo_vec = np.linalg.multi_dot(
+                                [mo.T, fak, mo]).reshape(norb**2)
 
                         if ifock < batch_ger:
                             e2_ger[:, ifock] = -gmo_vec_halfsize
@@ -2446,8 +2447,9 @@ class LinearSolver:
 
                     # Note: fak_mo_vec uses full MO coefficients matrix since
                     # it is only for fock_ger/fock_ung in nonlinear response
-                    fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
-                                                      mo]).reshape(norb**2)
+                    if self.nonlinear:
+                        fak_mo_vec = np.linalg.multi_dot(
+                            [mo.T, fak, mo]).reshape(norb**2)
 
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -gmo_vec_halfsize
@@ -3502,6 +3504,8 @@ class LinearSolver:
                 if self.nonlinear:
                     fock_ger_a = np.zeros((norb**2, batch_ger))
                     fock_ung_a = np.zeros((norb**2, batch_ung))
+                    fock_ger_b = np.zeros((norb**2, batch_ger))
+                    fock_ung_b = np.zeros((norb**2, batch_ung))
 
                 for ifock in range(batch_ger + batch_ung):
                     fak = fock_a[ifock]
@@ -3549,10 +3553,11 @@ class LinearSolver:
 
                     # Note: fak_mo_vec uses full MO coefficients matrix since
                     # it is only for fock_ger/fock_ung in nonlinear response
-                    fak_mo_vec = np.linalg.multi_dot([mo_a.T, fak,
-                                                      mo_a]).reshape(norb**2)
-                    fbk_mo_vec = np.linalg.multi_dot([mo_b.T, fbk,
-                                                      mo_b]).reshape(norb**2)
+                    if self.nonlinear:
+                        fak_mo_vec = np.linalg.multi_dot(
+                            [mo_a.T, fak, mo_a]).reshape(norb**2)
+                        fbk_mo_vec = np.linalg.multi_dot(
+                            [mo_b.T, fbk, mo_b]).reshape(norb**2)
 
                     if ifock < batch_ger:
                         e2_ger_a[:, ifock] = -gmo_vec_halfsize_a
