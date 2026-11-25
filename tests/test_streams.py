@@ -109,7 +109,7 @@ class TestStreams:
         Returns what print_blas_threads_info writes with n_omp OpenMP
         threads, a fake threadpoolctl which lists blas_pools (None for
         threadpoolctl not installed) and a main thread which may run on
-        main_cpus CPUs.
+        main_cpus logical cores.
         """
 
         monkeypatch.setattr('veloxchem.outputstream.get_number_of_threads',
@@ -156,7 +156,7 @@ class TestStreams:
         assert 'fewer threads than the 16 OpenMP threads' in text
         assert 'libopenblas.so (2)' in text
         if hasattr(os, 'sched_getaffinity'):
-            assert 'The main thread may run on 2 CPUs, as OMP_PLACES' in text
+            assert 'The main thread may run on 2 logical cores' in text
 
     def test_blas_threads_not_threaded(self, tmp_path, monkeypatch):
 
@@ -165,9 +165,10 @@ class TestStreams:
             32)
 
         assert 'libopenblas.so (1)' in text
-        # NOTE: the main thread may run on more CPUs than OpenMP threads, so
-        # the sentence on the binding of the main thread is left out.
-        assert 'as OMP_PLACES' not in text
+        # NOTE: the main thread may run on more logical cores than OpenMP
+        # threads, so the sentence on the binding of the main thread is left
+        # out.
+        assert 'The main thread may run on' not in text
 
     def test_blas_threads_as_openmp(self, tmp_path, monkeypatch):
 
@@ -178,7 +179,7 @@ class TestStreams:
 
         assert 'openblas 0.3.27, openmp, 16 threads.' in text
         assert '* Warning *' not in text
-        assert 'CPUs' not in text
+        assert 'logical cores' not in text
 
     def test_blas_threads_without_threadpoolctl(self, tmp_path, monkeypatch):
 
