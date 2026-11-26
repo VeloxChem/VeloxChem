@@ -399,20 +399,23 @@ def _set_c4(system, nonbonded, atoms, metal, forces, *, require_water):
 
 
 def set_c4_pairs(force, n_particles, metal, partners, c4) -> None:
-    """Give the metal ``c4`` and each partner oxygen 1, and restrict pairs to metal-partner.
+    """Give the metal(s) ``c4`` and each partner oxygen 1, and restrict pairs to metal-partner.
 
+    ``metal`` is one index or a list of indices (every fitted metal of a node).
     Without the interaction group, partner-partner pairs (e.g. water O-O) would
     also feel -1*1/r^4 and the solvent would collapse.
     """
-    partners = sorted(partners)
+    metals = sorted({metal} if isinstance(metal, (int, np.integer)) else
+                    set(metal))
+    partners = sorted(set(partners) - set(metals))
     members = set(partners)
     for index in range(n_particles):
         force.setParticleParameters(
-            index, [c4 if index == metal else float(index in members)])
+            index, [c4 if index in metals else float(index in members)])
     if force.getNumInteractionGroups() == 0:
-        force.addInteractionGroup([metal], partners)
+        force.addInteractionGroup(metals, partners)
     else:
-        force.setInteractionGroupParameters(0, [metal], partners)
+        force.setInteractionGroupParameters(0, metals, partners)
 
 
 def new_c4_force(system, nonbonded, n_particles):

@@ -218,12 +218,13 @@ def copy_force_field(ff):
 
 def check_force_field_atoms(ff,
                             *,
-                            exempt: int | None = None,
+                            exempt=(),
                             label=str) -> None:
     """Raise ValueError unless every atom has finite charge/LJ, nonnegative LJ, and the
     mixing is Lorentz-Berthelot (``comb_rule`` 2).
 
-    ``exempt`` may have negative LJ (a target whose LJ each candidate replaces);
+    The ``exempt`` atoms may have negative LJ (fitted metals whose LJ each
+    candidate replaces);
     ``label(index)`` names an atom in the messages.
     """
     for index, atom in ff.atoms.items():
@@ -232,7 +233,7 @@ def check_force_field_atoms(ff,
             raise ValueError(
                 f"VeloxChem left atom {label(index)} without finite "
                 "charge/LJ parameters")
-        if index != exempt and (atom["sigma"] < 0 or atom["epsilon"] < 0):
+        if index not in exempt and (atom["sigma"] < 0 or atom["epsilon"] < 0):
             raise ValueError(f"negative LJ parameters for {label(index)}")
     if getattr(ff, "comb_rule", 2) != 2:
         raise ValueError("OpenMM NonbondedForce and native MM fitting require "
@@ -414,7 +415,15 @@ FRAMEWORK_PROPERTIES = {
     "angle_rmsd": "degree",
 }
 DEFAULT_PROTOCOL = {
-    "method": "minimize",  # or "md": average over a short NVT trajectory
+    # "minimize" measures on the minimized structure, "md" averages over a
+    # short NVT trajectory. The MD always runs: a candidate whose structure
+    # breaks apart in it fails even when its targets are measured minimized.
+    "method": "minimize",
+    # blow-up check: a metal-donor distance (donors: heavy atoms within
+    # blowup_donor_cutoff of a fitted metal in the input structure) longer
+    # than its input value + blowup_stretch fails the candidate
+    "blowup_donor_cutoff_angstrom": 3.0,
+    "blowup_stretch_angstrom": 1.0,
     "tolerance_kjmol_nm": 1.0,
     "max_iterations": 5000,
     "temperature_k": 300.0,
@@ -428,6 +437,8 @@ DEFAULT_PROTOCOL = {
     "threads": None,
 }
 DEFAULT_CN_CUTOFF_ANGSTROM = 2.5
+EMBEDDED_TOLERANCE = 1.0e-3  # e, largest charge change between sweeps
+EMBEDDED_MAX_SWEEPS = 20
 DEFAULT_SHELL_SIZE = 6
 _ATOMS_NEEDED = {"distance": 2, "angle": 3, "angle_rmsd": 3}
 
@@ -474,15 +485,32 @@ class FrameworkSystem:
     be given as the charge list together with ``metal_charges`` and
     ``group_charges``: it is then used as is (no RESP) after checking that it
     matches the scheme.
+
+    ``"embedded"`` keeps the same integer charges (formal metals, integer
+    group totals, water-model water, single atoms at their group charge), so
+    every group can still leave the structure as a proper ion. Only the
+    distribution inside each multi-atom group changes: it is the RESP fit
+    (HF/6-31G*) of the group's SCF in the field of point charges on every
+    other atom of the structure, starting from the ``"groups"`` charges and
+    repeated until no charge moves by more than ``EMBEDDED_TOLERANCE`` e
+    (at most ``EMBEDDED_MAX_SWEEPS`` sweeps; all groups update together).
+    The RESP fits the group's own ESP (its nuclei and polarized density),
+    not the embedding charges. Non-periodic structures only.
     ``baseline_force_field`` accepts an already generated
     ``MMForceFieldGenerator`` for the same structure; it is copied, never changed.
     ``box_vectors`` (3x3, angstrom) makes the system periodic with PME.
     ``representation`` is ``"atom"`` (fit the real metal's LJ) or ``"cdam"``.
 
-    In the CDAM representation the target becomes a central particle plus
-    charge-only dummies. ``metal_site_charge`` is the total site charge kept
-    while dummy charges change; by default the baseline charge of the target,
-    which preserves the system charge. ``metal_dummy_bond`` is ``"harmonic"``
+    Every metal of the target's element is fitted (``fitted_indices``): a node
+    with six Zr gives all six the candidate parameters, while metals of other
+    elements keep their baseline parameters. The target metal is the
+    representative one for the coordination-number and coordination-RMSD
+    properties.
+
+    In the CDAM representation each fitted metal becomes a central particle
+    plus charge-only dummies. ``metal_site_charge`` is the total charge of
+    each site kept while dummy charges change; by default the baseline charge
+    of that metal, which preserves the system charge. ``metal_dummy_bond`` is ``"harmonic"``
     (default; finite flexibility, using the candidate's bond force constant)
     or ``"constraint"`` (exact distance). D-M-D harmonic angles hold the geometry,
     as in the aqueous CDAM model. ``c4_partners`` selects the oxygens that feel
@@ -560,6 +588,9 @@ class FrameworkSystem:
             self.target_index in metal_indices(self.molecule),
             f"target {self.target_metal!r} is {self.elements[self.target_index]}, "
             "not a metal")
+        self.fitted_indices = tuple(
+            m for m in metal_indices(self.molecule)
+            if self.elements[m] == self.elements[self.target_index])
         assert_msg_critical(
             self.charges is not None or self.baseline_force_field is not None,
             "choose baseline charges: charges='resp' (VeloxChem RESP), "
@@ -578,6 +609,7 @@ class FrameworkSystem:
         self.baseline_builds = 0
         self._baseline: FrameworkBaseline | None = None
         self._donors: dict[int, tuple] = {}
+        self._blowup: dict[float, list] = {}  # donor cutoff -> blow-up pairs
 
     def _check_options(self):
         """Critical error for any option value outside the supported set."""
@@ -592,12 +624,17 @@ class FrameworkSystem:
             self.water_model in WATER_MODELS_FOR_GROUPS,
             "water_model must be one of " + ", ".join(WATER_MODELS_FOR_GROUPS) +
             " (a 4-site model needs a virtual site the framework cannot add)")
-        if (isinstance(self.charges, str) and self.charges == "groups" and
+        if (isinstance(self.charges, str) and
+                self.charges in ("groups", "embedded") and
                 self.baseline_force_field is None):
             assert_msg_critical(
                 bool(self.metal_charges),
-                "charges='groups' (the default) needs the formal metal "
+                f"charges={self.charges!r} needs the formal metal "
                 "charges, e.g. metal_charges={'Al': 3}")
+        if isinstance(self.charges, str) and self.charges == "embedded":
+            assert_msg_critical(
+                self.box_vectors is None,
+                "charges='embedded' supports non-periodic structures only")
 
     def _read_structure(self):
         """A VeloxChem Molecule from the given object, xyz file, or xyz text."""
@@ -637,7 +674,7 @@ class FrameworkSystem:
         ff, source = self._generate_force_field()
         # The target may have negative LJ here because each candidate replaces it.
         check_force_field_atoms(ff,
-                                exempt=self.target_index,
+                                exempt=set(self.fitted_indices),
                                 label=self.labels.__getitem__)
         metals = metal_indices(self.molecule)
         xml_text, atom_names, bonds, removed = strip_metal_terms(
@@ -684,6 +721,8 @@ class FrameworkSystem:
         charges = self.charges
         if isinstance(charges, str) and charges == "groups":
             charges = self._group_scheme_charges()
+        elif isinstance(charges, str) and charges == "embedded":
+            charges = self._embedded_scheme_charges()
         ff = MMForceFieldGenerator()
         ff.ostream.mute()
         if isinstance(charges, str):
@@ -712,6 +751,11 @@ class FrameworkSystem:
             ff.partial_charges = values.copy()
             resp = True  # preset charges are kept; VeloxChem skips its own RESP
             source = ("VeloxChem MMForceFieldGenerator, formal metal charges "
+                      "with embedded per-group RESP ligands and "
+                      f"{self.water_model} water"
+                      if isinstance(self.charges, str) and
+                      self.charges == "embedded" else
+                      "VeloxChem MMForceFieldGenerator, formal metal charges "
                       f"with per-group RESP ligands and {self.water_model} water"
                       if isinstance(self.charges, str) else
                       "VeloxChem MMForceFieldGenerator, precomputed group-scheme "
@@ -854,6 +898,88 @@ class FrameworkSystem:
             f"charges, integer groups, {self.water_model} water); no RESP run")
         self.ostream.flush()
 
+    def _embedded_scheme_charges(self) -> list[float]:
+        """Per-atom charges of the ``"embedded"`` scheme (see the class docstring)."""
+        start = np.array(self._group_scheme_charges())
+        _, groups, totals, waters = self._group_plan()
+        free = [g for g, atoms in enumerate(groups)
+                if len(atoms) > 1 and g not in waters]
+        coordinates = self.molecule.get_coordinates_in_angstrom()
+        charges = start.copy()
+        for sweep in range(1, EMBEDDED_MAX_SWEEPS + 1):
+            updated = charges.copy()
+            for g in free:
+                atoms = groups[g]
+                others = np.setdiff1d(np.arange(len(charges)), atoms)
+                updated[atoms] = self._embedded_group_resp(
+                    [self.elements[i] for i in atoms], coordinates[atoms],
+                    totals.get(g, 0), coordinates[others], charges[others],
+                    " ".join(self.labels[i] for i in atoms))
+            change = float(np.abs(updated - charges).max())
+            charges = updated
+            self.ostream.print_info(
+                f"Embedded RESP sweep {sweep}: largest charge change "
+                f"{change:.4f} e")
+            self.ostream.flush()
+            if change <= EMBEDDED_TOLERANCE:
+                break
+        else:
+            raise ValueError(
+                f"embedded RESP did not converge in {EMBEDDED_MAX_SWEEPS} "
+                f"sweeps (last change {change:.4f} e)")
+        for g in free:
+            atoms = groups[g]
+            self.ostream.print_info(
+                "Embedded group " + " ".join(
+                    f"{self.labels[i]} {start[i]:+.3f}->{charges[i]:+.3f}"
+                    for i in atoms))
+        self.ostream.flush()
+        return charges.tolist()
+
+    @staticmethod
+    def _embedded_group_resp(elements, coordinates, total, field_xyz,
+                             field_charges, names) -> np.ndarray:
+        """RESP of one group's SCF (HF/6-31G*) in a field of point charges.
+
+        Coordinates in angstrom. The ESP fitted is that of the group's own
+        nuclei and density; the embedding charges only polarize the density.
+        """
+        from ..molecularbasis import MolecularBasis
+        from ..respchargesdriver import RespChargesDriver
+        from ..scfrestdriver import ScfRestrictedDriver
+
+        group = Molecule(list(elements), np.asarray(coordinates), "angstrom")
+        group.set_charge(total)
+        if (sum(group.get_element_ids()) - total) % 2:
+            raise ValueError(
+                f"group {names} with net charge {total:+d} has an odd number of "
+                "electrons; give its closed-shell charge in group_charges")
+        group.set_multiplicity(1)
+        points = np.zeros((6, len(field_charges)))
+        points[:3] = np.asarray(field_xyz).T / bohr_in_angstrom()
+        points[3] = field_charges
+        basis = MolecularBasis.read(group, "6-31G*", ostream=None)
+        identifier = AtomTypeIdentifier()
+        identifier.ostream.mute()
+        identifier.generate_gaff_atomtypes(group)
+        identifier.identify_equivalences()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                scf = ScfRestrictedDriver()
+                scf.ostream.mute()
+                scf.filename = str(Path(directory) / "embedded")
+                scf.point_charges = points
+                results = scf.compute(group, basis)
+                resp = RespChargesDriver()
+                resp.ostream.mute()
+                resp.filename = str(Path(directory) / "embedded_resp")
+                resp.equal_charges = identifier.equivalent_charges
+                charges = resp.compute(group, basis, results)
+        except Exception as exc:
+            raise ValueError(f"embedded RESP failed for the group {names}: "
+                             f"{type(exc).__name__}: {exc}") from exc
+        return np.asarray(charges, dtype=float)
+
     @staticmethod
     def _isolated_group_resp(elements, coordinates, total, names) -> np.ndarray:
         """RESP charges of one ligand group as an isolated closed-shell species."""
@@ -921,17 +1047,20 @@ class FrameworkSystem:
         nonbonded = nonbonded_force(system)
         for index in range(nonbonded.getNumExceptions()):
             left, right, *_ = nonbonded.getExceptionParameters(index)
-            if self.target_index in (left, right):
+            if set(self.fitted_indices) & {left, right}:
                 raise ValueError(
-                    "baseline still couples the target metal through bonded "
+                    "baseline still couples a fitted metal through bonded "
                     "exceptions; metal-ligand terms were not removed")
         return system
 
     def _fingerprint(self, system_xml, positions, box_nm) -> str:
         """Return a short SHA-256 digest of system, positions, target and box."""
         digest = hashlib.sha256()
+        fitted = ("" if len(self.fitted_indices) == 1 else
+                  str(self.fitted_indices))
         for part in (system_xml, positions.tobytes(), str(self.target_index),
-                     "" if box_nm is None else np.asarray(box_nm).tobytes()):
+                     "" if box_nm is None else np.asarray(box_nm).tobytes(),
+                     fitted):
             digest.update(part if isinstance(part, bytes) else part.encode())
         return digest.hexdigest()[:16]
 
@@ -943,7 +1072,7 @@ class FrameworkSystem:
         ``candidate`` is a ``CDAMCandidate`` point. In the atom representation
         only its metal sigma/epsilon (and C4) are used; the metal charge stays
         at its baseline value. In the CDAM representation dummies are added
-        around the target. Every other particle, exception, and bonded term is
+        around each fitted metal. Every other particle, exception, and bonded term is
         the baseline's; a fresh System per candidate lets constraints change.
 
         :param candidate:
@@ -965,46 +1094,50 @@ class FrameworkSystem:
                 f"candidate metal {candidate.metal} does not match target "
                 f"{self.elements[target]}")
         if self.representation == "atom":
-            nonbonded.setParticleParameters(target, baseline.charges[target],
-                                            sigma, epsilon)
+            for metal in self.fitted_indices:
+                nonbonded.setParticleParameters(metal, baseline.charges[metal],
+                                                sigma, epsilon)
             site = {
                 "metal": target,
+                "metals": list(self.fitted_indices),
                 "dummies": [],
                 "metal_site_charge": baseline.charges[target],
                 "central_charge": baseline.charges[target]
             }
         else:
-            site = self._add_cdam_site(system, nonbonded, candidate, sigma,
-                                       epsilon)
+            site = self._add_cdam_sites(system, nonbonded, candidate, sigma,
+                                        epsilon)
             positions = np.vstack([positions, site.pop("dummy_positions_nm")])
         if candidate.potential_form == "lj12_6_4":
             self._add_c4(system, nonbonded, candidate, site)
         return system, positions, site
 
-    def _metal_site_charge(self) -> float:
-        """Total CDAM site charge in e: ``metal_site_charge`` or the target's baseline charge."""
-        baseline = self.prepare_baseline()
+    def _metal_site_charge(self, metal) -> float:
+        """Total CDAM site charge in e: ``metal_site_charge`` or the metal's baseline charge."""
         if self.metal_site_charge is None:
-            return baseline.charges[baseline.target_index]
+            return self.prepare_baseline().charges[metal]
         return float(self.metal_site_charge)
 
-    def first_shell(self, size: int) -> list[int]:
+    def first_shell(self, size: int, metal: int | None = None) -> list[int]:
         """
-        Finds the nearest non-hydrogen, non-metal atoms to the target.
+        Finds the nearest non-hydrogen, non-metal atoms to a metal.
 
         :param size:
             The number of atoms.
+        :param metal:
+            The metal index; default the target.
 
         :return:
             The atom indices.
         """
 
         baseline = self.prepare_baseline()
-        return nearest_heavy_atoms(baseline.positions_nm, baseline.target_index,
+        metal = baseline.target_index if metal is None else metal
+        return nearest_heavy_atoms(baseline.positions_nm, metal,
                                    self.elements, baseline.metal_indices,
                                    baseline.box_vectors_nm, size)
 
-    def dummy_directions(self, candidate) -> np.ndarray:
+    def dummy_directions(self, candidate, metal: int | None = None) -> np.ndarray:
         """
         Rotates the template dummy directions onto the first coordination shell.
 
@@ -1014,6 +1147,8 @@ class FrameworkSystem:
 
         :param candidate:
             The CDAM candidate (its geometry gives the template).
+        :param metal:
+            The metal index; default the target.
 
         :return:
             The rotated unit directions.
@@ -1022,10 +1157,10 @@ class FrameworkSystem:
         template = np.asarray(candidate.geometries[candidate.geometry],
                               dtype=float)
         baseline = self.prepare_baseline()
-        target = baseline.target_index
-        shell = self.first_shell(len(template))
+        metal = baseline.target_index if metal is None else metal
+        shell = self.first_shell(len(template), metal)
         observed = minimum_image(
-            baseline.positions_nm[shell] - baseline.positions_nm[target],
+            baseline.positions_nm[shell] - baseline.positions_nm[metal],
             baseline.box_vectors_nm)
         observed /= np.linalg.norm(observed, axis=1)[:, None]
         return align_template(template, observed)
@@ -1033,7 +1168,7 @@ class FrameworkSystem:
     def bond_check(self, candidate) -> str | None:
         """
         Checks that harmonic metal-dummy bonds hold the dummies against the
-        first-shell donors of the input structure.
+        first-shell donors of every fitted metal in the input structure.
 
         :param candidate:
             The CDAM candidate.
@@ -1048,14 +1183,15 @@ class FrameworkSystem:
         size = len(candidate.geometries[candidate.geometry])
         if size not in self._donors:  # (charge, distance in angstrom) pairs
             baseline = self.prepare_baseline()
-            shell = self.first_shell(size)
-            vectors = minimum_image(
-                baseline.positions_nm[shell] -
-                baseline.positions_nm[baseline.target_index],
-                baseline.box_vectors_nm)
-            self._donors[size] = tuple(
-                zip([baseline.charges[atom] for atom in shell],
-                    np.linalg.norm(vectors, axis=1) / ANGSTROM_TO_NM))
+            pairs = []
+            for metal in self.fitted_indices:
+                shell = self.first_shell(size, metal)
+                vectors = minimum_image(
+                    baseline.positions_nm[shell] -
+                    baseline.positions_nm[metal], baseline.box_vectors_nm)
+                pairs += zip([baseline.charges[atom] for atom in shell],
+                             np.linalg.norm(vectors, axis=1) / ANGSTROM_TO_NM)
+            self._donors[size] = tuple(pairs)
         needed = BOND_SAFETY_FACTOR * max(
             minimum_bond_force_constant(candidate.dummy_charge, charge,
                                         distance, candidate.metal_dummy_distance)
@@ -1069,15 +1205,31 @@ class FrameworkSystem:
                 f"fall onto the donors (needs >= {needed:.0f}, "
                 f"{BOND_SAFETY_FACTOR:g} x the stability limit)")
 
-    def _add_cdam_site(self, system, nonbonded, candidate, sigma, epsilon):
-        """Replace the target by a central particle plus charge-only dummies."""
+    def _add_cdam_sites(self, system, nonbonded, candidate, sigma, epsilon):
+        """Replace every fitted metal by a CDAM site; the target's site leads."""
+        sites = [
+            self._add_cdam_site(system, nonbonded, candidate, sigma, epsilon,
+                                metal) for metal in self.fitted_indices
+        ]
+        lead = next(s for s in sites
+                    if s["metal"] == self.prepare_baseline().target_index)
+        return {
+            **lead,
+            "metals": [s["metal"] for s in sites],
+            "dummies": [d for s in sites for d in s["dummies"]],
+            "dummy_positions_nm": np.vstack(
+                [s["dummy_positions_nm"] for s in sites]),
+        }
+
+    def _add_cdam_site(self, system, nonbonded, candidate, sigma, epsilon,
+                       target):
+        """Replace one metal by a central particle plus charge-only dummies."""
         import openmm as mm
 
         baseline = self.prepare_baseline()
-        target = baseline.target_index
-        directions = self.dummy_directions(candidate)
+        directions = self.dummy_directions(candidate, target)
         n_dummies = len(directions)
-        site_charge = self._metal_site_charge()
+        site_charge = self._metal_site_charge(target)
         dummy_charge = float(candidate.dummy_charge)
         central_charge = site_charge - n_dummies * dummy_charge
         metal_mass = system.getParticleMass(target)._value
@@ -1141,11 +1293,11 @@ class FrameworkSystem:
         system.addForce(angles)
 
     def _add_c4(self, system, nonbonded, candidate, site):
-        """Add -C4/r^4 between the metal and selected oxygens, honoring exclusions."""
+        """Add -C4/r^4 between the fitted metals and selected oxygens, honoring exclusions."""
         partners = self.c4_oxygens()
         c4 = candidate.openmm_parameters()["c4"]
         force = new_c4_force(system, nonbonded, system.getNumParticles())
-        set_c4_pairs(force, system.getNumParticles(), site["metal"], partners,
+        set_c4_pairs(force, system.getNumParticles(), site["metals"], partners,
                      c4)
 
     def c4_oxygens(self) -> set[int]:
@@ -1235,9 +1387,12 @@ class FrameworkSystem:
         """
         Builds the candidate system, relaxes or samples it, and measures targets.
 
-        Targets may ask for ``method`` "minimize" or "md"; each requested
-        method runs once. ``protocol`` temporarily overrides protocol settings
-        (used for cheap screening). Failures return a failed result.
+        Targets may ask for ``method`` "minimize" or "md". One run minimizes
+        and then always continues with NVT MD, whatever the targets ask: the
+        candidate fails when a metal-donor distance blows up (see
+        ``blowup_check``) in the minimized structure or in any MD frame.
+        ``protocol`` temporarily overrides protocol settings (used for cheap
+        screening). Failures return a failed result.
 
         :param candidate:
             The CDAM candidate.
@@ -1261,19 +1416,12 @@ class FrameworkSystem:
             system, positions, site = self.build(candidate)
             preserved = compare_to_baseline(system,
                                             baseline,
-                                            changed={baseline.target_index})
+                                            changed=set(self.fitted_indices))
             if preserved:
                 raise RuntimeError(
                     f"non-target parameters changed: {preserved}")
             protocol = {**DEFAULT_PROTOCOL, **self.protocol, **(protocol or {})}
-            methods = {
-                target.metadata.get("method", protocol["method"])
-                for target in targets
-            }
-            frames = {
-                method: self._sample(system, positions, protocol, method)
-                for method in sorted(methods)
-            }
+            frames = self._sample(system, positions, protocol)
         except Exception as exc:
             return CalculationResult(
                 failed=True,
@@ -1316,8 +1464,64 @@ class FrameworkSystem:
             "quality_status": "usable",
         }
 
-    def _sample(self, system, positions, protocol, method) -> list[np.ndarray]:
-        """Minimize, then optionally run NVT MD; returns frames in nm."""
+    def _blowup_pairs(self, protocol) -> list[tuple[int, int, float]]:
+        """(metal, donor, input distance in A) of every fitted metal's donors."""
+        cutoff = float(protocol["blowup_donor_cutoff_angstrom"])
+        if cutoff in self._blowup:
+            return self._blowup[cutoff]
+        baseline = self.prepare_baseline()
+        pairs = []
+        for metal in self.fitted_indices:
+            vectors = minimum_image(
+                baseline.positions_nm - baseline.positions_nm[metal],
+                baseline.box_vectors_nm)
+            distances = np.linalg.norm(vectors, axis=1) / ANGSTROM_TO_NM
+            pairs += [(metal, int(atom), float(distances[atom]))
+                      for atom in np.flatnonzero(distances <= cutoff)
+                      if atom != metal and self.elements[atom] != "H" and
+                      atom not in baseline.metal_indices]
+        self._blowup[cutoff] = pairs
+        return pairs
+
+    def blowup_check(self, xyz_nm, protocol) -> str | None:
+        """
+        Checks that no fitted metal lost a donor of the input structure.
+
+        :param xyz_nm:
+            The coordinates in nm.
+        :param protocol:
+            The protocol (its blowup settings).
+
+        :return:
+            The reason the structure blew up, or None.
+        """
+
+        stretch = float(protocol["blowup_stretch_angstrom"])
+        box = self.prepare_baseline().box_vectors_nm
+        if not np.isfinite(xyz_nm).all():
+            return "coordinates are not finite"
+        worst = None
+        for metal, donor, reference in self._blowup_pairs(protocol):
+            distance = np.linalg.norm(
+                minimum_image(xyz_nm[donor] - xyz_nm[metal],
+                              box)) / ANGSTROM_TO_NM
+            excess = distance - reference
+            if excess > stretch and (worst is None or excess > worst[0]):
+                worst = (excess, metal, donor, distance, reference)
+        if worst is None:
+            return None
+        _, metal, donor, distance, reference = worst
+        return (f"{self.labels[metal]}-{self.labels[donor]} "
+                f"{distance:.3g} A (input {reference:.3f} A) is more than "
+                f"{stretch:g} A longer than in the input structure")
+
+    def _sample(self, system, positions, protocol) -> dict[str, list]:
+        """
+        Minimizes, then runs NVT MD, checking for blow-up throughout.
+
+        :return:
+            The frames in nm: {"minimize": [minimized], "md": [MD frames]}.
+        """
         import openmm as mm
         import openmm.unit as unit
 
@@ -1339,20 +1543,33 @@ class FrameworkSystem:
         state = context.getState(getPositions=True, getEnergy=True)
         if not np.isfinite(state.getPotentialEnergy()._value):
             raise RuntimeError("minimized energy is not finite")
-        if method == "minimize":
-            return [state.getPositions(asNumpy=True)._value]
+        minimized = state.getPositions(asNumpy=True)._value
+        reason = self.blowup_check(minimized, protocol)
+        if reason:
+            raise RuntimeError(f"minimized structure blew up: {reason}")
         context.setVelocitiesToTemperature(
             protocol["temperature_k"] * unit.kelvin, int(protocol["seed"]))
-        integrator.step(int(protocol["equilibration_steps"]))
-        frames = []
         interval = int(protocol["sample_interval"])
+        for step in range(0, int(protocol["equilibration_steps"]), interval):
+            integrator.step(min(interval,
+                                int(protocol["equilibration_steps"]) - step))
+            xyz = context.getState(getPositions=True).getPositions(
+                asNumpy=True)._value
+            reason = self.blowup_check(xyz, protocol)
+            if reason:
+                raise RuntimeError(f"MD equilibration blew up: {reason}")
+        frames = []
         for _ in range(max(1, int(protocol["production_steps"]) // interval)):
             integrator.step(interval)
             state = context.getState(getPositions=True, getEnergy=True)
             if not np.isfinite(state.getPotentialEnergy()._value):
                 raise RuntimeError("MD energy became nonfinite")
-            frames.append(state.getPositions(asNumpy=True)._value)
-        return frames
+            xyz = state.getPositions(asNumpy=True)._value
+            reason = self.blowup_check(xyz, protocol)
+            if reason:
+                raise RuntimeError(f"MD blew up: {reason}")
+            frames.append(xyz)
+        return {"minimize": [minimized], "md": frames}
 
     def measure(self, target, xyz_nm: np.ndarray, site) -> float:
         """

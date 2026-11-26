@@ -20,6 +20,18 @@ def al_node(**kwargs):
     return MetalNode.read_xyz_file(XYZ, charge=-1, **kwargs)
 
 
+def two_al_node():
+    """Two copies of the fragment, 9 A apart: two Al of the same element."""
+    atoms = XYZ.read_text().splitlines()[2:]
+    rows = atoms + [
+        f"{e} {float(x) + 9.0} {y} {z}"
+        for e, x, y, z in (line.split() for line in atoms)
+    ]
+    molecule = vlx.Molecule.read_xyz_string(f"{len(rows)}\n\n" +
+                                            "\n".join(rows))
+    return MetalNode(molecule, charge=-2)
+
+
 def ammine_node():
     """The fragment with one water replaced by NH3 (not typed automatically)."""
     lines = XYZ.read_text().splitlines()
@@ -90,6 +102,18 @@ class TestMetalNodeTargets:
         assert len(targets["Al in MOF: cis O-Al-O RMSD"]["atoms"]) == 12
         assert len(targets["Al in MOF: trans O-Al-O RMSD"]["atoms"]) == 3
         assert targets["Al in MOF: cis O-Al-O RMSD"]["value"] == 0.0
+
+    def test_targets_cover_every_metal_of_the_fitted_element(self):
+        node = two_al_node()
+        assert node.metal == 0 and node.fitted == (0, 19)
+        targets = node.targets("node", {})
+        hydroxide = targets["node: Al-O(hydroxide)"]
+        assert hydroxide["atoms"] == [["Al1", "O1"], ["Al1", "O2"],
+                                      ["Al2", "O9"], ["Al2", "O10"]]
+        assert hydroxide["value"] == pytest.approx(1.9)
+        cis = targets["node: cis O-Al-O RMSD"]["atoms"]
+        assert len(cis) == 24 and {t[1] for t in cis} == {"Al1", "Al2"}
+        assert len(targets["node: trans O-Al-O RMSD"]["atoms"]) == 6
 
     def test_reference_by_residue_type_and_tolerances(self):
         targets = al_node().targets(

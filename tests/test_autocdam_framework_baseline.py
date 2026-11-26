@@ -139,18 +139,55 @@ class TestAutoCdamFrameworkBaseline:
         assert "nonbonded parameters of particle 1" in compare_to_baseline(
             omm, system.prepare_baseline(), changed={0})
 
-    def test_target_label_selects_the_right_metal_among_several(self):
+    def test_every_metal_of_the_target_element_is_fitted(self):
         charges = CHARGES * 2
         system = FrameworkSystem(structure=node_molecule(copies=2),
                                  charges=charges,
                                  target_metal="Al2")
         baseline = system.prepare_baseline()
         assert system.target_index == 19 and baseline.metal_indices == (0, 19)
-        omm, _, _ = system.build(point(1.7, 0.3))
-        assert particle(omm, 19)[1] == pytest.approx(0.17)
-        assert particle(omm,
-                        0) == pytest.approx(particle(baseline.new_system(), 0))
-        assert compare_to_baseline(omm, baseline, changed={19}) == []
+        assert system.fitted_indices == (0, 19)
+        omm, _, site = system.build(point(1.7, 0.3))
+        assert site["metal"] == 19 and site["metals"] == [0, 19]
+        for metal in (0, 19):
+            assert particle(omm, metal)[1] == pytest.approx(0.17)
+        assert compare_to_baseline(omm, baseline, changed={0, 19}) == []
+        assert "nonbonded parameters of particle 0" in compare_to_baseline(
+            omm, baseline, changed={19})
+
+    def test_cdam_sites_on_every_fitted_metal(self):
+        import openmm as mm
+        system = FrameworkSystem(structure=node_molecule(copies=2),
+                                 charges=CHARGES * 2,
+                                 target_metal="Al1",
+                                 representation="cdam")
+        baseline = system.prepare_baseline()
+        candidate = CDAMCandidate("Al", 3, metal_lj_sigma=1.7,
+                                  metal_lj_epsilon=0.3, dummy_charge=0.5,
+                                  potential_form="lj12_6_4",
+                                  c4_metal_water=50.0)
+        omm, positions, site = system.build(candidate)
+        n = len(baseline.charges)
+        assert site["metal"] == 0 and site["metals"] == [0, 19]
+        assert site["dummies"] == list(range(n, n + 12))
+        assert omm.getNumParticles() == n + 12 and len(positions) == n + 12
+        for metal in (0, 19):  # central charge 3 - 6 * 0.5
+            assert particle(omm, metal)[0] == pytest.approx(0.0)
+        total = sum(particle(omm, i)[0] for i in range(omm.getNumParticles()))
+        assert total == pytest.approx(-2.0)
+        # each dummy sits next to its own metal
+        for k, dummy in enumerate(site["dummies"]):
+            metal = (0, 19)[k // 6]
+            assert np.linalg.norm(positions[dummy] -
+                                  positions[metal]) == pytest.approx(0.09)
+        bonded = {f.getBondParameters(i)[0]
+                  for f in omm.getForces() if f.getName() == "CDAM_metal_dummy"
+                  for i in range(f.getNumBonds())}
+        assert bonded == {0, 19}
+        c4 = next(f for f in omm.getForces()
+                  if isinstance(f, mm.CustomNonbondedForce))
+        assert sorted(c4.getInteractionGroupParameters(0)[0]) == [0, 19]
+        assert compare_to_baseline(omm, baseline, changed={0, 19}) == []
 
     def test_baseline_is_generated_once_and_never_mutated(self, monkeypatch):
         calls = []
@@ -239,6 +276,15 @@ class TestAutoCdamFrameworkBaseline:
         ({
             "water_model": "tip4pew"
         }, VeloxChemError, "water_model"),
+        ({
+            "charges": "embedded"
+        }, VeloxChemError, "needs the formal metal charges"),
+        ({
+            "charges": "embedded",
+            "metal_charges": {"Al": 3},
+            "group_charges": GROUP_CHARGES,
+            "box_vectors": np.eye(3) * 30.0
+        }, VeloxChemError, "non-periodic"),
     ])
     def test_invalid_framework_inputs_fail_clearly(self, kwargs, error,
                                                    message):
@@ -271,6 +317,32 @@ class TestAutoCdamFrameworkBaseline:
                            water_model="tip3p").prepare_baseline().charges
         assert same[13:16] == pytest.approx((-0.834, 0.417, 0.417))
         assert same[:13] == pytest.approx(tuple(charges[:13]))
+
+    def test_embedded_scheme_keeps_integer_groups_and_repolarizes_them(self):
+        node = FrameworkSystem(structure=node_molecule(),
+                               target_metal="Al",
+                               charges="embedded",
+                               metal_charges={"Al": 3},
+                               group_charges=GROUP_CHARGES)
+        charges = np.array(node.prepare_baseline().charges)
+        assert charges[0] == pytest.approx(3.0)
+        for group, total in (([1, 2], -1), ([3, 4], -1), ([5, 6, 7, 8], -1),
+                             ([9, 10, 11, 12], -1), ([13, 14, 15], 0),
+                             ([16, 17, 18], 0)):
+            assert charges[group].sum() == pytest.approx(total, abs=1e-5)
+        # waters keep the water model; the field of Al3+ repolarizes the
+        # hydroxides and formates away from their isolated RESP charges
+        assert charges[[13, 14, 15]] == pytest.approx([-0.8476, 0.4238, 0.4238])
+        isolated = np.array(CHARGES)
+        assert np.abs(charges[1:13] - isolated[1:13]).max() > 0.01
+        # converged: the embedded charges reproduce themselves
+        again = node._embedded_group_resp(
+            [node.elements[i] for i in (1, 2)],
+            node.molecule.get_coordinates_in_angstrom()[[1, 2]], -1,
+            node.molecule.get_coordinates_in_angstrom()[
+                [0] + list(range(3, 19))],
+            charges[[0] + list(range(3, 19))], "O1 H1")
+        assert again == pytest.approx(charges[[1, 2]], abs=2e-3)
 
     def test_precomputed_group_charges_are_checked_not_recomputed(
             self, monkeypatch):

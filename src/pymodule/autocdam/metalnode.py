@@ -39,11 +39,14 @@ halide -- which gives its formal charge, its donor atoms and whether it
 bridges several metals. Anything the rules do not recognize is set with
 ``set_residue_type``.
 
+Every metal of the fitted element is fitted: in a Zr6 node all six Zr carry
+the candidate parameters, and the targets cover all of them.
+
 It is not part of the AutoCDAM driver. Given as the ``system`` of one
 property, it hands the driver two ordinary inputs (see
 ``multisystem.expand_system_objects``): ``system()``, the framework system
 specification, and ``targets()``, the grouped geometry targets of the fitted
-metal -- the metal-donor distance per residue type and the RMSD of the
+metals -- the metal-donor distance per residue type and the RMSD of the
 donor-metal-donor angles (cis and trans) against the input geometry.
 """
 
@@ -127,21 +130,24 @@ class MetalNode:
 
     Instance variables
         - molecule: The VeloxChem Molecule of the node.
-        - metal: The index of the fitted metal.
+        - metal: The index of the target metal (one of the fitted metals).
+        - fitted: The indices of the fitted metals (all of its element).
         - residues: The residues (see ``Residue``).
 
     :param molecule:
         The node: a Molecule (its charge is the node charge).
     :param metal:
-        The fitted metal (element, atom label or index); default the only
-        metal atom.
+        The fitted metal element (or an atom label or index of it); default
+        the only metal element. All metals of that element are fitted.
     :param charge:
         The node charge; default the molecule's charge.
     :param name:
         The system name.
     :param charges:
         The framework charges: "groups" (default; formal metal charges and
-        per-residue RESP with the residue charges), "resp", a per-atom list in
+        per-residue RESP with the residue charges), "embedded" (the same
+        integer residue charges, each residue's distribution from RESP in the
+        field of the rest of the node), "resp", a per-atom list in
         e (used as given), or a charge file (json with "charges_e",
         "metal_charges", "group_charges" and "water_model") that is checked
         against the group scheme.
@@ -171,6 +177,8 @@ class MetalNode:
         self.metals = metal_indices(molecule)
         assert_msg_critical(bool(self.metals), "MetalNode: no metal atom found")
         self.metal = self._resolve_metal(metal)
+        self.fitted = tuple(m for m in self.metals
+                            if self.elements[m] == self.elements[self.metal])
         self.residues = self._classify()
 
     @classmethod
@@ -195,18 +203,18 @@ class MetalNode:
     # ------------------------------------------------------------ classifying
 
     def _resolve_metal(self, metal) -> int:
-        """The index of the fitted metal."""
+        """The index of the target metal: the first of the fitted element."""
         if metal is None:
+            elements = {self.elements[m] for m in self.metals}
             assert_msg_critical(
-                len(self.metals) == 1,
-                "MetalNode: the node has several metals "
-                f"({', '.join(self.labels[m] for m in self.metals)}); choose "
-                "one with metal=")
+                len(elements) == 1,
+                "MetalNode: the node has several metal elements "
+                f"({', '.join(sorted(elements))}); choose one with metal=")
             return self.metals[0]
         if isinstance(metal, str):
             same = [m for m in self.metals
                     if self.elements[m].upper() == metal.strip().upper()]
-            if len(same) == 1:
+            if same:
                 return same[0]
         index = resolve_atom(metal, self.labels)
         assert_msg_critical(index in self.metals,
@@ -312,8 +320,8 @@ class MetalNode:
         """Prints the metals and the typed residues."""
         lines = [
             f"Metal node {self.name!r}: {self._formula(range(len(self.elements)))}, "
-            f"charge {self.molecule.get_charge():+.0f}, fitted metal "
-            f"{self.labels[self.metal]}",
+            f"charge {self.molecule.get_charge():+.0f}, fitted metals "
+            f"{' '.join(self.labels[m] for m in self.fitted)}",
             f"{'Residue':>7}  {'Type':<23}{'Formula':<10}{'Charge':>6}  "
             f"{'Donors':<14}{'Binds':<12}{'M-donor (A)'}",
         ]
@@ -443,7 +451,8 @@ class MetalNode:
                         group_charges=data.get("group_charges", group_charges),
                         water_model=data.get("water_model", water_model))
         elif isinstance(charges, str):
-            # "groups": formal metal charges and RESP of each residue
+            # "groups" or "embedded": formal metal charges and integer
+            # residue charges, distributed by isolated or embedded RESP
             spec.update(charges=charges,
                         metal_charges=metal_charges,
                         group_charges=group_charges)
@@ -453,11 +462,12 @@ class MetalNode:
 
     def targets(self, name, values) -> dict[str, dict]:
         """
-        The grouped geometry targets of the fitted metal.
+        The grouped geometry targets of the fitted metals.
 
-        One distance target per residue type that binds the metal (the mean
-        metal-donor distance) and the RMSD of the cis and trans
-        donor-metal-donor angles against the input geometry. ``reference``
+        One distance target per residue type that binds a fitted metal (the
+        mean metal-donor distance over all fitted metals) and the RMSD of the
+        cis and trans donor-metal-donor angles of all fitted metals against
+        the input geometry. ``reference``
         maps a residue type (``"hydroxide"``, or ``"mu2-hydroxide"`` for a
         bridging one) to a distance in angstrom; by default the input
         geometry's. ``tolerance`` is ``{"distance": 0.05, "angle": 10.0}``.
@@ -485,49 +495,55 @@ class MetalNode:
         references = dict(values.get("reference") or {})
         common = {k: values[k] for k in ("weight", "role", "method")
                   if k in values}
-        metal = self.labels[self.metal]
+        element_of = self.elements[self.metal]
         xyz = self.molecule.get_coordinates_in_angstrom()
 
-        # metal-donor distances by residue type
+        # metal-donor pairs by residue type, over all fitted metals
         by_type = {}
         for r in self.residues:
-            if self.metal not in r.metals:
-                continue
-            for d in r.donors:
-                if self._bonded(d, self.metal):
-                    by_type.setdefault((r.label, r.kind, self.elements[d]),
-                                       []).append(d)
+            for m in r.metals:
+                if m not in self.fitted:
+                    continue
+                for d in r.donors:
+                    if self._bonded(d, m):
+                        by_type.setdefault(
+                            (r.label, r.kind, self.elements[d]),
+                            []).append((m, d))
         targets = {}
-        for (label, kind, element), donors in by_type.items():
+        for (label, kind, element), pairs in by_type.items():
             reference = references.get(label, references.get(kind))
             if reference is None:
                 reference = round(float(np.mean(
-                    [np.linalg.norm(xyz[d] - xyz[self.metal])
-                     for d in donors])), 4)
-            targets[f"{name}: {self.elements[self.metal]}-{element}({label})"] = {
+                    [np.linalg.norm(xyz[d] - xyz[m]) for m, d in pairs])), 4)
+            targets[f"{name}: {element_of}-{element}({label})"] = {
                 "system": self.name, "property": "distance",
-                "atoms": [[metal, self.labels[d]] for d in donors],
+                "atoms": [[self.labels[m], self.labels[d]] for m, d in pairs],
                 "value": float(reference), "tolerance": tolerance["distance"],
                 "unit": "angstrom", **common}
         leftover = set(references) - {k for key in by_type for k in key[:2]}
         assert_msg_critical(
             not leftover,
             f"property {name!r}: no donor of type {sorted(leftover)} binds "
-            f"{metal}; types are {sorted({l for l, _, _ in by_type})}")
+            f"{element_of}; types are {sorted({l for l, _, _ in by_type})}")
 
-        # donor-metal-donor angles, split into cis and trans by the input
-        donors = [d for ds in by_type.values() for d in ds]
-        cis, trans = [], []
-        for i, a in enumerate(donors):
-            for b in donors[i + 1:]:
-                u, v = xyz[a] - xyz[self.metal], xyz[b] - xyz[self.metal]
-                angle = np.degrees(np.arccos(np.clip(
-                    u @ v / np.linalg.norm(u) / np.linalg.norm(v), -1, 1)))
-                (trans if angle > TRANS_ANGLE_DEGREES else cis).append(
-                    [self.labels[a], metal, self.labels[b]])
+        # donor-metal-donor angles of each fitted metal, split into cis and
+        # trans by the input
+        cis, trans, donors = [], [], []
+        for m in self.fitted:
+            mine = [d for pairs in by_type.values() for n, d in pairs
+                    if n == m]
+            donors += mine
+            for i, a in enumerate(mine):
+                for b in mine[i + 1:]:
+                    u, v = xyz[a] - xyz[m], xyz[b] - xyz[m]
+                    angle = np.degrees(np.arccos(np.clip(
+                        u @ v / np.linalg.norm(u) / np.linalg.norm(v), -1,
+                        1)))
+                    (trans if angle > TRANS_ANGLE_DEGREES else cis).append(
+                        [self.labels[a], self.labels[m], self.labels[b]])
         elements = {self.elements[d] for d in donors}
         ligand = elements.pop() if len(elements) == 1 else "L"
-        shape = f"{ligand}-{self.elements[self.metal]}-{ligand}"
+        shape = f"{ligand}-{element_of}-{ligand}"
         for kind, triples in (("cis ", cis), ("trans ", trans)):
             if not triples:
                 continue

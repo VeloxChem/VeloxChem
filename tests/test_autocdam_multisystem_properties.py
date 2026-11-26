@@ -146,7 +146,8 @@ class TestAutoCdamMultisystemProperties:
         probe = [STRUCTURAL[0]]
         short = system.calculate(point(sigma=1.5),
                                  probe).values["al_o_carboxylate"]
-        long = system.calculate(point(sigma=2.6),
+        # sigma 2.6 now fails: a ligand leaves Al in the node MD (blow-up)
+        long = system.calculate(point(sigma=2.3),
                                 probe).values["al_o_carboxylate"]
         assert long > short
 
@@ -166,6 +167,51 @@ class TestAutoCdamMultisystemProperties:
         assert result.metadata["d_md"]["geometry"] == "md_average"
         assert result.metadata["d_md"]["n_frames"] == 4
         assert result.metadata["d_min"]["geometry"] == "minimized"
+
+    def test_md_runs_even_when_every_target_is_minimized(self):
+        checked = []
+
+        class Spy(FrameworkSystem):
+
+            def blowup_check(self, xyz_nm, protocol):
+                checked.append(len(xyz_nm))
+                return super().blowup_check(xyz_nm, protocol)
+
+        system = Spy(structure=molecule(), charges=CHARGES, target_metal="Al",
+                     representation="cdam", metal_dummy_bond="constraint",
+                     protocol={"equilibration_steps": 100,
+                               "production_steps": 400,
+                               "sample_interval": 100, "timestep_fs": 0.5})
+        result = system.calculate(point(), [
+            target("d_min", "distance", atoms=["Al", "O3"])])
+        assert not result.failed, result.failure_reason
+        assert result.metadata["d_min"]["geometry"] == "minimized"
+        # minimized + 1 equilibration chunk + 4 production frames
+        assert len(checked) == 6
+
+    def test_blowup_check_flags_a_lost_donor(self):
+        system = node()
+        protocol = {"blowup_donor_cutoff_angstrom": 3.0,
+                    "blowup_stretch_angstrom": 1.0}
+        xyz = np.array(system.prepare_baseline().positions_nm)
+        assert system.blowup_check(xyz, protocol) is None
+        o3 = system.labels.index("O3")
+        metal = system.target_index
+        xyz[o3] += 0.15 * (xyz[o3] - xyz[metal]) / np.linalg.norm(
+            xyz[o3] - xyz[metal])       # 1.5 A further from Al
+        reason = system.blowup_check(xyz, protocol)
+        assert reason is not None and "Al-O3" in reason
+        xyz[o3, 0] = np.nan
+        assert system.blowup_check(xyz, protocol) == "coordinates are not finite"
+
+    def test_a_candidate_that_blows_up_fails(self):
+        system = node(protocol={"equilibration_steps": 100,
+                                "production_steps": 200,
+                                "sample_interval": 100, "timestep_fs": 0.5,
+                                "blowup_stretch_angstrom": -1.0})
+        result = system.calculate(point(), [
+            target("d_min", "distance", atoms=["Al", "O3"])])
+        assert result.failed and "blew up" in result.failure_reason
 
     def test_periodic_distances_use_the_minimum_image(self):
         system = node(box_vectors=np.eye(3) * 25.0)
