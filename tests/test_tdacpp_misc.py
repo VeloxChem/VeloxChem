@@ -265,8 +265,10 @@ class TestComplexResponseTdaSolverMisc:
                                              'CLR_e2bger')]
         assert driver._dist_fock_ger.calls == [(expected_checkpoint,
                                                'CLR_Fock_ger')]
-        assert any('Time spent in writing checkpoint file:' in info
-                   for info in driver.ostream.infos)
+        assert any(
+            info.startswith(
+                f'Checkpoint written to file: {expected_checkpoint} (took ')
+            for info in driver.ostream.infos)
 
         restored_labels = []
 

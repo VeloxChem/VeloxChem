@@ -35,6 +35,7 @@ from io import StringIO
 from pathlib import Path
 import numpy as np
 import tempfile
+import time as tm
 import re
 
 from .scfrestdriver import ScfRestrictedDriver
@@ -1214,13 +1215,15 @@ class VibrationalAnalysis:
         if not (fname and isinstance(fname, str) and Path(fname).is_file()):
             return
 
+        write_t0 = tm.time()
+
         write_results_to_hdf5(fname,
                               'vib',
                               vib_results,
                               value_label='vibrational result')
 
-        valstr = 'Vibrational analysis results written to file: '
-        valstr += fname
+        valstr = f'Vibrational analysis results written to file: {fname} '
+        valstr += f'(took {tm.time() - write_t0:.2f} sec).'
         self.ostream.print_info(valstr)
         self.ostream.print_blank()
         self.ostream.flush()

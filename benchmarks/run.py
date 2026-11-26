@@ -619,6 +619,40 @@ def check_provenance(info):
                       f'OMP_NUM_THREADS={threads}')
 
 
+def check_runner_cores():
+    """
+    Exits when the runner may run on fewer logical cores than
+    OMP_NUM_THREADS. A case starts on the logical cores of the runner, so its
+    OpenMP threads would share them and its timings would not be those of
+    OMP_NUM_THREADS threads.
+    """
+
+    threads = os.environ.get('OMP_NUM_THREADS', '')
+    # NOTE: os.sched_getaffinity exists on Linux only; elsewhere the check is
+    # left out.
+    if not threads.isdigit() or not hasattr(os, 'sched_getaffinity'):
+        return
+
+    cores = len(os.sched_getaffinity(0))
+    if cores >= int(threads):
+        return
+
+    msg = (f'run.py: the runner may run on {cores} logical cores, fewer than '
+           f'OMP_NUM_THREADS={threads}, and every case would start on the '
+           'same ones.')
+    # NOTE: a BLAS library that uses OpenMP starts the OpenMP runtime when
+    # numpy is imported, and with OMP_PLACES or OMP_PROC_BIND set the runtime
+    # binds the main thread of the runner to one place.
+    bound = [k for k in ('OMP_PLACES', 'OMP_PROC_BIND') if k in os.environ]
+    if bound:
+        msg += (f' {" and ".join(bound)} in the environment of the runner '
+                'bind the runner itself when numpy uses an OpenMP BLAS '
+                'library; pass them to the cases through the launcher '
+                "instead, e.g. --launcher 'env OMP_PLACES=cores "
+                "OMP_PROC_BIND=close'.")
+    sys.exit(msg)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Run benchmark cases with and without RI.')
@@ -669,6 +703,7 @@ def main():
         return
 
     cases = find_cases(args.targets)
+    check_runner_cores()
     if args.memory_limit:
         memory_limit_prefix(args.memory_limit)
     launcher = shlex.split(args.launcher)

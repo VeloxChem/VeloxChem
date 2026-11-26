@@ -571,6 +571,8 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
                     va = {op: v for op, v in zip(self.a_components, a_grad)}
                     rsp_funcs = {}
 
+                    solutions_write_time = 0.0
+
                     # final h5 file for response solutions
                     if self.filename is not None:
                         final_h5_fname = f'{self.filename}.h5'
@@ -592,15 +594,18 @@ class ComplexResponseSolver(ComplexResponseSolverBase):
 
                         # write solutions to h5 file
                         if (self.save_solutions and final_h5_fname is not None):
+                            write_t0 = tm.time()
                             write_rsp_full_solution_to_hdf5(
                                 final_h5_fname, x, op_w_ind, len(solutions))
+                            solutions_write_time += tm.time() - write_t0
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
                     if (self.save_solutions and final_h5_fname is not None):
                         self.ostream.print_info(
                             'Response solution vectors written to file: ' +
-                            final_h5_fname)
+                            f'{final_h5_fname} ' +
+                            f'(took {solutions_write_time:.2f} sec).')
                         self.ostream.print_blank()
                         self.ostream.flush()
 

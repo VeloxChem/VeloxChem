@@ -20,12 +20,13 @@ benchmarks/
 
 | suite | cases | both variants | RI only |
 | --- | --- | --- | --- |
-| `quick` | caffeine and a nitroxide radical in def2-SVP: SCF (HF, B3LYP, BLYP, CAM-B3LYP, TPSSh, UKS), SCF gradient (RI-JK, RI-J, UKS), TDA, RPA, polarizability | 10 to 15 min | 3 min |
-| `standard` | diffuse and triple-zeta SCF and gradient, TDA of a 70-atom molecule, unrestricted TDA, TDDFT gradient, CPP, SHG, THG, TPA transition, TPA, 3PA transition, optimization (closed and open shell) | 1.5 to 2 h | 20 to 25 min |
-| `extended` | Hessian and IR, polarizability gradient, excited-state optimization; noradrenaline in def2-TZVPD (RPA, TPA, gradient); a triplet guanine dimer (UHF, UKS); a TDDFT gradient with RI-J | 7 to 8 h | 45 min |
+| `quick` | caffeine and a nitroxide radical in def2-SVP: SCF (HF, B3LYP, BLYP, CAM-B3LYP, TPSSh, UKS), SCF gradient (RI-JK, RI-J, UKS), TDA, RPA, polarizability | 15 min | 3 min |
+| `standard` | diffuse and triple-zeta SCF and gradient, TDA of a 70-atom molecule, unrestricted TDA, TDDFT gradient, CPP, SHG, THG, TPA transition, TPA, 3PA transition, optimization (closed and open shell) | 2 h | 25 min |
+| `extended` | Hessian and IR, polarizability gradient, excited-state optimization; noradrenaline in def2-TZVPD (RPA, TPA, gradient); a triplet guanine dimer (UHF, UKS); a TDDFT gradient with RI-J | 7.5 h | 45 min |
 
-Times measured on a 12th Gen Intel Core i9-12900K with 12 threads, one rank
-(2026-11-22). `--ri yes` runs the RI rows alone. `python benchmarks/run.py
+Times measured on a 12th Gen Intel Core i9-12900K, one rank, with 8 threads
+bound to the 8 performance cores (2026-11-25), as in the binding example under
+"Running". `--ri yes` runs the RI rows alone. `python benchmarks/run.py
 --list` prints every case.
 
 Whether an RI row fits depends on the memory of the machine. RI-JK for a
@@ -58,7 +59,7 @@ reported as a note, and a killed process is the problem.
 ## Running
 
 ```sh
-export OMP_NUM_THREADS=12
+export OMP_NUM_THREADS=8
 python benchmarks/run.py quick                       # both variants
 python benchmarks/run.py quick standard --ri yes     # RI rows only
 python benchmarks/run.py benchmarks/cases/quick/scf_hf.inp
@@ -71,6 +72,33 @@ when it is unset and when a BLAS library in the process serves fewer threads
 than it asks for. Reinstall after changing the code: the runner warns when the
 build commit printed in the output is not the checked-out commit (only for a
 build configured with `ENABLE_COMMIT_HASH`).
+
+To bind the threads of each case, pass `OMP_PLACES` and `OMP_PROC_BIND`
+through the launcher, not the environment of the runner:
+
+```sh
+export OMP_NUM_THREADS=8
+python benchmarks/run.py quick --launcher 'env OMP_PLACES=cores OMP_PROC_BIND=close'
+```
+
+Where numpy uses a BLAS library that runs on OpenMP (the OpenMP build of
+OpenBLAS in a conda installation, for example), these variables in the
+environment of the runner bind the runner itself to one place when it imports
+numpy, and every case it starts inherits that place. The runner stops before
+the first case when it may run on fewer logical cores than `OMP_NUM_THREADS`.
+
+With MPI, `OMP_NUM_THREADS` is the number of threads of each rank, and the MPI
+launcher has to bind each rank to its own `OMP_NUM_THREADS` cores; without
+that, every rank places its threads from the first core, and the ranks share
+those cores. The runner does not see the ranks and cannot check this. With
+MPICH (Hydra) and 4 threads a rank:
+
+```sh
+export OMP_NUM_THREADS=4
+python benchmarks/run.py quick --launcher 'env OMP_PLACES=cores OMP_PROC_BIND=close mpirun -n 2 -bind-to core:4'
+```
+
+With Open MPI the binding is `--map-by slot:PE=4 --bind-to core`.
 
 Each variant runs as its own process in a fresh directory,
 `results/<run id>/<suite>/<case>/<variant>/`, so no checkpoint file of an

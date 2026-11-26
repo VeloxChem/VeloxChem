@@ -73,6 +73,7 @@ twice rather than this module learning about batches it cannot see.
 """
 
 import numpy as np
+import time as tm
 
 from .veloxchemlib import SimdRIJKFockDriver
 from .veloxchemlib import SimdRIJKResponseDriver
@@ -167,6 +168,8 @@ def initialize_ri_jk(solver, molecule, basis, reuse=False):
     # another geometry), and let go here they are freed before the new ones
     # are allocated rather than after. The fallback is decided again as well.
     release_ri_jk(solver)
+
+    ri_setup_t0 = tm.time()
 
     mark_ri_setup(solver)
 
@@ -295,6 +298,8 @@ def initialize_ri_jk(solver, molecule, basis, reuse=False):
         solver.ostream.flush()
         return
 
+    b_vectors_t0 = tm.time()
+
     # NOTE: the metric is inverted through its Cholesky factor (the False passed
     # as use_inverse_square_root here and to prepare) with the solver's own
     # ri_metric_threshold. The SCF's ri_metric_route and ri_metric_threshold are
@@ -339,6 +344,8 @@ def initialize_ri_jk(solver, molecule, basis, reuse=False):
         'auxiliary functions, which is not the auxiliary basis once over ' +
         'the ranks')
 
+    b_vectors_time = tm.time() - b_vectors_t0
+
     solver._ri_jk_response_drv = response_drv
 
     # NOTE: what a build may take, which _max_densities cuts its densities by.
@@ -376,6 +383,13 @@ def initialize_ri_jk(solver, molecule, basis, reuse=False):
         f'{Profiler.memory_to_string(budget)} {where} for a build of one ' +
         'density; larger batches are cut to fit.')
     print_ri_reserve_floor(solver, reserve_floor)
+
+    # NOTE: the RI setup is the time from the choice of the auxiliary basis to
+    # the end of the B vectors, the memory estimate and the metric included.
+    ri_setup_time = tm.time() - ri_setup_t0
+    solver.ostream.print_info(
+        f'RI setup done in {ri_setup_time:.2f} sec, including ' +
+        f'{b_vectors_time:.2f} sec for the metric and the B vectors.')
     solver.ostream.print_blank()
     solver.ostream.flush()
 

@@ -1964,8 +1964,9 @@ class LinearSolver:
 
                         # Note: fak_mo_vec uses full MO coefficients matrix since
                         # it is only for fock_ger/fock_ung in nonlinear response
-                        fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
-                                                          mo]).reshape(norb**2)
+                        if self.nonlinear:
+                            fak_mo_vec = np.linalg.multi_dot(
+                                [mo.T, fak, mo]).reshape(norb**2)
 
                         if ifock < batch_ger:
                             e2_ger[:, ifock] = -gmo_vec_halfsize
@@ -2446,8 +2447,9 @@ class LinearSolver:
 
                     # Note: fak_mo_vec uses full MO coefficients matrix since
                     # it is only for fock_ger/fock_ung in nonlinear response
-                    fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
-                                                      mo]).reshape(norb**2)
+                    if self.nonlinear:
+                        fak_mo_vec = np.linalg.multi_dot(
+                            [mo.T, fak, mo]).reshape(norb**2)
 
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -gmo_vec_halfsize
@@ -2562,6 +2564,14 @@ class LinearSolver:
         gs_dm_gost = self._gostshyp_gs_density
         tessellation_settings = self._gostshyp_tess_info
 
+        # NOTE: FockComm is the time of the broadcast of the densities and of
+        # the reduction of the Fock matrices. A rank which finishes its share
+        # of the Fock matrices before the others waits for them in the
+        # reduction, unless a collective inside the build (the RI-J fitting)
+        # made it wait there already, so on more than one rank FockComm holds
+        # that wait as well as the transfer.
+        comm_t0 = tm.time()
+
         if comm_rank == mpi_master():
             num_densities = len(dens)
         else:
@@ -2582,6 +2592,9 @@ class LinearSolver:
         # method, and on two ranks it turned the lowest excitation energies of water
         # negative without any complaint.
         dens_factors = comm.bcast(dens_factors, root=mpi_master())
+
+        if profiler is not None:
+            profiler.add_timing_info('FockComm', tm.time() - comm_t0)
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
@@ -2748,8 +2761,13 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockGOST', tm.time() - t0)
 
+        comm_t0 = tm.time()
+
         for idx in range(len(fock_arrays)):
             fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
+
+        if profiler is not None:
+            profiler.add_timing_info('FockComm', tm.time() - comm_t0)
 
         if comm_rank == mpi_master():
             return fock_arrays
@@ -2840,6 +2858,9 @@ class LinearSolver:
         gs_dm_gost = self._gostshyp_gs_density
         tessellation_settings = self._gostshyp_tess_info
 
+        # NOTE: FockComm is timed as in _comp_lr_fock.
+        comm_t0 = tm.time()
+
         if comm_rank == mpi_master():
             num_densities = len(dens_a)
         else:
@@ -2862,6 +2883,9 @@ class LinearSolver:
         # method, and on two ranks it turned the lowest excitation energies of water
         # negative without any complaint.
         dens_factors = comm.bcast(dens_factors, root=mpi_master())
+
+        if profiler is not None:
+            profiler.add_timing_info('FockComm', tm.time() - comm_t0)
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
@@ -3059,11 +3083,16 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockGOST', tm.time() - t0)
 
+        comm_t0 = tm.time()
+
         for idx in range(num_densities):
             fock_arrays[idx * 2 + 0] = comm.reduce(fock_arrays[idx * 2 + 0],
                                                    root=mpi_master())
             fock_arrays[idx * 2 + 1] = comm.reduce(fock_arrays[idx * 2 + 1],
                                                    root=mpi_master())
+
+        if profiler is not None:
+            profiler.add_timing_info('FockComm', tm.time() - comm_t0)
 
         if comm_rank == mpi_master():
             return fock_arrays
@@ -3475,6 +3504,8 @@ class LinearSolver:
                 if self.nonlinear:
                     fock_ger_a = np.zeros((norb**2, batch_ger))
                     fock_ung_a = np.zeros((norb**2, batch_ung))
+                    fock_ger_b = np.zeros((norb**2, batch_ger))
+                    fock_ung_b = np.zeros((norb**2, batch_ung))
 
                 for ifock in range(batch_ger + batch_ung):
                     fak = fock_a[ifock]
@@ -3522,10 +3553,11 @@ class LinearSolver:
 
                     # Note: fak_mo_vec uses full MO coefficients matrix since
                     # it is only for fock_ger/fock_ung in nonlinear response
-                    fak_mo_vec = np.linalg.multi_dot([mo_a.T, fak,
-                                                      mo_a]).reshape(norb**2)
-                    fbk_mo_vec = np.linalg.multi_dot([mo_b.T, fbk,
-                                                      mo_b]).reshape(norb**2)
+                    if self.nonlinear:
+                        fak_mo_vec = np.linalg.multi_dot(
+                            [mo_a.T, fak, mo_a]).reshape(norb**2)
+                        fbk_mo_vec = np.linalg.multi_dot(
+                            [mo_b.T, fbk, mo_b]).reshape(norb**2)
 
                     if ifock < batch_ger:
                         e2_ger_a[:, ifock] = -gmo_vec_halfsize_a
@@ -3618,8 +3650,10 @@ class LinearSolver:
         t0 = tm.time()
 
         if self.rank == mpi_master():
+            # NOTE: no ostream, as the arrays are added below and the line
+            # about the file is printed after them.
             success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
-                                     basis, dft_dict, pe_dict, self.ostream)
+                                     basis, dft_dict, pe_dict, None)
         else:
             success = False
         success = self.comm.bcast(success, root=mpi_master())
@@ -3641,9 +3675,9 @@ class LinearSolver:
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
-            checkpoint_text = 'Time spent in writing checkpoint file: '
-            checkpoint_text += f'{(tm.time() - t0):.2f} sec'
-            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_info(
+                f'Checkpoint written to file: {self.checkpoint_file} ' +
+                f'(took {tm.time() - t0:.2f} sec).')
             self.ostream.print_blank()
 
     def _graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):

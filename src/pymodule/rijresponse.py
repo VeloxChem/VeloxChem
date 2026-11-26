@@ -43,6 +43,7 @@ room the prediction left.
 
 from mpi4py import MPI
 import numpy as np
+import time as tm
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import PackedMatrix
@@ -91,6 +92,8 @@ def initialize_ri_j(solver, molecule, basis, reuse=False):
     solver._ri_j_fallback = False
     solver._ri_j_memory = None
     solver._ri_drv = None
+
+    ri_setup_t0 = tm.time()
 
     mark_ri_setup(solver)
 
@@ -192,6 +195,12 @@ def initialize_ri_j(solver, molecule, basis, reuse=False):
         f'{Profiler.memory_to_string(budget)} {where}; three-center ' +
         f'integrals are held in memory, in {ri_drv.number_of_parts()} parts.')
     print_ri_reserve_floor(solver, reserve_floor)
+
+    # NOTE: the RI setup is the time from the choice of the auxiliary basis to
+    # the end of the three-center integrals, the memory estimate and the
+    # metric included.
+    ri_setup_time = tm.time() - ri_setup_t0
+    solver.ostream.print_info(f'RI setup done in {ri_setup_time:.2f} sec.')
     solver.ostream.print_blank()
     solver.ostream.flush()
 

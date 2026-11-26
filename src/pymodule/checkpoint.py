@@ -61,7 +61,8 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
     :param pe_dict:
         The dictionary containing PE information.
     :param ostream:
-        The output stream.
+        The output stream, or None for a caller which adds to the file after
+        this and prints the line about it itself.
 
     :return:
         True if checkpoint file is written. False if checkpoint file is not
@@ -73,6 +74,8 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
     if not valid_checkpoint:
         return False
 
+    t0 = tm.time()
+
     create_hdf5(fname, molecule, basis, dft_dict['dft_func_label'],
                 pe_dict['potfile_text'])
 
@@ -81,10 +84,10 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
         hf.create_dataset(label, data=array)
     hf.close()
 
-    checkpoint_text = 'Checkpoint written to file: '
-    checkpoint_text += fname
-    ostream.print_info(checkpoint_text)
-    ostream.print_blank()
+    if ostream is not None:
+        ostream.print_info(f'Checkpoint written to file: {fname} ' +
+                           f'(took {tm.time() - t0:.2f} sec).')
+        ostream.print_blank()
 
     return True
 
@@ -256,14 +259,8 @@ def write_distributed_focks(fname, dist_focks, key_freq_pairs, comm, ostream):
 
     dist_focks.append_to_hdf5_file(fname, 'distributed_focks')
 
-    checkpoint_text = 'Checkpoint written to file: '
-    checkpoint_text += fname
-    ostream.print_info(checkpoint_text)
-    ostream.print_blank()
-
-    checkpoint_text = 'Time spent in writing checkpoint file: '
-    checkpoint_text += f'{(tm.time() - t0):.2f} sec'
-    ostream.print_info(checkpoint_text)
+    ostream.print_info(f'Checkpoint written to file: {fname} ' +
+                       f'(took {tm.time() - t0:.2f} sec).')
     ostream.print_blank()
 
     return True

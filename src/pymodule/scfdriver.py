@@ -1225,7 +1225,7 @@ class ScfDriver:
         self._level_shift_smooth_alpha = None
         self._level_shift_smooth_beta = None
 
-        profiler.end(self.ostream, scf_flag=True, comm=self.comm)
+        profiler.end(self.ostream, comm=self.comm)
 
         self._print_ri_memory_check()
 
@@ -1757,6 +1757,8 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             if checkpoint_file and isinstance(checkpoint_file, str):
+                checkpoint_t0 = tm.time()
+
                 if self._dft:
                     xc_label = self.xcfun.get_func_label()
                 else:
@@ -1796,8 +1798,9 @@ class ScfDriver:
                                              group_name='method_settings')
 
                 self.ostream.print_blank()
-                self.ostream.print_info('Checkpoint written to file: ' +
-                                        checkpoint_file)
+                self.ostream.print_info(
+                    f'Checkpoint written to file: {checkpoint_file} ' +
+                    f'(took {tm.time() - checkpoint_t0:.2f} sec).')
                 self.ostream.flush()
 
     def _comp_diis(self, molecule, ao_basis, den_mat, profiler):
@@ -1830,6 +1833,18 @@ class ScfDriver:
             })
 
         diis_start_time = tm.time()
+
+        # NOTE: the line which marks where the time printed at the end of this
+        # step starts, in the reduced-basis line or in the SCF finish line.
+        if self._first_step:
+            self.ostream.print_info('Starting Reduced Basis SCF calculation...')
+        elif self._acc_type_used == 'L2_DIIS':
+            self.ostream.print_info('Starting SCF calculation in full basis...')
+            self.ostream.print_blank()
+        else:
+            self.ostream.print_info('Starting SCF calculation...')
+            self.ostream.print_blank()
+        self.ostream.flush()
 
         if self.rank == mpi_master():
             acc_diis = Diis(self.max_err_vecs, self.diis_thresh, self.scf_type)
@@ -1873,7 +1888,6 @@ class ScfDriver:
                 self.ostream.print_info(
                     'Point charges one-electron integral computed in' +
                     ' {:.2f} sec.'.format(tm.time() - t0point_charges))
-                self.ostream.print_blank()
 
         linear_dependency = False
 
@@ -1884,7 +1898,9 @@ class ScfDriver:
             eigvals, eigvecs = screened_eigh(S, self.ovl_thresh)
             oao_mat = eigvecs * (1.0 / np.sqrt(eigvals))
 
-            if self.print_level > 1:
+            # NOTE: the reduced-basis step prints neither this nor the
+            # one-electron integrals (_comp_one_ints).
+            if self.print_level > 1 and not self._first_step:
                 self.ostream.print_info('Orthogonalization matrix computed in' +
                                         ' {:.2f} sec.'.format(tm.time() - t0))
                 self.ostream.print_blank()
@@ -2088,7 +2104,6 @@ class ScfDriver:
                 self.ostream.print_info(
                     'Three-center integrals are held in memory, in ' +
                     f'{self._ri_drv.number_of_parts()} parts.')
-                self.ostream.print_blank()
                 self.ostream.flush()
 
         elif use_ri_jk and not self._ri_fallback:
@@ -2255,6 +2270,10 @@ class ScfDriver:
                 self._ri_drv = None
                 self._ri_aux_atoms = []
 
+        # NOTE: the time of the metric and the B vectors, which is printed as part
+        # of the RI setup, and None where they are not formed.
+        b_vectors_time = None
+
         # NOTE: the metric and the B vectors, which a calculation which fell back
         # to the four-center integrals does not form.
         if use_ri_jk and not self._ri_fallback:
@@ -2267,6 +2286,10 @@ class ScfDriver:
             # choice is taken in one place.
             metric_erf = PackedMatrix()
 
+            # NOTE: the lines saying how each metric was inverted, which are
+            # formed on the master, where the metrics are made, and printed by it.
+            metric_route_lines = []
+
             if self.rank == mpi_master():
                 if range_separated:
                     # NOTE: the two come out of one call, which forms both
@@ -2274,12 +2297,21 @@ class ScfDriver:
                     metric, metric_erf = self._ri_drv.make_metric_rs(
                         molecule, basis_ri, self.ri_metric_threshold,
                         use_inverse_square_root, mode, omega)
+                    metric_route_lines = [
+                        self._get_ri_metric_route_line(
+                            'Full-range (1/r) RI metric', metric),
+                        self._get_ri_metric_route_line(
+                            'Long-range (erf) RI metric', metric_erf),
+                    ]
                 else:
                     # NOTE: make_metric also answers the way of building, which
                     # is the way it was asked for when that is in_memory.
                     metric, _ = self._ri_drv.make_metric(
                         molecule, basis_ri, self.ri_metric_threshold,
                         use_inverse_square_root, mode)
+                    metric_route_lines = [
+                        self._get_ri_metric_route_line('RI metric', metric)
+                    ]
             else:
                 metric = PackedMatrix()
 
@@ -2309,28 +2341,36 @@ class ScfDriver:
             # metrics which peak_memory counts only while the B vectors are formed.
             del metric, metric_erf
 
+            # NOTE: one line per metric, as the full-range and the long-range
+            # metric of a range-separated functional can be inverted differently.
             if range_separated:
-                # NOTE: the attenuated metric is the worse conditioned of the two
-                # by construction, so it is the one likely to have fallen back to
-                # its square root. Which of them did says so in its own warning.
                 self.ostream.print_info(
                     'Range-separated functional: two sets of B vectors at ' +
                     f'omega = {omega:.3f}.')
-                self.ostream.print_info(
-                    'Both metrics inverted through their ' +
-                    f'{self.ri_metric_route}.')
-            else:
-                self.ostream.print_info(
-                    f'Metric inverted through its {self.ri_metric_route}.')
+            for line in metric_route_lines:
+                self.ostream.print_info(line)
 
             self.ostream.print_info('B vectors are held in memory.')
-
-            self.ostream.print_info(
-                f'B vectors for RI done in {tm.time() - ri_prep_t0:.2f} sec.')
-            self.ostream.print_blank()
             self.ostream.flush()
 
+            b_vectors_time = tm.time() - ri_prep_t0
+
         self._ri_setup_time = tm.time() - ri_setup_t0
+
+        uses_ri = (use_ri_coulomb or use_ri_jk) and not self._ri_fallback
+
+        # NOTE: the RI setup is the time from the choice of the auxiliary basis
+        # to the end of the B vectors (RI-JK) or of the three-center integrals
+        # (RI-J), the memory estimate and the metric included.
+        if uses_ri:
+            valstr = f'RI setup done in {self._ri_setup_time:.2f} sec'
+            if b_vectors_time is not None:
+                valstr += (f', including {b_vectors_time:.2f} sec for the ' +
+                           'metric and the B vectors')
+            self.ostream.print_info(valstr + '.')
+            self.ostream.print_blank()
+
+        self.ostream.flush()
 
         e_grad = None
 
@@ -2338,7 +2378,7 @@ class ScfDriver:
         use_pfon = False
         use_density_damping = False
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and not self._first_step:
             self._print_scf_title()
 
         for i in self._get_scf_range():
@@ -2350,7 +2390,14 @@ class ScfDriver:
             else:
                 self._num_iter = i
 
-            profiler.set_timing_key(f'Iteration {self._num_iter:d}')
+            # NOTE: iteration 0 is the Fock build from the initial guess, before
+            # the first DIIS step. It is timed as Preparation, the key under which
+            # the response solvers time the build from their initial trial
+            # vectors.
+            if self._num_iter == 0:
+                profiler.set_timing_key('Preparation')
+            else:
+                profiler.set_timing_key(f'Iteration {self._num_iter:d}')
 
             iter_start_time = tm.time()
 
@@ -2367,6 +2414,8 @@ class ScfDriver:
 
             self._e_gostshyp = e_pr
 
+            # NOTE: ErrVec is timed in two parts, before and after CPCM, which
+            # the profiler adds up.
             profiler.start_timer('ErrVec')
 
             e_el = self._comp_energy(fock_mat, vxc_mat, e_emb, e_pr, kin_mat,
@@ -3051,30 +3100,30 @@ class ScfDriver:
 
         # timing printout
 
-        if self.rank == mpi_master() and self.print_level > 1:
+        # NOTE: these lines form one block with the point-charge and
+        # orthogonalization lines printed after them in _comp_diis, and the
+        # orthogonalization line ends the block with a blank line. The
+        # reduced-basis step prints none of them.
+        if (self.rank == mpi_master() and self.print_level > 1 and
+                not self._first_step):
 
             self.ostream.print_info('Overlap matrix computed in' +
                                     ' {:.2f} sec.'.format(ovl_dt))
-            self.ostream.print_blank()
 
             self.ostream.print_info('Kinetic energy matrix computed in' +
                                     ' {:.2f} sec.'.format(kin_dt))
-            self.ostream.print_blank()
 
             self.ostream.print_info('Nuclear potential matrix computed in' +
                                     ' {:.2f} sec.'.format(npot_dt))
-            self.ostream.print_blank()
 
             if self.electric_field is not None:
                 self.ostream.print_info('Electric dipole matrices computed in' +
                                         ' {:.2f} sec.'.format(dipole_dt))
-                self.ostream.print_blank()
 
             if basis.has_ecp():
                 self.ostream.print_info(
                     'Effective core potential matrix computed in ' +
                     '{:.2f} sec.'.format(ecp_dt))
-                self.ostream.print_blank()
 
             self.ostream.flush()
 
@@ -3402,6 +3451,36 @@ class ScfDriver:
             nocc = [max(n, g) for n, g in zip(nocc, guess)]
 
         return sum(nocc)
+
+    def _get_ri_metric_route_line(self, name, metric):
+        """
+        Gets the line saying how an RI-JK metric was inverted.
+
+        :param name:
+            The name of the metric in the line.
+        :param metric:
+            The inverted metric, as make_metric or make_metric_rs returns it.
+
+        :return:
+            The line.
+        """
+
+        # NOTE: the route is read from the type of the matrix returned. The
+        # Cholesky routes (cholesky_inverse, and cholesky_factor for the direct
+        # way) return a lower triangular matrix and inverse_square_root a
+        # symmetric one (PackedLinearAlgebra.cpp). The metric is inverted through
+        # its inverse square root when that is asked for (ri_metric_route
+        # 'eigenvalues') and when the Cholesky factorization asked for fails,
+        # which the driver does not report otherwise: a metric which is not
+        # numerically positive definite has no Cholesky factor.
+        if metric.get_type() == mat_t.lower_triangular:
+            return f'{name} inverted by Cholesky factorization.'
+
+        if self.ri_metric_route == 'cholesky':
+            return (f'{name} inverted by inverse square root, as it has no ' +
+                    'Cholesky factor.')
+
+        return f'{name} inverted by inverse square root.'
 
     def _get_ri_memory_budget(self, ao_basis):
         """
@@ -4751,25 +4830,21 @@ class ScfDriver:
         Prints SCF cycles header to output stream.
         """
 
-        if self._first_step:
-            self.ostream.print_info('Starting Reduced Basis SCF calculation...')
-
+        self.ostream.print_blank()
+        if self._dft:
+            ename = '   Kohn-Sham Energy'
         else:
-            self.ostream.print_blank()
-            if self._dft:
-                ename = '   Kohn-Sham Energy'
-            else:
-                ename = 'Hartree-Fock Energy'
+            ename = 'Hartree-Fock Energy'
 
-            valstr = '{} | {} | {} | {} | {} | {}'.format(
-                'Iter.', ename, 'Energy Change',
-                'Gradient Norm', 'Max. Gradient', 'Density Change')
+        valstr = '{} | {} | {} | {} | {} | {}'.format(
+            'Iter.', ename, 'Energy Change',
+            'Gradient Norm', 'Max. Gradient', 'Density Change')
 
-            if self._gostshyp:
-                valstr += ' | Neg. Amp. Points'
+        if self._gostshyp:
+            valstr += ' | Neg. Amp. Points'
 
-            self.ostream.print_header(valstr)
-            self.ostream.print_header(len(valstr) * '-')
+        self.ostream.print_header(valstr)
+        self.ostream.print_header(len(valstr) * '-')
 
     def _print_gostshyp_neg_amp_info(self):
         """
@@ -4801,6 +4876,14 @@ class ScfDriver:
             The start time of SCF calculation.
         """
 
+        # NOTE: _comp_diis passes its diis_start_time, which is set before the
+        # one-electron integrals. The time printed is the one-electron
+        # integrals, the orthogonalization matrix, the screening of the
+        # four-center integrals, the RI setup, the rows of the timing table, the
+        # checkpoint written after the iterations and, when the SCF converged,
+        # the results file, apart from the dipole moment, the printing and the
+        # convergence checks, which are not timed. The reduced-basis step writes
+        # neither file.
         if self._first_step:
             valstr = '...done. SCF energy in reduced basis set: '
             valstr += '{:.12f}'.format(self._scf_energy)
@@ -5253,9 +5336,12 @@ class ScfDriver:
         else:
             potfile_text = ''
 
+        final_h5_t0 = tm.time()
+
         create_hdf5(final_h5_fname, molecule, ao_basis, xc_label, potfile_text)
         write_scf_results_to_hdf5(final_h5_fname, self.scf_results)
 
         self.ostream.print_blank()
-        self.ostream.print_info('SCF results written to file: ' +
-                                final_h5_fname)
+        self.ostream.print_info(
+            f'SCF results written to file: {final_h5_fname} ' +
+            f'(took {tm.time() - final_h5_t0:.2f} sec).')

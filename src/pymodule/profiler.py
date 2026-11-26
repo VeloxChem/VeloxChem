@@ -52,6 +52,8 @@ class Profiler:
         - start_time: The starting time.
         - timing_dict: The dictionary containing information about timing.
         - timing_key: The key for the timing dictionary.
+        - timer_starts: The start times of the running timers, by timing key
+          and label.
         - memory_usage: The list of tuples with the elapsed time, the
           resident memory of the current process, the peak resident memory
           of the current process so far, the total system memory usage, and
@@ -76,6 +78,7 @@ class Profiler:
 
         self.timing_dict = None
         self.timing_key = None
+        self.timer_starts = None
 
         self.memory_usage = None
         self.pr = None
@@ -103,6 +106,7 @@ class Profiler:
         self.start_time = tm.time()
 
         self.timing_dict = {}
+        self.timer_starts = {}
         self.memory_usage = []
 
         if self.memory_profiling:
@@ -121,14 +125,12 @@ class Profiler:
             import tracemalloc
             tracemalloc.start()
 
-    def end(self, ostream, scf_flag=False, comm=None):
+    def end(self, ostream, comm=None):
         """
         Stops the profiler and print the output.
 
         :param ostream:
             The output stream.
-        :param scf_flag:
-            The flag for SCF.
         :param comm:
             The communicator whose ranks the peak memory is gathered over, or
             None for the rank that prints alone. Every rank of it must call
@@ -138,9 +140,9 @@ class Profiler:
         if self.memory_profiling:
             self.check_memory_usage('Profiler stops')
 
-        self.print_timing(ostream, scf_flag)
+        self.print_timing(ostream)
         self.print_profiling_summary(ostream)
-        self.print_memory_usage(ostream, scf_flag)
+        self.print_memory_usage(ostream)
         self.print_peak_memory_over_ranks(ostream, comm)
         self.print_memory_tracing(ostream)
 
@@ -216,7 +218,8 @@ class Profiler:
 
     def start_timer(self, label):
         """
-        Starts the timer for a label.
+        Starts the timer for a label. The times between the starts and stops
+        of a label under one timing key add up.
 
         :param label:
             The label.
@@ -225,7 +228,12 @@ class Profiler:
         key = self.timing_key
 
         if self.timing and (key is not None) and (key in self.timing_dict):
-            self.timing_dict[key][label] = tm.time()
+            # NOTE: the entry is made at the start, as the columns of the
+            # timing table follow the order in which labels enter timing_dict,
+            # and a label such as 'total' is started first and stopped last.
+            if label not in self.timing_dict[key]:
+                self.timing_dict[key][label] = 0.0
+            self.timer_starts[(key, label)] = tm.time()
 
     def stop_timer(self, label):
         """
@@ -238,8 +246,8 @@ class Profiler:
         key = self.timing_key
 
         if self.timing and (key is not None) and (key in self.timing_dict):
-            t0 = self.timing_dict[key][label]
-            self.timing_dict[key][label] = tm.time() - t0
+            t0 = self.timer_starts.pop((key, label))
+            self.timing_dict[key][label] += tm.time() - t0
 
     def add_timing_info(self, label, dt):
         """
@@ -258,14 +266,15 @@ class Profiler:
                 self.timing_dict[key][label] = 0.0
             self.timing_dict[key][label] += dt
 
-    def print_timing(self, ostream, scf_flag=False, rank_name=None):
+    def print_timing(self, ostream, rank_name=None):
         """
         Prints timing.
 
         :param ostream:
             The output stream.
-        :param scf:
-            The flag for SCF.
+        :param rank_name:
+            The name of the rank the timing is of, printed in the title, or
+            None.
         """
 
         if self.timing:
@@ -295,8 +304,6 @@ class Profiler:
             ostream.print_header(valstr.ljust(width))
 
             for key, val in self.timing_dict.items():
-                if scf_flag and key.lower() == 'iteration 0':
-                    continue
                 valstr = f'{key:<18s}'
                 for label in labels:
                     if label in val:
@@ -377,7 +384,7 @@ class Profiler:
 
         return True
 
-    def print_memory_usage(self, ostream, scf_flag=False):
+    def print_memory_usage(self, ostream):
         """
         Prints memory usage.
 
@@ -395,8 +402,6 @@ class Profiler:
 
         :param ostream:
             The output stream.
-        :param scf_flag:
-            The flag for SCF.
         """
 
         if self.memory_profiling:
@@ -412,8 +417,6 @@ class Profiler:
             ostream.print_header(mem_str.ljust(92))
 
             for dt, proc_mem, peak_mem, sys_mem, remark in self.memory_usage:
-                if scf_flag and remark.lower() == 'iteration 0':
-                    continue
                 mem_str = '{:.2f} sec'.format(dt).ljust(14)
                 mem_str += ' {:16s}'.format(self.memory_to_string(proc_mem))
                 mem_str += ' {:16s}'.format(self.memory_to_string(peak_mem))
