@@ -61,7 +61,7 @@ def get_tm_parameters():
     for idx, (s, e) in enumerate(zip(sigma_values, epsilon_values)):
         key = tm_elements[idx]
 
-        sigma = 0.1 * s * 2.0
+        sigma = 0.1 * s * 2.0 / 2.0**(1.0 / 6.0)
         epsilon = e * 4.184
 
         tm_parameters[key] = {'sigma': sigma, 'epsilon': epsilon}
