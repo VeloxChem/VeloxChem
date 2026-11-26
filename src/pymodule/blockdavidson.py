@@ -44,6 +44,11 @@ class BlockDavidsonSolver:
     Instance variables
         - neigenpairs: The number of eigenpairs of A matrix determined by
           solver.
+        - num_extra_roots, extra_root_cluster_thresh,
+          max_extra_cluster_roots: The roots refined above neigenpairs (see
+          LinearSolver._get_num_refined_roots).
+        - conv_thresh: The residual norm above which a refined root receives
+          a trial vector; with None, every refined root receives one.
         - sigma_matrices: The sigma vectors A * X in matrix format {A * X_0, A
           * X_1,...}.
         - trial_matrices: The trial vectors in matrix format {X_0, X_1,...}.
@@ -52,7 +57,11 @@ class BlockDavidsonSolver:
     def __init__(self,
                  max_subspace_dim=None,
                  collapse_nvec=None,
-                 lindep_thresh=1.0e-6):
+                 lindep_thresh=1.0e-6,
+                 num_extra_roots=0,
+                 extra_root_cluster_thresh=0.0,
+                 max_extra_cluster_roots=0,
+                 conv_thresh=None):
         """
         Initializes block Davidson sover to default setup.
         """
@@ -60,12 +69,23 @@ class BlockDavidsonSolver:
         # excited states information
         self.neigenpairs = None
 
+        # roots refined above neigenpairs
+        self.num_extra_roots = num_extra_roots
+        self.extra_root_cluster_thresh = extra_root_cluster_thresh
+        self.max_extra_cluster_roots = max_extra_cluster_roots
+
+        # roots with residual norms at or below conv_thresh receive no trial
+        # vectors
+        self.conv_thresh = conv_thresh
+
         # solver storage setup
         self.sigma_matrices = None
         self.trial_matrices = None
 
-        # residual data
+        # residual data (residual_matrices also holds the residuals of the
+        # roots above neigenpairs, with Ritz values in refined_eigs)
         self.residual_matrices = None
+        self.refined_eigs = None
         self.residual_norms = None
         self.residual_eigs = None
 
@@ -205,16 +225,27 @@ class BlockDavidsonSolver:
         rlmat = np.matmul(self.trial_matrices.T, self.sigma_matrices)
 
         reigs, rvecs = np.linalg.eigh(rlmat)
-        yvecs = rvecs[:, :self.neigenpairs].copy()
-        self.residual_eigs = reigs[:self.neigenpairs]
-        self.ritz_vectors = np.matmul(self.trial_matrices, yvecs)
 
-        self.residual_matrices = self.ritz_vectors.copy()
-        for i in range(self.neigenpairs):
-            self.residual_matrices[:, i] *= self.residual_eigs[i]
+        # roots above neigenpairs get residuals and trial vectors as well,
+        # but their Ritz values, vectors and residual norms are not reported
+        # and not part of the convergence check
+        nrefine = LinearSolver._get_num_refined_roots(
+            reigs, self.neigenpairs, self.num_extra_roots,
+            self.extra_root_cluster_thresh, self.max_extra_cluster_roots)
+
+        yvecs = rvecs[:, :nrefine].copy()
+        self.refined_eigs = reigs[:nrefine]
+        ritz_vectors = np.matmul(self.trial_matrices, yvecs)
+
+        self.residual_matrices = ritz_vectors.copy()
+        for i in range(nrefine):
+            self.residual_matrices[:, i] *= self.refined_eigs[i]
         self.residual_matrices -= np.matmul(self.sigma_matrices, yvecs)
 
-        self.residual_norms = np.linalg.norm(self.residual_matrices, axis=0)
+        self.residual_eigs = self.refined_eigs[:self.neigenpairs]
+        self.ritz_vectors = ritz_vectors[:, :self.neigenpairs].copy()
+        self.residual_norms = np.linalg.norm(
+            self.residual_matrices[:, :self.neigenpairs], axis=0)
 
     def collapse_subspace(self):
         """
@@ -258,10 +289,14 @@ class BlockDavidsonSolver:
         Gets the number of vectors retained when collapsing the subspace.
         """
 
-        if self.collapse_nvec is not None:
-            return max(self.neigenpairs, self.collapse_nvec)
+        # the collapsed space keeps at least every root that can be refined
+        max_refined = (self.neigenpairs + self.num_extra_roots +
+                       self.max_extra_cluster_roots)
 
-        return 2 * self.neigenpairs
+        if self.collapse_nvec is not None:
+            return max(max_refined, self.collapse_nvec)
+
+        return max(max_refined, 2 * self.neigenpairs)
 
     def comp_trial_vectors(self, diag_mat):
         """
@@ -275,9 +310,23 @@ class BlockDavidsonSolver:
             The trial vectors.
         """
 
-        tvecs = self.residual_matrices.copy()
-        for i in range(self.neigenpairs):
-            tvecs[:, i] /= (self.residual_eigs[i] - diag_mat)
+        residuals = self.residual_matrices
+        shifts = self.refined_eigs
+
+        # A root receives a trial vector only when its residual norm is above
+        # conv_thresh, which is when check_convergence counts it as not
+        # converged. The residual of a converged root can be as small as the
+        # rounding errors; the vector made from it is then rounding noise, and
+        # after the projection in project_trial_vectors it is not reliably
+        # orthogonal to the reduced space.
+        if self.conv_thresh is not None:
+            keep = np.linalg.norm(residuals, axis=0) > self.conv_thresh
+            residuals = residuals[:, keep]
+            shifts = shifts[keep]
+
+        tvecs = residuals.copy()
+        for i in range(tvecs.shape[1]):
+            tvecs[:, i] /= (shifts[i] - diag_mat)
 
         tvecs = LinearSolver.normalize(tvecs)
 

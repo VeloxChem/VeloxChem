@@ -35,6 +35,7 @@ import numpy as np
 import time
 
 from .oneeints import compute_electric_dipole_integrals
+from .riresponse import lend_ri
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
                            hartree_in_inverse_nm, hartree_in_wavenumber,
                            fine_structure_constant,
@@ -45,7 +46,7 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check,
+                           dft_and_ri_sanity_check,
                            nonlinear_response_environment_sanity_check)
 from .errorhandler import assert_msg_critical
 from .resultsio import write_results_to_hdf5
@@ -153,11 +154,8 @@ class TpaDriverBase(NonlinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute', 'nonlinear')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute', 'nonlinear')
 
         profiler = Profiler({
             'timing': self.timing,
@@ -170,6 +168,11 @@ class TpaDriverBase(NonlinearSolver):
             self._print_header('Two-Photon Absorbtion Driver Setup')
 
         start_time = time.time()
+
+        # NOTE: before the RI-JK B vectors or the RI-J integrals are set up,
+        # which keep back from what they may hold the smallest batch of the
+        # nonlinear Fock builds.
+        self._set_ri_reserve_floor(molecule, ao_basis, scf_results)
 
         eri_dict = self._init_eri(molecule, ao_basis)
 
@@ -247,7 +250,8 @@ class TpaDriverBase(NonlinearSolver):
             'conv_thresh', 'max_iter', 'eri_thresh', 'timing',
             'memory_profiling', 'batch_size', 'restart', 'xcfun', 'grid_level',
             'potfile', 'electric_field', 'program_end_time', '_debug',
-            '_block_size_factor', 'ri_coulomb'
+            '_block_size_factor', 'ri_coulomb', 'ri_jk',
+            'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -258,7 +262,8 @@ class TpaDriverBase(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             Nb_drv.checkpoint_file = str(fpath) + '_tpa_1.h5'
 
-        Nb_results = Nb_drv.compute(molecule, ao_basis, scf_results, v_grad)
+        with lend_ri(self, Nb_drv):
+            Nb_results = Nb_drv.compute(molecule, ao_basis, scf_results, v_grad)
 
         self._is_converged = Nb_drv.is_converged
 
@@ -300,6 +305,12 @@ class TpaDriverBase(NonlinearSolver):
         self.ostream.flush()
 
         profiler.end(self.ostream)
+
+        # NOTE: the RI memory check of this driver's own Fock builds; the
+        # solvers it drives print their own.
+        self._print_ri_memory_check()
+
+        self._release_freed_memory()
 
         if self.rank == mpi_master() and self.filename is not None:
             self._write_final_hdf5(self.filename, tpa_dict)

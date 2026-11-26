@@ -62,6 +62,23 @@ get_number_of_threads() -> int
     return omp_get_max_threads();
 }
 
+/// @brief The smallest number of iterations for which a parallel region pays for
+/// itself.
+/// @note Opening a region costs a fork and a join whose price grows with the number
+/// of the threads, while the work of a loop with a handful of iterations does not.
+/// Measured on this code: the loop of make_pair_groups runs a single chunk for c60
+/// and cost 0.008 ms on one thread and 0.060 ms on sixteen, for the same work. A
+/// loop below this many iterations is therefore run by the encountering thread.
+/// @note The bound does not depend on the number of the threads on purpose. A bound
+/// which rose with the team would push a loop of tens of iterations back to one
+/// thread on a large machine, which is the opposite of what is wanted.
+/// @note This applies to a loop whose iteration carries little work. A loop whose
+/// iteration is a whole block of atom pairs is worth a region even when it holds a
+/// handful of them: gating the ordering and the screening of the blocks this way was
+/// measured and made c60 half again slower, as seven blocks over seven threads beats
+/// seven blocks over one by far more than a fork costs.
+inline constexpr int min_parallel_iterations = 8;
+
 /// @brief Sets static scheduling for parallel region.
 inline auto
 set_static_scheduler() -> void

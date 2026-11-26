@@ -38,6 +38,7 @@
 #include <sstream>
 
 #include "ChemicalElement.hpp"
+#include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
 #include "TensorComponents.hpp"
 #include "TensorLabels.hpp"
@@ -157,9 +158,70 @@ CMolecularBasis::slice(const std::vector<int> &atoms) const -> CMolecularBasis
 }
 
 auto
-CMolecularBasis::basis_sets() const -> std::vector<CAtomBasis>
+CMolecularBasis::basis_groups() const -> std::vector<CAtomBasisGroup>
+{
+    std::vector<std::vector<int>> atoms(_basis_sets.size());
+
+    std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) { atoms[_indices[i]].push_back(i); });
+
+    std::vector<CAtomBasisGroup> groups;
+
+    groups.reserve(_basis_sets.size());
+
+    std::ranges::for_each(std::views::iota(size_t{0}, _basis_sets.size()),
+                          [&](const auto i) { groups.push_back(CAtomBasisGroup(_basis_sets[i], atoms[i], static_cast<int>(i))); });
+
+    return groups;
+}
+
+auto
+CMolecularBasis::basis_pair_groups() const -> std::vector<CAtomBasisPairGroup>
+{
+    // NOTE: pair groups refer to atom bases owned by this molecular basis, not
+    // by the transient groups below, so they stay valid after groups expires.
+
+    // NOTE: the atom pairs of the groups are formed by the threads, as they are
+    // as many as the square of the atoms of the molecule and forming them one
+    // after another is a large part of the description of a sparse matrix.
+
+    return CAtomBasisPairGroup::make_pair_groups(basis_groups());
+}
+
+auto
+CMolecularBasis::basis_pair_groups(const CMolecularBasis &other) const -> std::vector<CAtomBasisPairGroup>
+{
+    // NOTE: pair groups are non-symmetric by contract, i.e. the full direct
+    // product of bra and ket atoms is retained, even if the molecular bases
+    // share an atom basis.
+
+    const auto bra_groups = basis_groups();
+
+    const auto ket_groups = other.basis_groups();
+
+    std::vector<CAtomBasisPairGroup> pair_groups;
+
+    pair_groups.reserve(bra_groups.size() * ket_groups.size());
+
+    std::ranges::for_each(bra_groups, [&](const auto &bra) {
+        std::ranges::for_each(ket_groups, [&](const auto &ket) { pair_groups.push_back(CAtomBasisPairGroup(bra, ket)); });
+    });
+
+    return pair_groups;
+}
+
+auto
+CMolecularBasis::basis_sets() const -> const std::vector<CAtomBasis> &
 {
     return _basis_sets;
+}
+
+auto
+CMolecularBasis::basis_set(const int index) const -> const CAtomBasis &
+{
+    errors::assertMsgCritical((index >= 0) && (index < static_cast<int>(_basis_sets.size())),
+                              std::string("MolecularBasis.basis_set: Index of atom basis is out of range"));
+
+    return _basis_sets[index];
 }
 
 auto
@@ -171,20 +233,17 @@ CMolecularBasis::basis_sets_indices() const -> std::vector<int>
 auto
 CMolecularBasis::max_angular_momentum() const -> int
 {
-    auto pos = std::ranges::max_element(
-        _basis_sets, [&](const auto &lbas, const auto &rbas) { return lbas.max_angular_momentum() < rbas.max_angular_momentum(); });
+    if (_basis_sets.empty()) return -1;
 
-    return (pos == _basis_sets.end()) ? -1 : pos->max_angular_momentum();
+    return std::ranges::max(_basis_sets | std::views::transform([](const auto &abas) { return abas.max_angular_momentum(); }));
 }
 
 auto
 CMolecularBasis::max_angular_momentum(const std::vector<int> &atoms) const -> int
 {
-    auto pos = std::ranges::max_element(atoms, [&](const int i, const int j) {
-        return _basis_sets[_indices[i]].max_angular_momentum() < _basis_sets[_indices[j]].max_angular_momentum();
-    });
+    if (atoms.empty()) return -1;
 
-    return (pos == atoms.end()) ? -1 : _basis_sets[_indices[*pos]].max_angular_momentum();
+    return std::ranges::max(atoms | std::views::transform([&](const int i) { return _basis_sets[_indices[i]].max_angular_momentum(); }));
 }
 
 auto
@@ -193,7 +252,7 @@ CMolecularBasis::basis_functions() const -> std::vector<CBasisFunction>
     std::vector<CBasisFunction> bfs;
 
     std::ranges::for_each(_indices, [&](const int i) {
-        auto cbfs = _basis_sets[i].basis_functions();
+        const auto &cbfs = _basis_sets[i].functions();
         bfs.insert(bfs.end(), cbfs.begin(), cbfs.end());
     });
 
@@ -232,7 +291,7 @@ CMolecularBasis::basis_functions(const std::vector<int> &atoms) const -> std::ve
     std::vector<CBasisFunction> bfs;
 
     std::ranges::for_each(atoms, [&](const int i) {
-        auto cbfs = _basis_sets[_indices.at(i)].basis_functions();
+        const auto &cbfs = _basis_sets[_indices.at(i)].functions();
         bfs.insert(bfs.end(), cbfs.begin(), cbfs.end());
     });
 
@@ -271,9 +330,7 @@ CMolecularBasis::atomic_indices() const -> std::vector<int>
     std::vector<int> atom_indices;
 
     std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) {
-        const auto cbfs     = _basis_sets[_indices[i]].basis_functions();
-        auto       cindices = std::vector<int>(cbfs.size(), i);
-        atom_indices.insert(atom_indices.end(), cindices.begin(), cindices.end());
+        atom_indices.insert(atom_indices.end(), _basis_sets[_indices[i]].number_of_basis_functions(), i);
     });
 
     return atom_indices;
@@ -285,9 +342,7 @@ CMolecularBasis::atomic_indices(const int angular_momentum) const -> std::vector
     std::vector<int> atom_indices;
 
     std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) {
-        const auto cbfs     = _basis_sets[_indices[i]].basis_functions(angular_momentum);
-        auto       cindices = std::vector<int>(cbfs.size(), i);
-        atom_indices.insert(atom_indices.end(), cindices.begin(), cindices.end());
+        atom_indices.insert(atom_indices.end(), _basis_sets[_indices[i]].number_of_basis_functions(angular_momentum), i);
     });
 
     return atom_indices;
@@ -299,9 +354,7 @@ CMolecularBasis::atomic_indices(const int angular_momentum, const size_t npgtos)
     std::vector<int> atom_indices;
 
     std::ranges::for_each(std::views::iota(0, static_cast<int>(_indices.size())), [&](const int i) {
-        const auto cbfs     = _basis_sets[_indices[i]].basis_functions(angular_momentum, npgtos);
-        auto       cindices = std::vector<int>(cbfs.size(), i);
-        atom_indices.insert(atom_indices.end(), cindices.begin(), cindices.end());
+        atom_indices.insert(atom_indices.end(), _basis_sets[_indices[i]].number_of_basis_functions(angular_momentum, npgtos), i);
     });
 
     return atom_indices;
@@ -313,9 +366,7 @@ CMolecularBasis::atomic_indices(const std::vector<int> &atoms) const -> std::vec
     std::vector<int> atom_indices;
 
     std::ranges::for_each(atoms, [&](const int i) {
-        const auto cbfs     = _basis_sets[_indices[i]].basis_functions();
-        auto       cindices = std::vector<int>(cbfs.size(), i);
-        atom_indices.insert(atom_indices.end(), cindices.begin(), cindices.end());
+        atom_indices.insert(atom_indices.end(), _basis_sets[_indices[i]].number_of_basis_functions(), i);
     });
 
     return atom_indices;
@@ -327,9 +378,7 @@ CMolecularBasis::atomic_indices(const std::vector<int> &atoms, const int angular
     std::vector<int> atom_indices;
 
     std::ranges::for_each(atoms, [&](const int i) {
-        const auto cbfs     = _basis_sets[_indices[i]].basis_functions(angular_momentum);
-        auto       cindices = std::vector<int>(cbfs.size(), i);
-        atom_indices.insert(atom_indices.end(), cindices.begin(), cindices.end());
+        atom_indices.insert(atom_indices.end(), _basis_sets[_indices[i]].number_of_basis_functions(angular_momentum), i);
     });
 
     return atom_indices;
@@ -341,18 +390,23 @@ CMolecularBasis::atomic_indices(const std::vector<int> &atoms, const int angular
     std::vector<int> atom_indices;
 
     std::ranges::for_each(atoms, [&](const int i) {
-        const auto cbfs     = _basis_sets[_indices[i]].basis_functions(angular_momentum, npgtos);
-        auto       cindices = std::vector<int>(cbfs.size(), i);
-        atom_indices.insert(atom_indices.end(), cindices.begin(), cindices.end());
+        atom_indices.insert(atom_indices.end(), _basis_sets[_indices[i]].number_of_basis_functions(angular_momentum, npgtos), i);
     });
 
     return atom_indices;
 }
 
 auto
+CMolecularBasis::number_of_basis_functions() const -> size_t
+{
+    return std::accumulate(
+        _indices.begin(), _indices.end(), size_t{0}, [&](const size_t &sum, const int &i) { return sum + _basis_sets[i].number_of_basis_functions(); });
+}
+
+auto
 CMolecularBasis::number_of_basis_functions(const int angular_momentum) const -> size_t
 {
-    return std::accumulate(_indices.begin(), _indices.end(), size_t{0}, [&](const int &sum, const int &i) {
+    return std::accumulate(_indices.begin(), _indices.end(), size_t{0}, [&](const size_t &sum, const int &i) {
         return sum + _basis_sets[i].number_of_basis_functions(angular_momentum);
     });
 }
@@ -495,7 +549,11 @@ CMolecularBasis::index_map(const int angular_momentum, const size_t npgtos) cons
         offset++;
     };
 
-    std::ranges::for_each(_indices, [&](const int i) { std::ranges::for_each(_basis_sets[i].basis_functions(angular_momentum), bf_index); });
+    std::ranges::for_each(_indices, [&](const int i) {
+        std::ranges::for_each(_basis_sets[i].functions(), [&](const auto &bf) {
+            if (bf.get_angular_momentum() == angular_momentum) bf_index(bf);
+        });
+    });
 
     return ao_indices;
 }

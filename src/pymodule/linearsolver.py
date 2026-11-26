@@ -40,6 +40,7 @@ import sys
 import h5py
 
 from .veloxchemlib import T4CScreener
+from .veloxchemlib import release_free_memory
 from .veloxchemlib import MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, hartree_in_ev
 from .veloxchemlib import rotatory_strength_in_cgs
@@ -47,7 +48,16 @@ from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
-from .rifockdriver import RIFockDriver
+from .riresponse import print_ri_memory_check
+from .riresponse import check_ri_jk_not_lent
+from .riresponse import release_ri_jk
+from .riresponse import release_ri_j
+from .rijkresponse import initialize_ri_jk
+from .rijkresponse import ri_jk_fock_matrices
+from .rijkresponse import ri_jk_fock_matrices_unrestricted
+from .rijresponse import initialize_ri_j
+from .rijresponse import ri_j_coulomb_matrices
+from .rijresponse import ri_j_coulomb_matrices_unrestricted
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -56,21 +66,37 @@ from .oneeints import (compute_electric_dipole_integrals,
                        compute_quadrupole_integrals,
                        compute_linear_momentum_integrals,
                        compute_angular_momentum_integrals)
-from .sanitychecks import (dft_sanity_check, ri_sanity_check, pe_sanity_check,
+from .sanitychecks import (dft_and_ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check,
                            gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
+from .fikaembedding import fika_embedding_text
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel, unparse_input,
                           write_unparsed_input_to_hdf5,
                           read_unparsed_input_from_hdf5)
-from .dftutils import get_default_grid_level, print_xc_reference
+from .dftutils import (get_default_grid_level, get_optimal_grid_box_size,
+                       print_xc_reference, get_response_fock_xc_density_memory,
+                       get_response_fock_xc_call_memory)
 from .checkpoint import write_rsp_hdf5
-from .batchsize import get_batch_size
+from .batchsize import get_four_center_batch_size
+from .batchsize import get_ri_batch_size
+from .batchsize import get_ri_density_memory
 from .batchsize import get_number_of_batches
 from .cpcmdriver import CpcmDriver
 from .gostshypdriver import GostshypDriver
+
+# NOTE: the matrices of n_ao by n_ao which _e2n_half_size_single_comm holds on
+# the master for each density of a batch while it splits the Fock matrices:
+# the density (dks), the matrix of the trial vector (kns), the Fock matrix the
+# build returns, and for a general trial vector the gerade and ungerade parts
+# of the Fock matrix (raw_fock_ger, raw_fock_ung) and of the trial vector
+# matrix (raw_kns_ger, raw_kns_ung). A gerade or an ungerade trial vector holds
+# one of each pair. _e2n_half_size_single_comm_unrestricted holds these for
+# each spin.
+_RI_BATCH_MATRICES = 7
+_RI_BATCH_MATRICES_UNRESTRICTED = 14
 
 
 class LinearSolver:
@@ -88,6 +114,8 @@ class LinearSolver:
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
+        - xc_screening_threshold: The value a basis function must reach over a
+          grid box to be kept for it.
         - pe: The flag for running polarizable embedding calculation.
         - pe_options: The dictionary with options for polarizable embedding.
         - electric_field: The static electric field.
@@ -121,6 +149,14 @@ class LinearSolver:
         - dist_fock_ung: The distributed ungerade Fock matrices in MO.
     """
 
+    # NOTE: the attributes a deepcopy leaves as the constructor sets them: the
+    # simd RI drivers, which have no copy in Python, what describes the B
+    # vectors of the RI-JK one, and whether they are lent or borrowed (see
+    # riresponse.lend_ri). Read by the __deepcopy__ of the eigensolver bases.
+    _ri_not_copied = ('_ri_drv', '_ri_jk_drv', '_ri_jk_response_drv',
+                      '_ri_jk_aux_basis', '_ri_jk_memory', '_ri_jk_lent',
+                      '_ri_jk_borrowing')
+
     def __init__(self, comm, ostream):
         """
         Initializes linear solver to default setup.
@@ -131,15 +167,61 @@ class LinearSolver:
         self.batch_size = None
 
         # RI-J
+        self.ri = True
         self.ri_coulomb = False
         self.ri_jk = False
-        self.ri_auxiliary_basis = 'def2-universal-jfit'
+        # NOTE: None takes the auxiliary basis set of the RI kind used
+        # (sanitychecks.get_ri_auxiliary_basis).
+        self.ri_auxiliary_basis = None
         self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
+
+        # NOTE: whether the SCF this response is formed on fell back from RI to
+        # the four-center integrals, for want of memory or, with RI-JK, for the
+        # number of atoms. It is read from the SCF results, and ri, ri_coulomb
+        # and ri_jk are left as they were set.
+        self._ri_fallback = False
+
+        # NOTE: whether the SCF this response is formed on was asked to use RI
+        # whatever memory it needs (ScfDriver.force_ri). It is read from the
+        # SCF results, and the response then uses RI whatever memory it is
+        # predicted to need as well.
+        self._force_ri = False
+
+        # NOTE: the memory the simd RI driver of a rank may hold, in GB, taken as
+        # it is; None takes what is free less the reserves. An attribute and not
+        # an input keyword, as for the gradient's budget. The SCF's
+        # ri_memory_budget is not handed on to response.
+        self.ri_memory_budget = None
+
+        # NOTE: whether this response fell back from RI to the four-center
+        # integrals for want of memory of its own, and what the build was
+        # checked with. RI-JK's is decided with the B vectors at the start of
+        # each calculation and lent with them (riresponse.lend_ri); RI-J's is
+        # decided again whenever the integrals are.
+        self._ri_jk_fallback = False
+        self._ri_jk_memory = None
+        self._ri_j_fallback = False
+        self._ri_j_memory = None
+
+        # NOTE: whether this solver's RI-JK B vectors are lent to a solver it
+        # drives, and whether the ones it holds are borrowed from the driver
+        # that drives it, for the duration of one compute (riresponse.lend_ri).
+        self._ri_jk_lent = False
+        self._ri_jk_borrowing = False
+
+        # NOTE: the resolution of the identity for response needs a fitting basis
+        # for the exchange as well as the Coulomb. The default above fits the
+        # Coulomb alone, so a calculation which turns on ri_jk has to name a jkfit
+        # basis and is refused if it does not.
+        self._ri_jk_drv = None
+        self._ri_jk_response_drv = None
+        self._ri_jk_aux_basis = None
 
         # dft
         self.xcfun = None
         self.grid_level = None
+        self.xc_screening_threshold = None
         self._dft = False
 
         # polarizable embedding
@@ -241,6 +323,9 @@ class LinearSolver:
         self._input_keywords = {
             'response': {
                 'eri_thresh': ('float', 'ERI screening threshold'),
+                'xc_screening_threshold':
+                    ('float', 'value a basis function must reach over a grid '
+                     'box to be kept for it'),
                 'batch_size': ('int', 'batch size for Fock build'),
                 'conv_thresh': ('float', 'convergence threshold'),
                 'max_iter': ('int', 'maximum number of iterations'),
@@ -261,14 +346,15 @@ class LinearSolver:
                 'print_level': ('int', 'verbosity of output (1-3)'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
-                '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
                 'non_equilibrium_solv':
                     ('bool',
                      'toggle use of non-equilibrium solvation for response'),
             },
             'method_settings': {
+                'ri': ('bool', 'use RI approximation'),
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
-                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
+                'ri_jk': ('bool', 'use RI-JK approximation'),
+                'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
@@ -390,9 +476,7 @@ class LinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
-        ri_sanity_check(self)
-
-        dft_sanity_check(self, 'update_settings')
+        dft_and_ri_sanity_check(self, 'update_settings')
 
         pe_sanity_check(self, method_dict)
 
@@ -553,7 +637,7 @@ class LinearSolver:
         return (checkpoint_rsp_input == current_rsp_input and
                 checkpoint_method_input == current_method_input)
 
-    def _init_eri(self, molecule, basis):
+    def _init_eri(self, molecule, basis, reuse_ri=False):
         """
         Initializes ERI.
 
@@ -561,15 +645,17 @@ class LinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
+        :param reuse_ri:
+            True where the RI-JK B vectors or the RI-J driver, or the fallback
+            of either, were set up earlier in the same calculation and are used
+            again (see rijkresponse.initialize_ri_jk and
+            rijresponse.initialize_ri_j).
 
         :return:
             The dictionary of ERI information.
         """
 
-        # TODO: enable RI-JK
-        assert_msg_critical(
-            not self.ri_jk,
-            f'{type(self).__name__}.compute: RI-JK is not yet supported')
+        # NOTE: only the simd driver has a response path.
 
         if self.rank == mpi_master():
             screening = T4CScreener()
@@ -578,16 +664,276 @@ class LinearSolver:
             screening = None
         screening = self.comm.bcast(screening, root=mpi_master())
 
-        if self.ri_coulomb:
-            self._ri_drv = RIFockDriver(self.comm, self.ostream)
-            self._ri_drv.prepare_buffers(molecule,
-                                         basis,
-                                         self.ri_auxiliary_basis,
-                                         verbose=True)
+        asks_ri_coulomb = (self.ri_coulomb and self._dft and
+                           self.xcfun is not None and
+                           not self.xcfun.is_hybrid())
+        asks_ri_jk = self.ri_jk and not asks_ri_coulomb
+
+        self._print_ri_fallback_info(asks_ri_coulomb, asks_ri_jk)
+
+        if asks_ri_coulomb and not self._ri_fallback:
+            initialize_ri_j(self, molecule, basis, reuse_ri)
+
+        # NOTE: not gated on _uses_ri_jk(), which reads this response's own
+        # fallback: that is decided again by rijkresponse.initialize_ri_jk at
+        # the start of each calculation, and one left from an earlier
+        # calculation would otherwise keep it from being decided again.
+        if asks_ri_jk and not self._ri_fallback:
+            self._init_simd_ri_jk(molecule, basis, reuse_ri)
 
         return {
             'screening': screening,
         }
+
+    def _uses_ri_jk(self):
+        """
+        Checks whether the Fock matrices are formed with the SIMD RI-JK driver,
+        which is what ri_jk asks for unless the SCF fell back to the
+        four-center integrals, for want of memory or for the number of atoms,
+        or this response did, for want of memory.
+
+        :return:
+            True if the SIMD RI-JK driver forms the Fock matrices.
+        """
+
+        return (self.ri_jk and not self._ri_fallback and
+                not self._ri_jk_fallback)
+
+    def _uses_ri_coulomb(self):
+        """
+        Checks whether the Coulomb matrices are formed with the SIMD RI-J
+        driver, which is what ri_coulomb asks for unless the SCF or this
+        response fell back to the four-center integrals for want of memory.
+
+        :return:
+            True if the SIMD RI-J driver forms the Coulomb matrices.
+        """
+
+        return (self.ri_coulomb and not self._ri_fallback and
+                not self._ri_j_fallback)
+
+    def _disable_subcomms_for_ri(self):
+        """
+        Turns use_subcomms off, with a warning, when the Fock matrices of the
+        response are formed with RI-J or RI-JK. Called by the sigma builds of
+        this class (_e2n_half_size) and of CphfSolver (build_sigmas) before
+        they choose between the single communicator and the subcommunicators.
+        """
+
+        # NOTE: each rank holds a share of the auxiliary basis, set up on this
+        # solver's communicator: RI-J fits the parts of owned_parts(), RI-JK
+        # uses its share of the B vectors. _comp_lr_fock sums the shares over
+        # the communicator it is given, so a Fock build on a subcommunicator
+        # sums the shares of that subcommunicator alone, which with more than
+        # one rank is not the whole auxiliary basis. The subcommunicator path
+        # of this class (_e2n_half_size_subcomms) also builds no density
+        # factors, and _comp_lr_fock without them forms the RI-JK Fock
+        # matrices from the four-center integrals, on top of an RI ground
+        # state, on any number of ranks. The subcommunicators are turned off
+        # on one rank as well, so the setting behaves the same on any number
+        # of ranks.
+        # TODO: enable subcomms for RI-J and RI-JK
+        if self.use_subcomms and self._uses_ri_coulomb():
+            self.use_subcomms = False
+            warn_msg = 'Use of subcomms is disabled for RI-J.'
+            self.ostream.print_warning(warn_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        if self.use_subcomms and self._uses_ri_jk():
+            self.use_subcomms = False
+            warn_msg = 'Use of subcomms is disabled for RI-JK.'
+            self.ostream.print_warning(warn_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+    def _get_excitation_orbital_indices(self, nocc, norb):
+        """
+        Gets the orbitals the trial vectors excite between, in the order
+        lrvec2mat lays them out.
+
+        :param nocc:
+            The number of occupied orbitals (of one spin).
+        :param norb:
+            The number of orbitals.
+
+        :return:
+            The indices of the occupied orbitals the trial vectors excite from
+            and of the virtual orbitals they excite to: the core orbitals and
+            every virtual one for core excitation; the core and the highest
+            valence orbitals and the lowest virtual ones for a restricted
+            subspace; every occupied and every virtual orbital otherwise.
+        """
+
+        if getattr(self, 'core_excitation', False):
+            occ_inds = list(range(self.num_core_orbitals))
+            vir_inds = list(range(nocc, norb))
+        elif getattr(self, 'restricted_subspace', False):
+            occ_inds = (list(range(self.num_core_orbitals)) +
+                        list(range(nocc - self.num_valence_orbitals, nocc)))
+            vir_inds = list(range(nocc, nocc + self.num_virtual_orbitals))
+        else:
+            occ_inds = list(range(nocc))
+            vir_inds = list(range(nocc, norb))
+
+        return occ_inds, vir_inds
+
+    def _ri_density_memory(self, molecule, basis, dft_dict, n_ao, n_matrices,
+                           n_factor_columns, n_sliced):
+        """
+        Gets the memory the solver holds on the master rank for each density
+        of an RI Fock build, as get_ri_batch_size takes it. Called on the
+        master only.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param dft_dict:
+            The dictionary of DFT information.
+
+        The other parameters are those of batchsize.get_ri_density_memory.
+
+        :return:
+            The memory in bytes.
+        """
+
+        xc_density_memory = get_response_fock_xc_density_memory(
+            molecule, basis, dft_dict, self.xcfun if self._dft else None,
+            self.xc_screening_threshold)
+
+        return get_ri_density_memory(n_ao, n_matrices, n_factor_columns,
+                                     n_sliced, xc_density_memory)
+
+    def _xc_call_memory(self, molecule, basis, dft_dict, open_shell):
+        """
+        Gets the memory a Fock build holds on the master rank once, whatever
+        the number of its densities, as get_ri_batch_size and
+        get_four_center_batch_size take it: that of the exchange-correlation
+        integration. Called on the master only.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param dft_dict:
+            The dictionary of DFT information.
+        :param open_shell:
+            True where the build integrates open-shell densities.
+
+        :return:
+            The memory in bytes.
+        """
+
+        return get_response_fock_xc_call_memory(
+            molecule, basis, dft_dict, self.xcfun if self._dft else None,
+            open_shell, self.xc_screening_threshold)
+
+    def _note_ri_batch_memory(self, density_memory, ndens):
+        """
+        Records, for memory profiling, the most the solver held on the master
+        rank for the densities of one batch of an RI build.
+
+        :param density_memory:
+            The memory of one density, as get_ri_batch_size took it; None away
+            from the master rank, where nothing is recorded.
+        :param ndens:
+            The densities of the batch.
+        """
+
+        if density_memory is not None:
+            self._ri_batch_memory = max(getattr(self, '_ri_batch_memory', 0),
+                                        density_memory * ndens)
+
+    def release_ri(self):
+        """
+        Releases the RI set the solver formed for its solve: the RI-JK B
+        vectors or the RI-J driver, and the fallback of either. Its results
+        are kept; a solver computed again sets up its RI anew. The CPHF
+        drivers call this once they have taken cphf_results and, where they
+        compute it, omega; after it, compute_omega stops with an error before
+        any work, until compute is run again. A solver whose B vectors are
+        lent out or borrowed (riresponse.lend_ri) is refused. Every rank must
+        call this.
+        """
+
+        check_ri_jk_not_lent(self)
+
+        assert_msg_critical(
+            not self._ri_jk_borrowing,
+            f'{type(self).__name__}.release_ri: its RI-JK B vectors are ' +
+            'borrowed from the driver that computes it (riresponse.lend_ri)')
+
+        release_ri_jk(self)
+        release_ri_j(self)
+
+        # NOTE: the RI-JK B vectors are freed in blocks the allocator may keep
+        # resident, and release_ri_jk does not return them; they are returned
+        # here (release_ri_j returns the RI-J integrals itself).
+        release_free_memory()
+
+    def _release_freed_memory(self):
+        """
+        Returns the memory the allocator holds free to the system. Each solver
+        calls this once at the end of its solve, after it has dropped its trial
+        and sigma vectors (the TDA solvers keep theirs in self.solver, and
+        CphfSolver.compute calls it after compute_subspace_solver returns),
+        not after every iteration.
+        """
+
+        # NOTE: the memory a solve frees is partly in pieces the allocator
+        # keeps rather than returns. Kept, it stays resident, and what runs
+        # next reads it as memory in use and takes a smaller batch or RI
+        # budget.
+        release_free_memory()
+
+    def _print_ri_memory_check(self):
+        """
+        Prints, with memory profiling, the most the simd RI driver was
+        predicted to reach against the growth of each rank's peak after it was
+        set up. Every rank must call this.
+        """
+
+        print_ri_memory_check(self)
+
+    def _print_ri_fallback_info(self, asks_ri_coulomb, asks_ri_jk):
+        """
+        Prints that response follows the SCF to the four-center integrals,
+        where RI was asked for and the SCF fell back.
+
+        :param asks_ri_coulomb:
+            Whether the settings ask for RI-J.
+        :param asks_ri_jk:
+            Whether the settings ask for RI-JK.
+        """
+
+        if not self._ri_fallback or not (asks_ri_coulomb or asks_ri_jk):
+            return
+
+        # NOTE: response follows the ground state it is handed. RI on top of a
+        # four-center SCF would be the response of a different energy. The SCF
+        # has already warned, so this is an info line.
+        label = 'RI-J' if asks_ri_coulomb else 'RI-JK'
+        self.ostream.print_info(
+            f'The SCF formed its Fock matrices without {label}, so the ' +
+            'response Fock matrices are formed from the four-center integrals.')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def _init_simd_ri_jk(self, molecule, basis, reuse=False):
+        """
+        Forms the B vectors the simd RI-JK response driver contracts.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param reuse:
+            True where they were formed earlier in the same calculation and
+            are used again (see rijkresponse.initialize_ri_jk).
+        """
+
+        initialize_ri_jk(self, molecule, basis, reuse)
 
     def _init_dft(self, molecule, scf_results, silent=False):
         """
@@ -610,6 +956,15 @@ class LinearSolver:
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
+
+            if self.rank == mpi_master():
+                nbf = scf_results['C_alpha'].shape[0]
+            else:
+                nbf = None
+            nbf = self.comm.bcast(nbf, root=mpi_master())
+            self._xcfun_ldstaging = get_optimal_grid_box_size(nbf)
+            # update leading dimension (max batch size for DFT grid)
+            self.xcfun._set_leading_dimension(self._xcfun_ldstaging)
 
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule, self._xcfun_ldstaging)
@@ -645,6 +1000,24 @@ class LinearSolver:
             'dft_func_label': dft_func_label,
         }
 
+    def _compute_pe_fock(self, density_matrix, comm):
+        """
+        Computes the embedding Fock contribution of a response density.
+
+        :param density_matrix:
+            The total (alpha + beta) response density matrix.
+        :param comm:
+            The communicator of the Fock build (a subcommunicator when the
+            densities are distributed); the fika embedding is computed on
+            its master rank.
+
+        :return:
+            The Fock contribution (on the master rank of the communicator).
+        """
+
+        return self._embedding_drv.compute_pe_contributions(
+            density_matrix=density_matrix, comm=comm)
+
     def _init_pe(self, molecule, basis, silent=False):
         """
         Initializes polarizable embedding.
@@ -658,32 +1031,21 @@ class LinearSolver:
             The dictionary of polarizable embedding information.
         """
 
+        potfile_text = ''
+
         if self._pe:
-            assert_msg_critical(
-                self.embedding['settings']['embedding_method'] == 'PE',
-                'PolarizableEmbedding: Invalid embedding_method. Only PE is supported.'
-            )
+            from .fikaembedding import FikaEmbeddingLRS
 
-            from .embedding import PolarizableEmbeddingLRS
-
-            self._embedding_drv = PolarizableEmbeddingLRS(
-                molecule=molecule,
-                ao_basis=basis,
-                options=self.embedding,
-                comm=self.comm)
-
-            # TODO: print PyFraME info
-
+            self._embedding_drv = FikaEmbeddingLRS(molecule=molecule,
+                                                   ao_basis=basis,
+                                                   options=self.embedding,
+                                                   comm=self.comm,
+                                                   conv_thresh=self.conv_thresh)
             if not silent:
-                pot_info = 'Reading polarizable embedding: {}'.format(
-                    self.pe_options['potfile'])
-                self.ostream.print_info(pot_info)
+                for line in self._embedding_drv.get_info():
+                    self.ostream.print_info(line)
                 self.ostream.print_blank()
-
-            with open(str(self.pe_options['potfile']), 'r') as f_pot:
-                potfile_text = '\n'.join(f_pot.readlines())
-        else:
-            potfile_text = ''
+            potfile_text = fika_embedding_text(self.embedding)
 
         return {
             'potfile_text': potfile_text,
@@ -922,6 +1284,48 @@ class LinearSolver:
                 self.guess_scaling_threshold * self.initial_guess_multiplier +
                 (nstates - self.guess_scaling_threshold))
 
+    @staticmethod
+    def _get_num_refined_roots(ritz_values, nstates, num_extra_roots,
+                               cluster_thresh, max_cluster_roots):
+        """
+        Gets the number of lowest Ritz roots that receive new trial vectors in
+        a Davidson iteration of the excited-state eigensolvers.
+
+        The Ritz values of the first iterations can be ordered differently
+        from the converged excitation energies. A state whose Ritz value lies
+        above root nstates receives no new trial vectors when only nstates
+        roots are refined, and the solver can converge without it. The
+        num_extra_roots roots above nstates are therefore refined as well.
+        While the next root lies within cluster_thresh of the last refined
+        root, it is refined too, up to max_cluster_roots more roots, so that a
+        near-degenerate group is not split at that point. The callers judge
+        convergence on the nstates requested roots only.
+
+        :param ritz_values:
+            The Ritz values in ascending order.
+        :param nstates:
+            The number of requested states.
+        :param num_extra_roots:
+            The number of roots refined above nstates.
+        :param cluster_thresh:
+            The largest difference (in Hartree) between neighbouring Ritz
+            values that extends the refined roots.
+        :param max_cluster_roots:
+            The largest number of roots added by that extension.
+
+        :return:
+            The number of refined roots.
+        """
+
+        nroots = min(nstates + num_extra_roots, len(ritz_values))
+        nroots_max = min(nroots + max_cluster_roots, len(ritz_values))
+
+        while (nroots < nroots_max and
+               ritz_values[nroots] - ritz_values[nroots - 1] < cluster_thresh):
+            nroots += 1
+
+        return nroots
+
     def _get_excitation_space_dimension_restricted(self, nocc, norb):
         """
         Gets the excitation-space dimension for restricted methods.
@@ -1116,14 +1520,7 @@ class LinearSolver:
             not (self.use_subcomms and self._gostshyp),
             'LinearSolver: Cannot use subcomms with GOSTSHYP')
 
-        if self.use_subcomms and self.ri_coulomb:
-            self.use_subcomms = False
-            warn_msg = 'Use of subcomms is disabled for RI-J.'
-            self.ostream.print_warning(warn_msg)
-            self.ostream.print_blank()
-            self.ostream.flush()
-
-        # TODO: enable subcomms for RI-J
+        self._disable_subcomms_for_ri()
 
         if self.use_subcomms:
             if method_type == 'restricted':
@@ -1204,6 +1601,19 @@ class LinearSolver:
                 vecs_ger.shape(0) == vecs_ung.shape(0),
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
+
+            # NOTE: the build is written for arrays of real numbers on every
+            # path. Every solver which reaches here stores its trial vectors so
+            # (the damped response stores a complex vector as its real and
+            # imaginary parts). An array of complex numbers would lose its
+            # imaginary part in the four-center build without an error, so it
+            # is refused here.
+            assert_msg_critical(
+                not np.iscomplexobj(vecs_ger.data) and
+                not np.iscomplexobj(vecs_ung.data),
+                'LinearSolver: the trial vectors have to be arrays of real ' +
+                'numbers (complex ones as their real and imaginary parts), ' +
+                'not arrays of complex numbers')
 
             mo = scf_results['C_alpha']
             fa = scf_results['F_alpha']
@@ -1554,8 +1964,9 @@ class LinearSolver:
 
                         # Note: fak_mo_vec uses full MO coefficients matrix since
                         # it is only for fock_ger/fock_ung in nonlinear response
-                        fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
-                                                          mo]).reshape(norb**2)
+                        if self.nonlinear:
+                            fak_mo_vec = np.linalg.multi_dot(
+                                [mo.T, fak, mo]).reshape(norb**2)
 
                         if ifock < batch_ger:
                             e2_ger[:, ifock] = -gmo_vec_halfsize
@@ -1708,6 +2119,19 @@ class LinearSolver:
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
+            # NOTE: the build is written for arrays of real numbers on every
+            # path. Every solver which reaches here stores its trial vectors so
+            # (the damped response stores a complex vector as its real and
+            # imaginary parts). An array of complex numbers would lose its
+            # imaginary part in the four-center build without an error, so it
+            # is refused here.
+            assert_msg_critical(
+                not np.iscomplexobj(vecs_ger.data) and
+                not np.iscomplexobj(vecs_ung.data),
+                'LinearSolver: the trial vectors have to be arrays of real ' +
+                'numbers (complex ones as their real and imaginary parts), ' +
+                'not arrays of complex numbers')
+
             mo = scf_results['C_alpha']
             fa = scf_results['F_alpha']
 
@@ -1736,7 +2160,36 @@ class LinearSolver:
 
         n_total = n_general + n_extra_ger + n_extra_ung
 
-        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        # NOTE: the exchange-correlation integration holds this once for
+        # each build, whatever the number of its densities; both kinds of
+        # build take it off the room.
+        call_memory = None
+
+        if self.rank == mpi_master():
+            call_memory = self._xc_call_memory(molecule, basis, dft_dict,
+                                               False)
+
+        if self._uses_ri_jk() or self._uses_ri_coulomb():
+            # NOTE: an RI-JK build also holds the two right factors of each
+            # density (ri_jk_factors below), n_ao by the occupied orbitals the
+            # trial vectors excite from: nocc, or fewer for core excitation or
+            # a restricted subspace, which nocc bounds.
+            density_memory = None
+
+            if self.rank == mpi_master():
+                density_memory = self._ri_density_memory(
+                    molecule, basis, dft_dict, n_ao, _RI_BATCH_MATRICES,
+                    2 * nocc if self._uses_ri_jk() else 0, 1)
+
+            batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
+                                           density_memory, self.comm,
+                                           call_memory)
+            self._note_ri_batch_memory(density_memory,
+                                       min(batch_size, n_total))
+        else:
+            batch_size = get_four_center_batch_size(self.batch_size, n_total,
+                                                    n_ao, self.comm,
+                                                    call_memory)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         if profiler is not None:
@@ -1779,6 +2232,18 @@ class LinearSolver:
                 kns = []
             else:
                 dks = None
+            # NOTE: the factors of the densities, collected beside them. None where
+            # this way of building cannot be taken, and then nothing looks for them.
+            # The left factor is the occupied orbitals the trial vectors excite
+            # from, which are fewer than all of them where core excitation or a
+            # restricted subspace is asked for.
+            ri_jk_factors = None
+
+            if self.rank == mpi_master() and self._uses_ri_jk():
+                occ_inds, vir_inds = self._get_excitation_orbital_indices(
+                    nocc, norb)
+                mo_vir_exc = mo[:, vir_inds]
+                ri_jk_factors = (mo[:, occ_inds], [], [])
 
             prep_t0 = tm.time()
 
@@ -1851,6 +2316,26 @@ class LinearSolver:
                         dak = self.commut_mo_density(kn, nocc)
                         dak = np.linalg.multi_dot([mo, dak, mo.T])
 
+                    # NOTE: the same density as the factors it is made of,
+                    # which the resolution of the identity wants and the dense
+                    # path does not. lrvec2mat lays the excitation part out
+                    # between the occupied orbitals the trial vectors excite
+                    # from and the virtual ones they excite to, in each mode,
+                    # and the commutator leaves those occupied orbitals on the
+                    # left of the excitation part and on the right of the
+                    # de-excitation part. So the density is C(occupied) times
+                    # the first factor transposed plus the second factor times
+                    # C(occupied) transposed, and one transformation of the
+                    # occupied orbitals serves both.
+                    if ri_jk_factors is not None:
+                        n_occ_exc = len(occ_inds)
+                        n_vir_exc = len(vir_inds)
+                        n_ov = n_occ_exc * n_vir_exc
+                        zmat = vec[:n_ov].reshape(n_occ_exc, n_vir_exc)
+                        ymat = vec[n_ov:].reshape(n_occ_exc, n_vir_exc)
+                        ri_jk_factors[1].append(-np.matmul(mo_vir_exc, zmat.T))
+                        ri_jk_factors[2].append(np.matmul(mo_vir_exc, ymat.T))
+
                     dks.append(dak)
                     kns.append(kn)
 
@@ -1860,7 +2345,8 @@ class LinearSolver:
             # form Fock matrices
 
             fock = self._comp_lr_fock(dks, molecule, basis, eri_dict, dft_dict,
-                                      pe_dict, profiler)
+                                      pe_dict, profiler,
+                                      dens_factors=ri_jk_factors)
 
             if profiler is not None:
                 # only increment FockCount on master rank
@@ -1961,8 +2447,9 @@ class LinearSolver:
 
                     # Note: fak_mo_vec uses full MO coefficients matrix since
                     # it is only for fock_ger/fock_ung in nonlinear response
-                    fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
-                                                      mo]).reshape(norb**2)
+                    if self.nonlinear:
+                        fak_mo_vec = np.linalg.multi_dot(
+                            [mo.T, fak, mo]).reshape(norb**2)
 
                     if ifock < batch_ger:
                         e2_ger[:, ifock] = -gmo_vec_halfsize
@@ -2024,7 +2511,9 @@ class LinearSolver:
                       dft_dict,
                       pe_dict,
                       profiler=None,
-                      comm=None):
+                      comm=None,
+                      dens_factors=None,
+                      cpcm_non_equilibrium=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -2042,6 +2531,18 @@ class LinearSolver:
             The dictionary containing PE information.
         :param profiler:
             The profiler.
+        :param dens_factors:
+            The densities as the factors they were made from: a left factor which
+            the batch shares and one right factor for each density, so that
+            dens[i] is left times rights[i] transposed. Only the resolution of the
+            identity uses them, and only because the exchange of a factorised
+            density costs the basis squared where the exchange of the same density
+            as a matrix costs the basis cubed. None where the caller has not
+            formed them, and the dense path is taken.
+        :param cpcm_non_equilibrium:
+            Whether the C-PCM response of a density uses the optical
+            dielectric constant: one bool for all densities, or one for each
+            density; None for non_equilibrium_solv of the solver.
 
         :return:
             The Fock matrix (2e part).
@@ -2063,6 +2564,14 @@ class LinearSolver:
         gs_dm_gost = self._gostshyp_gs_density
         tessellation_settings = self._gostshyp_tess_info
 
+        # NOTE: FockComm is the time of the broadcast of the densities and of
+        # the reduction of the Fock matrices. A rank which finishes its share
+        # of the Fock matrices before the others waits for them in the
+        # reduction, unless a collective inside the build (the RI-J fitting)
+        # made it wait there already, so on more than one rank FockComm holds
+        # that wait as well as the transfer.
+        comm_t0 = tm.time()
+
         if comm_rank == mpi_master():
             num_densities = len(dens)
         else:
@@ -2074,6 +2583,18 @@ class LinearSolver:
 
         for idx in range(num_densities):
             dens[idx] = comm.bcast(dens[idx], root=mpi_master())
+
+        # NOTE: **the factors are broadcast as the densities are.** They are built
+        # on the master rank alone, and were left there: a rank which found none
+        # took `use_ri_jk` to be false, built its share of the densities the four
+        # centre way instead, and the reduction below added that four centre share
+        # to the master's fitted whole. What came back was a Fock matrix of neither
+        # method, and on two ranks it turned the lowest excitation energies of water
+        # negative without any complaint.
+        dens_factors = comm.bcast(dens_factors, root=mpi_master())
+
+        if profiler is not None:
+            profiler.add_timing_info('FockComm', tm.time() - comm_t0)
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
@@ -2105,26 +2626,45 @@ class LinearSolver:
 
         fock_arrays = []
 
-        for idx in range(num_densities):
+        # NOTE: the resolution of the identity takes the whole batch at once, as
+        # the left factor is transformed once for all of it, so it replaces the
+        # loop rather than sitting inside it.
+        use_ri_jk = (self._uses_ri_jk() and fock_type != 'j' and
+                     dens_factors is not None)
+
+        # NOTE: the simd Coulomb only driver takes the whole batch too, for a
+        # reason of its own: every density is fitted against the same integrals,
+        # and the one thing the ranks have to exchange is the right hand side of
+        # each fitting. Gathered into one array and reduced once, that is a single
+        # collective for the batch where a density at a time would be one each.
+        use_ri_coulomb = (self._uses_ri_coulomb() and fock_type == 'j')
+
+        if use_ri_coulomb:
+            fock_arrays = ri_j_coulomb_matrices(self, dens, comm)
+
+        elif use_ri_jk:
+            # NOTE: a hybrid range-separated functional has its attenuated
+            # exchange subtracted inside the same call, in the same pass over the
+            # auxiliary basis. The four-centre correction further down is not
+            # reached for this path at all: it sits inside the loop over the
+            # densities, and that loop runs zero times here.
+            fock_arrays = self._comp_ri_jk_fock(
+                basis, dens_factors, exchange_scaling_factor,
+                erf_k_coef if need_omega else 0.0)
+
+        for idx in range(0 if (use_ri_jk or use_ri_coulomb) else num_densities):
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
                     'LinearSolver: RI is only applicable to pure DFT functional'
                 )
 
-            if self.ri_coulomb and fock_type == 'j':
-                # symmetrize density for RI-J
-                den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
-                den_mat_for_ri_j.set_values(0.5 * (dens[idx] + dens[idx].T))
+            den_mat_for_fock = make_matrix(basis, mat_t.general)
+            den_mat_for_fock.set_values(dens[idx])
 
-                fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
-            else:
-                den_mat_for_fock = make_matrix(basis, mat_t.general)
-                den_mat_for_fock.set_values(dens[idx])
-
-                fock_mat = fock_drv.compute(screening, den_mat_for_fock,
-                                            fock_type, exchange_scaling_factor,
-                                            0.0, thresh_int)
+            fock_mat = fock_drv.compute(screening, den_mat_for_fock,
+                                        fock_type, exchange_scaling_factor,
+                                        0.0, thresh_int)
 
             fock_np = fock_mat.to_numpy()
             fock_mat = Matrix()
@@ -2155,6 +2695,10 @@ class LinearSolver:
                     comm.Get_rank(), comm.Get_size())
 
             xc_drv = XCIntegrator()
+
+            if self.xc_screening_threshold is not None:
+                xc_drv.set_screening_threshold(self.xc_screening_threshold)
+
             xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis, dens,
                                       gs_density, molgrid, self.xcfun)
 
@@ -2166,8 +2710,7 @@ class LinearSolver:
             for idx in range(num_densities):
                 # Note: only closed shell density for now
                 dm = dens[idx] * 2.0
-                V_emb = self._embedding_drv.compute_pe_contributions(
-                    density_matrix=dm)
+                V_emb = self._compute_pe_fock(dm, comm)
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += V_emb
 
@@ -2178,10 +2721,19 @@ class LinearSolver:
 
             t0 = tm.time()
 
+            if cpcm_non_equilibrium is None:
+                cpcm_non_equilibrium = self.non_equilibrium_solv
+            if isinstance(cpcm_non_equilibrium, (bool, np.bool_)):
+                cpcm_non_equilibrium = [cpcm_non_equilibrium] * num_densities
+            assert_msg_critical(
+                len(cpcm_non_equilibrium) == num_densities,
+                f'{type(self).__name__}._comp_lr_fock: expected one ' +
+                'cpcm_non_equilibrium for each density')
+
             for idx in range(num_densities):
                 Fock_sol = self.cpcm_drv.compute_response_fock(
                     molecule, basis, dens[idx] * 2.0, self.cpcm_cg_thresh,
-                    self.non_equilibrium_solv)
+                    cpcm_non_equilibrium[idx])
 
                 if comm_rank == mpi_master():
                     fock_arrays[idx] += Fock_sol
@@ -2209,13 +2761,46 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockGOST', tm.time() - t0)
 
+        comm_t0 = tm.time()
+
         for idx in range(len(fock_arrays)):
             fock_arrays[idx] = comm.reduce(fock_arrays[idx], root=mpi_master())
+
+        if profiler is not None:
+            profiler.add_timing_info('FockComm', tm.time() - comm_t0)
 
         if comm_rank == mpi_master():
             return fock_arrays
         else:
             return None
+
+    def _comp_ri_jk_fock(self,
+                         basis,
+                         dens_factors,
+                         exchange_scaling_factor,
+                         erf_exchange_scaling_factor=0.0):
+        """
+        Computes the two-electron part for a batch of factorised densities.
+
+        :param basis:
+            The AO basis set.
+        :param dens_factors:
+            The left factor the batch shares and the right factor of each density.
+        :param exchange_scaling_factor:
+            The fraction of exact exchange.
+        :param erf_exchange_scaling_factor:
+            The coefficient of the exchange of the attenuated operator, which is
+            the erf coefficient of a hybrid range-separated functional and zero for
+            every other calculation. It is subtracted as the plain exchange is, so
+            this is the same number the four-centre way is passed.
+
+        :return:
+            The Fock matrices as numpy arrays, one for each density.
+        """
+
+        return ri_jk_fock_matrices(self, basis, dens_factors,
+                                          exchange_scaling_factor,
+                                          erf_exchange_scaling_factor)
 
     def _comp_lr_fock_unrestricted(self,
                                    dens,
@@ -2225,7 +2810,8 @@ class LinearSolver:
                                    dft_dict,
                                    pe_dict,
                                    profiler=None,
-                                   comm=None):
+                                   comm=None,
+                                   dens_factors=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -2243,6 +2829,12 @@ class LinearSolver:
             The dictionary containing PE information.
         :param profiler:
             The profiler.
+        :param dens_factors:
+            The factors of each spin's densities, as a pair of them, or None where
+            the caller has only the densities themselves. The resolution of the
+            identity takes the whole batch at once from these; a caller which does
+            not have them -- the orbital response solvers hand this raw densities --
+            is served by the four-centre way below as it always was.
 
         :return:
             The Fock matrix (2e part).
@@ -2266,6 +2858,9 @@ class LinearSolver:
         gs_dm_gost = self._gostshyp_gs_density
         tessellation_settings = self._gostshyp_tess_info
 
+        # NOTE: FockComm is timed as in _comp_lr_fock.
+        comm_t0 = tm.time()
+
         if comm_rank == mpi_master():
             num_densities = len(dens_a)
         else:
@@ -2279,6 +2874,18 @@ class LinearSolver:
         for idx in range(num_densities):
             dens_a[idx] = comm.bcast(dens_a[idx], root=mpi_master())
             dens_b[idx] = comm.bcast(dens_b[idx], root=mpi_master())
+
+        # NOTE: **the factors are broadcast as the densities are.** They are built
+        # on the master rank alone, and were left there: a rank which found none
+        # took `use_ri_jk` to be false, built its share of the densities the four
+        # centre way instead, and the reduction below added that four centre share
+        # to the master's fitted whole. What came back was a Fock matrix of neither
+        # method, and on two ranks it turned the lowest excitation energies of water
+        # negative without any complaint.
+        dens_factors = comm.bcast(dens_factors, root=mpi_master())
+
+        if profiler is not None:
+            profiler.add_timing_info('FockComm', tm.time() - comm_t0)
 
         thresh_int = int(-math.log10(self.eri_thresh))
 
@@ -2310,54 +2917,69 @@ class LinearSolver:
 
         fock_arrays = []
 
-        for idx in range(num_densities):
+        # NOTE: the resolution of the identity takes the whole batch at once, as
+        # each spin's left factor is transformed once for all of it, so it replaces
+        # the loop rather than sitting inside it. The two spins share the Coulomb
+        # of their densities added and share nothing else, their occupied orbitals
+        # being neither the same orbitals nor the same number of them.
+        # NOTE: the simd Coulomb only driver takes the whole batch too, and the
+        # right hand sides of its fittings are reduced in one collective.
+        use_ri_coulomb = (self._uses_ri_coulomb() and fock_type == 'j')
+
+        use_ri_jk = (self._uses_ri_jk() and fock_type != 'j' and
+                     dens_factors is not None)
+
+        if use_ri_coulomb:
+            fock_arrays = ri_j_coulomb_matrices_unrestricted(
+                self, dens_a, dens_b, comm)
+
+        elif use_ri_jk:
+            # NOTE: a range-separated functional has its attenuated exchange
+            # subtracted inside the same call. The four-centre correction further
+            # down is not reached for this path: it sits inside the loop over the
+            # densities, and that loop runs zero times here.
+            factors_a, factors_b = dens_factors
+
+            fock_arrays = ri_jk_fock_matrices_unrestricted(
+                self, basis, factors_a, factors_b, exchange_scaling_factor,
+                erf_k_coef if need_omega else 0.0)
+
+        for idx in range(0 if (use_ri_jk or use_ri_coulomb) else num_densities):
             if self.ri_coulomb:
                 assert_msg_critical(
                     fock_type == 'j',
                     'LinearSolver: RI is only applicable to pure DFT functional'
                 )
 
-            if self.ri_coulomb and fock_type == 'j':
-                # TODO: double check
-                # symmetrize density for RI-J
-                den_mat_for_ri_j = make_matrix(basis, mat_t.symmetric)
-                dens_Jab = dens_a[idx] + dens_b[idx]
-                den_mat_for_ri_j.set_values(0.5 * (dens_Jab + dens_Jab.T))
+            # for now we calculate Ka, Kb and Jab separately for open-shell
+            den_mat_for_Ka = make_matrix(basis, mat_t.general)
+            den_mat_for_Ka.set_values(dens_a[idx])
 
-                fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
+            fock_mat = fock_drv.compute(screening, den_mat_for_Ka, 'kx',
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
+            K_a_np = fock_mat.to_numpy()
 
-                fock_mat_a_np = fock_mat.to_numpy()
-                fock_mat_b_np = fock_mat.to_numpy()
-            else:
-                # for now we calculate Ka, Kb and Jab separately for open-shell
-                den_mat_for_Ka = make_matrix(basis, mat_t.general)
-                den_mat_for_Ka.set_values(dens_a[idx])
+            den_mat_for_Kb = make_matrix(basis, mat_t.general)
+            den_mat_for_Kb.set_values(dens_b[idx])
 
-                fock_mat = fock_drv.compute(screening, den_mat_for_Ka, 'kx',
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
-                K_a_np = fock_mat.to_numpy()
+            fock_mat = fock_drv.compute(screening, den_mat_for_Kb, 'kx',
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
 
-                den_mat_for_Kb = make_matrix(basis, mat_t.general)
-                den_mat_for_Kb.set_values(dens_b[idx])
+            K_b_np = fock_mat.to_numpy()
 
-                fock_mat = fock_drv.compute(screening, den_mat_for_Kb, 'kx',
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
+            den_mat_for_Jab = make_matrix(basis, mat_t.general)
+            den_mat_for_Jab.set_values(dens_a[idx] + dens_b[idx])
 
-                K_b_np = fock_mat.to_numpy()
+            fock_mat = fock_drv.compute(screening, den_mat_for_Jab, 'j',
+                                        exchange_scaling_factor, 0.0,
+                                        thresh_int)
 
-                den_mat_for_Jab = make_matrix(basis, mat_t.general)
-                den_mat_for_Jab.set_values(dens_a[idx] + dens_b[idx])
+            J_ab_np = fock_mat.to_numpy()
 
-                fock_mat = fock_drv.compute(screening, den_mat_for_Jab, 'j',
-                                            exchange_scaling_factor, 0.0,
-                                            thresh_int)
-
-                J_ab_np = fock_mat.to_numpy()
-
-                fock_mat_a_np = J_ab_np - K_a_np
-                fock_mat_b_np = J_ab_np - K_b_np
+            fock_mat_a_np = J_ab_np - K_a_np
+            fock_mat_b_np = J_ab_np - K_b_np
 
             if need_omega:
                 # for range-separated functional
@@ -2396,6 +3018,10 @@ class LinearSolver:
                 dens_a_and_b.append(db)
 
             xc_drv = XCIntegrator()
+
+            if self.xc_screening_threshold is not None:
+                xc_drv.set_screening_threshold(self.xc_screening_threshold)
+
             xc_drv.integrate_fxc_fock(fock_arrays, molecule, basis,
                                       dens_a_and_b, gs_density, molgrid,
                                       self.xcfun)
@@ -2408,8 +3034,7 @@ class LinearSolver:
 
             for idx in range(num_densities):
                 dm = dens_a[idx] + dens_b[idx]
-                V_emb = self._embedding_drv.compute_pe_contributions(
-                    density_matrix=dm)
+                V_emb = self._compute_pe_fock(dm, comm)
 
                 if comm_rank == mpi_master():
                     fock_arrays[idx * 2 + 0] += V_emb
@@ -2458,11 +3083,16 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('FockGOST', tm.time() - t0)
 
+        comm_t0 = tm.time()
+
         for idx in range(num_densities):
             fock_arrays[idx * 2 + 0] = comm.reduce(fock_arrays[idx * 2 + 0],
                                                    root=mpi_master())
             fock_arrays[idx * 2 + 1] = comm.reduce(fock_arrays[idx * 2 + 1],
                                                    root=mpi_master())
+
+        if profiler is not None:
+            profiler.add_timing_info('FockComm', tm.time() - comm_t0)
 
         if comm_rank == mpi_master():
             return fock_arrays
@@ -2527,6 +3157,19 @@ class LinearSolver:
                 'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
+            # NOTE: the build is written for arrays of real numbers on every
+            # path. Every solver which reaches here stores its trial vectors so
+            # (the damped response stores a complex vector as its real and
+            # imaginary parts). An array of complex numbers would lose its
+            # imaginary part in the four-center build without an error, so it
+            # is refused here.
+            assert_msg_critical(
+                not np.iscomplexobj(vecs_ger.data) and
+                not np.iscomplexobj(vecs_ung.data),
+                'LinearSolver: the trial vectors have to be arrays of real ' +
+                'numbers (complex ones as their real and imaginary parts), ' +
+                'not arrays of complex numbers')
+
             mo_a = scf_results['C_alpha']
             mo_b = scf_results['C_beta']
 
@@ -2565,7 +3208,36 @@ class LinearSolver:
 
         n_total = n_general + n_extra_ger + n_extra_ung
 
-        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        # NOTE: the exchange-correlation integration holds this once for
+        # each build, whatever the number of its densities; both kinds of
+        # build take it off the room.
+        call_memory = None
+
+        if self.rank == mpi_master():
+            call_memory = self._xc_call_memory(molecule, basis, dft_dict,
+                                               True)
+
+        if self._uses_ri_jk() or self._uses_ri_coulomb():
+            # NOTE: as in _e2n_half_size_single_comm, for both spins: n_ao by
+            # nocc_a and n_ao by nocc_b for each RI-JK right factor, which bound
+            # the core excitation case.
+            density_memory = None
+
+            if self.rank == mpi_master():
+                density_memory = self._ri_density_memory(
+                    molecule, basis, dft_dict, n_ao,
+                    _RI_BATCH_MATRICES_UNRESTRICTED,
+                    2 * (nocc_a + nocc_b) if self._uses_ri_jk() else 0, 2)
+
+            batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
+                                           density_memory, self.comm,
+                                           call_memory)
+            self._note_ri_batch_memory(density_memory,
+                                       min(batch_size, n_total))
+        else:
+            batch_size = get_four_center_batch_size(self.batch_size, n_total,
+                                                    n_ao, self.comm,
+                                                    call_memory)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         if profiler is not None:
@@ -2613,6 +3285,25 @@ class LinearSolver:
                 kns_a = None
                 dks_b = None
                 kns_b = None
+
+            # NOTE: the factors of each spin, gathered beside its densities. The
+            # left factor of a spin is the occupied orbitals of that spin the
+            # trial vectors excite from (the core ones for core excitation), so
+            # the two spins carry a set each rather than sharing one. Formed
+            # only where the resolution of the identity will use them.
+            ri_jk_factors = None
+
+            if self.rank == mpi_master() and self._uses_ri_jk():
+                occ_inds_a, vir_inds_a = self._get_excitation_orbital_indices(
+                    nocc_a, norb)
+                occ_inds_b, vir_inds_b = self._get_excitation_orbital_indices(
+                    nocc_b, norb)
+                ri_jk_factors = ((mo_a[:, occ_inds_a], [], []),
+                                 (mo_b[:, occ_inds_b], [], []))
+                ri_jk_spins = ((ri_jk_factors[0], mo_a[:, vir_inds_a],
+                                len(occ_inds_a), len(vir_inds_a)),
+                               (ri_jk_factors[1], mo_b[:, vir_inds_b],
+                                len(occ_inds_b), len(vir_inds_b)))
 
             prep_t0 = tm.time()
 
@@ -2699,6 +3390,24 @@ class LinearSolver:
                         dak = np.linalg.multi_dot([mo_a, dak, mo_a.T])
                         dbk = np.linalg.multi_dot([mo_b, dbk, mo_b.T])
 
+                    # NOTE: the same densities as the factors they are made of,
+                    # spin by spin. The commutator leaves the occupied orbitals
+                    # of that spin which the trial vectors excite from on the
+                    # left of the excitation part and on the right of the
+                    # de-excitation part, exactly as in the restricted case, so
+                    # each density is C(occupied) times the first factor
+                    # transposed plus the second factor times C(occupied)
+                    # transposed.
+                    if ri_jk_factors is not None:
+                        for (factors, mo_vir_exc, n_occ_exc,
+                             n_vir_exc), vec_spin in zip(ri_jk_spins,
+                                                         (vec_a, vec_b)):
+                            n_ov = n_occ_exc * n_vir_exc
+                            zmat = vec_spin[:n_ov].reshape(n_occ_exc, n_vir_exc)
+                            ymat = vec_spin[n_ov:].reshape(n_occ_exc, n_vir_exc)
+                            factors[1].append(-np.matmul(mo_vir_exc, zmat.T))
+                            factors[2].append(np.matmul(mo_vir_exc, ymat.T))
+
                     dks_a.append(dak)
                     dks_b.append(dbk)
                     kns_a.append(kn_a)
@@ -2711,7 +3420,7 @@ class LinearSolver:
 
             fock = self._comp_lr_fock_unrestricted(
                 (dks_a, dks_b), molecule, basis, eri_dict, dft_dict, pe_dict,
-                profiler)
+                profiler, dens_factors=ri_jk_factors)
 
             if profiler is not None:
                 # only increment FockCount on master rank
@@ -2795,6 +3504,8 @@ class LinearSolver:
                 if self.nonlinear:
                     fock_ger_a = np.zeros((norb**2, batch_ger))
                     fock_ung_a = np.zeros((norb**2, batch_ung))
+                    fock_ger_b = np.zeros((norb**2, batch_ger))
+                    fock_ung_b = np.zeros((norb**2, batch_ung))
 
                 for ifock in range(batch_ger + batch_ung):
                     fak = fock_a[ifock]
@@ -2842,10 +3553,11 @@ class LinearSolver:
 
                     # Note: fak_mo_vec uses full MO coefficients matrix since
                     # it is only for fock_ger/fock_ung in nonlinear response
-                    fak_mo_vec = np.linalg.multi_dot([mo_a.T, fak,
-                                                      mo_a]).reshape(norb**2)
-                    fbk_mo_vec = np.linalg.multi_dot([mo_b.T, fbk,
-                                                      mo_b]).reshape(norb**2)
+                    if self.nonlinear:
+                        fak_mo_vec = np.linalg.multi_dot(
+                            [mo_a.T, fak, mo_a]).reshape(norb**2)
+                        fbk_mo_vec = np.linalg.multi_dot(
+                            [mo_b.T, fbk, mo_b]).reshape(norb**2)
 
                     if ifock < batch_ger:
                         e2_ger_a[:, ifock] = -gmo_vec_halfsize_a
@@ -2938,8 +3650,10 @@ class LinearSolver:
         t0 = tm.time()
 
         if self.rank == mpi_master():
+            # NOTE: no ostream, as the arrays are added below and the line
+            # about the file is printed after them.
             success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
-                                     basis, dft_dict, pe_dict, self.ostream)
+                                     basis, dft_dict, pe_dict, None)
         else:
             success = False
         success = self.comm.bcast(success, root=mpi_master())
@@ -2961,9 +3675,9 @@ class LinearSolver:
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
-            checkpoint_text = 'Time spent in writing checkpoint file: '
-            checkpoint_text += f'{(tm.time() - t0):.2f} sec'
-            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_info(
+                f'Checkpoint written to file: {self.checkpoint_file} ' +
+                f'(took {tm.time() - t0:.2f} sec).')
             self.ostream.print_blank()
 
     def _graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):
@@ -3069,10 +3783,6 @@ class LinearSolver:
         cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
             self.eri_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
-
-        if self.ri_coulomb:
-            cur_str = 'Resolution of the Identity      : RI-J'
-            self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
@@ -3229,7 +3939,8 @@ class LinearSolver:
                       precond,
                       dist_bger=None,
                       dist_bung=None,
-                      renormalize=True):
+                      renormalize=True,
+                      allow_empty=False):
         """
         Computes orthonormalized trial vectors.
 
@@ -3243,6 +3954,10 @@ class LinearSolver:
             The distributed ungerade subspace.
         :param renormalize:
             The flag for normalization.
+        :param allow_empty:
+            If True, return empty sets when no vector is left after the
+            projection onto the complement of the subspace and the removal of
+            linear dependence, instead of stopping.
 
         :return:
             The orthonormalized gerade and ungerade trial vectors.
@@ -3251,9 +3966,18 @@ class LinearSolver:
         dist_new_ger, dist_new_ung = self._precond_trials(vectors, precond)
 
         if self.rank == mpi_master():
-            assert_msg_critical(
-                dist_new_ger.data.size > 0 or dist_new_ung.data.size > 0,
-                'LinearSolver: trial vectors are empty')
+            no_trials = (dist_new_ger.data.size == 0 and
+                         dist_new_ung.data.size == 0)
+            # At the initial guess (no reduced space yet) the vectors are the
+            # right-hand sides, and an empty set means that all of them were
+            # below norm_thresh after preconditioning.
+            if no_trials and dist_bger is None and dist_bung is None:
+                self.ostream.print_warning(
+                    'All right-hand sides are zero; the response functions '
+                    'vanish.')
+                self.ostream.flush()
+            assert_msg_critical(not no_trials,
+                                'LinearSolver: trial vectors are empty')
 
         if dist_new_ger.data.size == 0:
             dist_new_ger.data = np.zeros((dist_new_ung.shape(0), 0))
@@ -3294,7 +4018,42 @@ class LinearSolver:
                     dist_new_ung)
                 dist_new_ung = self._normalize_half_size(dist_new_ung)
 
+        # The preconditioned vectors can all be removed above when what is
+        # left of them after the projection is too small, for example when the
+        # residuals lie inside the reduced space. The callers cannot continue
+        # without new vectors, and the iteration could not make progress, so
+        # stop here. Callers pass allow_empty=True only when adding guess
+        # vectors to a subspace restored from a checkpoint; there an empty set
+        # means that the subspace already contains the guesses, and the
+        # iterations add vectors where the residuals require them.
+        if self.rank == mpi_master() and not allow_empty:
+            assert_msg_critical(
+                dist_new_ger.shape(1) + dist_new_ung.shape(1) > 0,
+                'LinearSolver: No new trial vectors can be added to the '
+                'reduced space. The remaining equations cannot be converged.')
+
         return dist_new_ger, dist_new_ung
+
+    def _get_num_trial_vectors(self, dist_ger, dist_ung):
+        """
+        Gets the total number of gerade and ungerade trial vectors, the same
+        on all ranks.
+
+        :param dist_ger:
+            The distributed gerade trial vectors.
+        :param dist_ung:
+            The distributed ungerade trial vectors.
+
+        :return:
+            The number of trial vectors.
+        """
+
+        if self.rank == mpi_master():
+            n_trials = dist_ger.shape(1) + dist_ung.shape(1)
+        else:
+            n_trials = None
+
+        return self.comm.bcast(n_trials, root=mpi_master())
 
     def get_prop_grad(self,
                       operator,

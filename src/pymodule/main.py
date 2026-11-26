@@ -32,6 +32,7 @@
 
 from mpi4py import MPI
 from datetime import datetime, timedelta
+from pathlib import Path
 import traceback
 import sys
 import os
@@ -74,7 +75,7 @@ from .cppsolver import ComplexResponseSolver
 from .polarizabilitygradient import PolarizabilityGradient
 from .vibrationalanalysis import VibrationalAnalysis
 from .visualizationdriver import VisualizationDriver
-from .trajectorydriver import TrajectoryDriver
+from .ensembledriver import EnsembleDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
@@ -222,7 +223,7 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     elif prop_type == 'tpa transition':
         rsp_prop = TpaTransition(rsp_dict, method_dict)
 
-    elif prop_type == 'transition dipole moment':
+    elif prop_type == 'excited state moment':
         rsp_prop = DoubleResTransition(rsp_dict, method_dict)
 
     elif prop_type == 'thg':
@@ -271,6 +272,33 @@ def updated_dict_with_eri_settings(settings_dict, scf_drv):
     return new_dict
 
 
+def check_checkpoint_files(input_dict):
+    """
+    Checks that no checkpoint file set in the input is the final h5 file of
+    the run. Every rank must call this.
+
+    :param input_dict:
+        The input dictionary, with the input file's path without its suffix
+        under 'filename'.
+    """
+
+    # NOTE: every driver writes its results to the final h5 file of the run,
+    # f'{filename}.h5'. A checkpoint file of that name would be overwritten by
+    # the results, and a restart from it would then fail. Checkpoint files
+    # sharing a name with each other, or with the names a driver derives from
+    # its checkpoint file, are not checked here.
+    final_h5 = Path(f"{input_dict['filename']}.h5").resolve()
+
+    for group, settings in input_dict.items():
+        if isinstance(settings, dict) and 'checkpoint_file' in settings:
+            checkpoint_file = settings['checkpoint_file']
+            assert_msg_critical(
+                Path(checkpoint_file).resolve() != final_h5,
+                f'@{group}: checkpoint_file {checkpoint_file} collides with ' +
+                'the final h5 file of this run, where the results are ' +
+                'written; set another name, or leave it unset for the default')
+
+
 def main():
     """
     Runs VeloxChem with command line arguments.
@@ -304,6 +332,8 @@ def _main_body():
 
     task = MpiTask([args.input_file, args.output_file], MPI.COMM_WORLD)
     task_type = task.input_dict['jobs']['task'].lower()
+
+    check_checkpoint_files(task.input_dict)
 
     # Timelimit
 
@@ -350,23 +380,24 @@ def _main_body():
         force_field_drv.update_settings(force_field_dict, resp_dict)
         force_field_drv.compute(task.molecule, task.ao_basis)
 
-    # Spectrum from trajectory
+    # Ensemble/trajectory calculation
 
-    if task_type == 'trajectory':
-        traj_dict = (dict(task.input_dict['trajectory'])
-                     if 'trajectory' in task.input_dict else {})
+    if task_type == 'ensemble':
+        ensemble_dict = (dict(task.input_dict['ensemble'])
+                         if 'ensemble' in task.input_dict else {})
+        ensemble_dict['filename'] = task.input_dict['filename']
+
         spect_dict = (dict(task.input_dict['spectrum_settings'])
                       if 'spectrum_settings' in task.input_dict else {})
+        scf_dict = (dict(task.input_dict['scf'])
+                    if 'scf' in task.input_dict else {})
         rsp_dict = (dict(task.input_dict['response'])
                     if 'response' in task.input_dict else {})
 
-        traj_dict['filename'] = task.input_dict['filename']
-        traj_dict['charges'] = task.input_dict['charges']
-        traj_dict['polarizabilities'] = task.input_dict['polarizabilities']
-
-        traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
-        traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
-        traj_drv.compute(task.molecule, task.ao_basis)
+        ens_drv = EnsembleDriver(task.mpi_comm, task.ostream)
+        ens_drv.update_settings(ensemble_dict, spect_dict, scf_dict, rsp_dict,
+                                method_dict)
+        ens_drv.compute_from_input()
 
     # Diatomic vibronic spectrum using Numerov
 
@@ -491,6 +522,10 @@ def _main_body():
 
         elif run_excited_state_gradient:
 
+            assert_msg_critical(
+                not use_xtb,
+                'Excited-state gradient is not supported with xTB')
+
             rsp_dict = dict(task.input_dict['response'])
             rsp_dict['program_end_time'] = program_end_time
             rsp_dict['filename'] = task.input_dict['filename']
@@ -505,8 +540,17 @@ def _main_body():
 
             rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
                                            method_dict)
-            rsp_prop.init_driver(task.mpi_comm, task.ostream)
+            rsp_prop.init_driver(task.mpi_comm,
+                                 task.ostream,
+                                 method_type=scf_drv.scf_type)
             rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
+
+            # NOTE: the analytical gradient reads the response's results and
+            # the type of its solver, and its numerical gradient computes the
+            # response again, which sets up the RI anew. The response's RI set
+            # is released so that the orbital response (CPHF) after it decides
+            # RI or four-center with that memory free.
+            rsp_prop._rsp_driver.release_ri()
 
             tddftgrad_drv = TddftGradientDriver(scf_drv)
             # set print level for input file based calculation
@@ -576,6 +620,10 @@ def _main_body():
 
         elif run_excited_state_gradient:
 
+            assert_msg_critical(
+                not use_xtb,
+                'Excited-state gradient is not supported with xTB')
+
             grad_dict = (task.input_dict['gradient']
                          if 'gradient' in task.input_dict else {})
 
@@ -593,7 +641,9 @@ def _main_body():
 
             rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
                                            method_dict)
-            rsp_prop.init_driver(task.mpi_comm, task.ostream)
+            rsp_prop.init_driver(task.mpi_comm,
+                                 task.ostream,
+                                 method_type=scf_drv.scf_type)
             rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
             tddftgrad_drv = TddftGradientDriver(scf_drv)
@@ -667,7 +717,9 @@ def _main_body():
 
                 rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
                                                method_dict)
-                rsp_prop.init_driver(task.mpi_comm, task.ostream)
+                rsp_prop.init_driver(task.mpi_comm,
+                                     task.ostream,
+                                     method_type=scf_drv.scf_type)
                 rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
                 vibrational_drv = VibrationalAnalysis(scf_drv,
@@ -716,6 +768,11 @@ def _main_body():
         lr_drv.frequencies = polgrad_drv.frequencies
         lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_results)
 
+        # NOTE: the polarizability gradient reads only lr_results; the linear
+        # response's RI set is released so that its CPHF decides RI or
+        # four-center with that memory free.
+        lr_drv.release_ri()
+
         polgrad_results_not_used = polgrad_drv.compute(
             task.molecule, task.ao_basis, scf_drv.scf_results, lr_results)
 
@@ -729,6 +786,15 @@ def _main_body():
         rsp_dict['program_end_time'] = program_end_time
         rsp_dict['filename'] = task.input_dict['filename']
         rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
+
+        # NOTE: of what a response task runs below, only the excited-state
+        # gradient, vibrational analysis and optimization are given the SCF
+        # driver, and the gradients read the RI driver it formed. Without
+        # those sections in the input, the RI driver is released before the
+        # response forms its own.
+        if not any(key in task.input_dict for key in
+                   ['gradient', 'vibrational', 'optimize_excited_state']):
+            scf_drv.release_ri()
 
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm,
@@ -747,6 +813,16 @@ def _main_body():
             prop_type = None
 
         if prop_type in ['absorption', 'uv-vis', 'ecd']:
+
+            # NOTE: what follows (the orbital response, the gradient, the
+            # excited-state Hessian) reads the response's results and the type
+            # of its solver, and computes the response again where it needs
+            # it, which sets up the RI anew. The response's RI set is released
+            # so that the orbital response (CPHF) decides RI or four-center
+            # with that memory free.
+            if any(key in task.input_dict for key in
+                   ['orbital_response', 'gradient', 'vibrational']):
+                rsp_prop._rsp_driver.release_ri()
 
             if 'orbital_response' in task.input_dict:
                 orbrsp_dict = task.input_dict['orbital_response']

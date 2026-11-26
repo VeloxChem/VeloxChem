@@ -1,0 +1,20 @@
+# Caffeine, B3LYP, def2-SVP: complex polarization propagator absorption, 6 frequencies (RI-JK).
+@jobs
+task: response
+@end
+
+@method settings
+xcfun: b3lyp
+basis: def2-svp
+@end
+
+@response
+property: absorption (cpp)
+frequencies: 0.15-0.25 (0.02)
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end

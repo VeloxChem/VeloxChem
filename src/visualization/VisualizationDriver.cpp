@@ -84,6 +84,8 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
 {
     auto natoms = molecule.number_of_atoms();
 
+    const auto &coords = molecule.coordinates();
+
     auto max_angl = basis.max_angular_momentum();
 
     std::vector<double> phi;
@@ -149,7 +151,7 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
             {
                 // process coordinates
 
-                auto rxyz = molecule.coordinates()[atomidx].coordinates();
+                auto rxyz = coords[atomidx].coordinates();
 
                 double rx = xp - rxyz[0];
 

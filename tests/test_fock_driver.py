@@ -1,5 +1,6 @@
 from pathlib import Path
 import numpy as np
+import pytest
 
 from mpi4py import MPI
 
@@ -12,6 +13,106 @@ from veloxchem.fockdriver import FockDriver
 
 
 class TestFockDriver:
+
+    @staticmethod
+    def get_hydrogen_def2_svpd(label):
+
+        if label == 'h':
+            mol = Molecule.read_str('H 0.0 0.0 0.0', 'angstrom')
+            mol.set_multiplicity(2)
+        else:
+            mol = Molecule.read_str('H 0.0 0.0 0.0\nH 0.0 0.0 0.74', 'angstrom')
+        bas = MolecularBasis.read(mol, 'def2-svpd', ostream=None)
+
+        return mol, bas
+
+    # NOTE: def2-SVPD has two s and two p shells on hydrogen. The number of
+    # shells of an angular momentum (the stride between its components) is
+    # then also one of the p orbital indices: in H2, 4 s and 4 p shells,
+    # with p orbital indices 4 to 7. The screened Fock build is compared with
+    # the one contracted from the ERI tensor, which does not use local
+    # indices.
+    @pytest.mark.parametrize('label', ['h', 'h2'])
+    @pytest.mark.parametrize('mtype', [mat_t.symmetric, mat_t.general])
+    @pytest.mark.parametrize('fock_type, factor', [
+        ('j', 0.0),
+        ('k', 0.0),
+        ('kx', 0.4),
+        ('2jk', 0.0),
+        ('2jkx', 0.4),
+    ])
+    def test_fock_with_as_many_p_as_s_shells(self, label, mtype, fock_type,
+                                             factor):
+
+        comm = MPI.COMM_WORLD
+
+        mol, bas = self.get_hydrogen_def2_svpd(label)
+        naos = bas.get_dimensions_of_basis()
+
+        rng = np.random.default_rng(1)
+        dens = rng.standard_normal((naos, naos))
+        if mtype == mat_t.symmetric:
+            dens = dens + dens.T
+
+        den_mat = make_matrix(bas, mtype)
+        den_mat.set_values(dens)
+
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas, mol, 'eri')
+
+        fock_drv = FockDriver(comm)
+        fock_mat = fock_drv.compute(t4c_drv, den_mat, fock_type, factor, 0.0,
+                                    15)
+        fock = comm.reduce(fock_mat.to_numpy(), root=mpi_master())
+
+        eri = fock_drv.compute_eri(mol, bas)
+
+        if comm.Get_rank() == mpi_master():
+            jmat = np.einsum('ijkl,kl->ij', eri, dens)
+            kmat = np.einsum('ikjl,kl->ij', eri, dens)
+            ref_fock = {
+                'j': jmat,
+                'k': kmat,
+                'kx': factor * kmat,
+                '2jk': 2.0 * jmat - kmat,
+                '2jkx': 2.0 * jmat - factor * kmat,
+            }[fock_type]
+            assert np.max(np.abs(fock - ref_fock)) < 1.0e-10
+
+    @pytest.mark.parametrize('label', ['h', 'h2'])
+    def test_focks_with_as_many_p_as_s_shells(self, label):
+
+        comm = MPI.COMM_WORLD
+
+        mol, bas = self.get_hydrogen_def2_svpd(label)
+        naos = bas.get_dimensions_of_basis()
+
+        rng = np.random.default_rng(1)
+        dens = rng.standard_normal((naos, naos))
+
+        den_mat = make_matrix(bas, mat_t.general)
+        den_mat.set_values(dens)
+        den_mats = Matrices()
+        den_mats.add(den_mat, '0')
+        den_mats.add(den_mat, '1')
+
+        t4c_drv = T4CScreener()
+        t4c_drv.partition(bas, mol, 'eri')
+
+        fock_drv = FockDriver(comm)
+        fock_mats = fock_drv.compute(t4c_drv, den_mats, ['j', 'k'], 0.0, 0.0,
+                                     15)
+        fock_mats = fock_mats.reduce(comm, mpi_master())
+
+        eri = fock_drv.compute_eri(mol, bas)
+
+        if comm.Get_rank() == mpi_master():
+            jmat = np.einsum('ijkl,kl->ij', eri, dens)
+            kmat = np.einsum('ikjl,kl->ij', eri, dens)
+            assert np.max(np.abs(fock_mats.matrix('0').to_numpy() -
+                                 jmat)) < 1.0e-10
+            assert np.max(np.abs(fock_mats.matrix('1').to_numpy() -
+                                 kmat)) < 1.0e-10
 
     def get_data_h2o_dimer(self):
 

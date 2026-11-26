@@ -48,6 +48,7 @@
 #include "MathFunc.hpp"
 #include "MultiTimer.hpp"
 #include "Prescreener.hpp"
+#include "XCTimingReport.hpp"
 #include "SerialDenseLinearAlgebra.hpp"
 #include "SerialDensityGridGenerator.hpp"
 #include "StringFormat.hpp"
@@ -343,15 +344,7 @@ integrateVxcFockForGgaClosedShell(const CMolecule&                  molecule,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    if (xcprof::wanted()) xcprof::report("Vxc, GGA, closed shell", timer, omptimers, n_boxes);
 
     return mat_Vxc;
 }
@@ -661,15 +654,7 @@ integrateVxcFockForGgaOpenShell(const CMolecule&                  molecule,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    if (xcprof::wanted()) xcprof::report("Vxc, GGA, open shell", timer, omptimers, n_boxes);
 
     return mat_Vxc;
 }
@@ -1043,15 +1028,7 @@ integrateFxcFockForGgaClosedShell(const std::vector<double*>&       aoFockPointe
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    if (xcprof::wanted()) xcprof::report("Fxc, GGA, closed shell", timer, omptimers, n_boxes);
 }
 
 auto
@@ -1481,15 +1458,7 @@ integrateFxcFockForGgaOpenShell(const std::vector<double*>&       aoFockPointers
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    if (xcprof::wanted()) xcprof::report("Fxc, GGA, open shell", timer, omptimers, n_boxes);
 }
 
 auto
@@ -1822,15 +1791,7 @@ integrateKxcFockForGgaClosedShell(const std::vector<double*>& aoFockPointers,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    if (xcprof::wanted()) xcprof::report("Kxc, GGA, closed shell", timer, omptimers, n_boxes);
 }
 
 auto
@@ -2230,15 +2191,7 @@ integrateKxcLxcFockForGgaClosedShell(const std::vector<double*>& aoFockPointers,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    if (xcprof::wanted()) xcprof::report("KxcLxc, GGA, closed shell", timer, omptimers, n_boxes);
 }
 
 auto

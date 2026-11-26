@@ -35,14 +35,16 @@ import numpy as np
 import time
 
 from .oneeints import compute_electric_dipole_integrals
-from .veloxchemlib import mpi_master, hartree_in_wavenumber
+from .riresponse import lend_ri
+from .rijkresponse import ri_jk_general_factors
+from .veloxchemlib import mpi_master, hartree_in_ev, hartree_in_wavenumber
 from .profiler import Profiler
 from .cppsolver import ComplexResponseSolver
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check,
+                           dft_and_ri_sanity_check,
                            nonlinear_response_environment_sanity_check)
 from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
@@ -51,7 +53,7 @@ from .checkpoint import write_distributed_focks
 
 class ThgDriver(NonlinearSolver):
     """
-    Implements the isotropic cubic response driver for Third-harmonic gerneration
+    Implements the isotropic cubic response driver for third-harmonic generation
     (thg)
 
     # vlxtag: RHF, thg, CR
@@ -72,8 +74,8 @@ class ThgDriver(NonlinearSolver):
 
     def __init__(self, comm, ostream):
         """
-        Initializes the isotropic cubic response driver for two-photon
-        absorption (thg)
+        Initializes the isotropic cubic response driver for third-harmonic
+        generation (THG)
         """
 
         super().__init__(comm, ostream)
@@ -108,10 +110,20 @@ class ThgDriver(NonlinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
+    def _get_nonlinear_fock_modes(self):
+        """
+        Gets the modes of the nonlinear Fock builds this driver makes.
+
+        :return:
+            A tuple of modes.
+        """
+
+        return ('thg', 'thg_ii')
+
     def compute(self, molecule, ao_basis, scf_tensors):
         """
-        Computes the isotropic cubic response function for two-photon
-        absorption
+        Computes the isotropic cubic response function for third-harmonic
+        generation
 
         :param molecule:
             The molecule.
@@ -144,11 +156,8 @@ class ThgDriver(NonlinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute', 'nonlinear')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute', 'nonlinear')
 
         profiler = Profiler({
             'timing': self.timing,
@@ -158,9 +167,14 @@ class ThgDriver(NonlinearSolver):
         })
 
         if self.rank == mpi_master():
-            self._print_header('Two-Photon Absorbtion Driver Setup')
+            self._print_header('Third-Harmonic Generation Driver Setup')
 
         start_time = time.time()
+
+        # NOTE: before the RI-JK B vectors or the RI-J integrals are set up,
+        # which keep back from what they may hold the smallest batch of the
+        # nonlinear Fock builds.
+        self._set_ri_reserve_floor(molecule, ao_basis, scf_tensors)
 
         eri_dict = self._init_eri(molecule, ao_basis)
 
@@ -237,7 +251,8 @@ class ThgDriver(NonlinearSolver):
             'conv_thresh', 'max_iter', 'eri_thresh', 'timing',
             'memory_profiling', 'batch_size', 'restart', 'xcfun', 'grid_level',
             'potfile', 'electric_field', 'program_end_time', '_debug',
-            '_block_size_factor', 'ri_coulomb'
+            '_block_size_factor', 'ri_coulomb', 'ri_jk',
+            'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -249,7 +264,8 @@ class ThgDriver(NonlinearSolver):
             Nb_drv.checkpoint_file = str(fpath) + '_tpa_1.h5'
             # Nb_drv.write_h5 = self.write_h5
 
-        Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
+        with lend_ri(self, Nb_drv):
+            Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
 
         self._is_converged = Nb_drv.is_converged
 
@@ -292,6 +308,12 @@ class ThgDriver(NonlinearSolver):
         self.ostream.flush()
 
         profiler.end(self.ostream)
+
+        # NOTE: the RI memory check of this driver's own Fock builds; the
+        # solvers it drives print their own.
+        self._print_ri_memory_check()
+
+        self._release_freed_memory()
 
         return tpa_dict
 
@@ -430,7 +452,7 @@ class ThgDriver(NonlinearSolver):
                     sum_val += t4_dict[(w, w, w)]
                 for key, val in other_dict.items():
                     sum_val += val[(w, w, w)]
-                THG[(w, w, w)] = sum_val.real
+                THG[(w, w, w)] = sum_val
 
             ret_dict.update(other_dict)
 
@@ -442,11 +464,33 @@ class ThgDriver(NonlinearSolver):
                 'frequencies': list(self.frequencies),
             })
 
-            self._print_results2(ret_dict)
+            self._print_results(ret_dict)
 
         profiler.check_memory_usage('End of thg')
 
         return ret_dict
+
+    def _gather_ri_jk_factor_lists(self, local_lists):
+        """
+        Gathers the right factors of the densities each rank computed and
+        concatenates them in rank order, which is the order the density columns
+        were laid out in.
+
+        :param local_lists:
+            The local lists of right factors, in the order of the factors.
+        :return:
+            The concatenated lists on the master rank, None on the others.
+        """
+
+        gathered = self.comm.gather(local_lists, root=mpi_master())
+
+        if self.rank != mpi_master():
+            return None
+
+        return [
+            [x for rank_lists in gathered for x in rank_lists[i]]
+            for i in range(len(local_lists))
+        ]
 
     def get_densities(self, wi, Nx, mo, nocc, norb):
         """
@@ -517,6 +561,21 @@ class ThgDriver(NonlinearSolver):
         dens_t0 = time.time()
 
         mo = self.comm.bcast(mo, root=mpi_master())
+
+        # NOTE: the factors of the two orders which reach the Fock build, kept
+        # apart as lists of the occupied and the virtual right factor. Every rank
+        # builds them for the tasks it was dealt and they are gathered in task
+        # order before the Fock build, as the resolution of the identity sweeps
+        # the densities one batch at a time and the columns have to line up.
+        self._ri_jk_factors = None
+
+        if self._uses_ri_jk():
+            self._ri_jk_factors = {
+                'left_occ': mo[:, :nocc],
+                'left_vir': mo[:, nocc:],
+                'second': ([], []),
+                'third': ([], []),
+            }
 
         for task_id, rank in task_rank_pairs:
             # only go through the tasks that are associated with self.rank
@@ -591,6 +650,25 @@ class ThgDriver(NonlinearSolver):
                 D_lam_sig_tau_z += (self.commut(kx, one_third * D_lamtau_xz) +
                                     self.commut(ky, one_third * D_lamtau_yz) +
                                     self.commut(kz, one_third * D_lamtau_zz))
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals and in the order the columns are laid out
+                # below. The two orders are collected apart because the array of
+                # each is cut with a stride of its own where there is a
+                # functional, and laid end to end where there is not, which is
+                # the order they are joined in at the call.
+                if self._ri_jk_factors is not None:
+                    for name, mat in (('second', D_sig_xx), ('second', D_sig_yy),
+                                      ('second', D_sig_zz), ('second', D_sig_xy),
+                                      ('second', D_sig_xz), ('second', D_sig_yz),
+                                      ('third', D_lam_sig_tau_x),
+                                      ('third', D_lam_sig_tau_y),
+                                      ('third', D_lam_sig_tau_z)):
+                        for part in (np.real, np.imag):
+                            ra, rb = ri_jk_general_factors(
+                                mo, nocc, part(mat))
+                            self._ri_jk_factors[name][0].append(ra)
+                            self._ri_jk_factors[name][1].append(rb)
 
                 # density transformation from MO to AO basis
 
@@ -675,6 +753,20 @@ class ThgDriver(NonlinearSolver):
             else:
                 distributed_density_3.append(dist_den_3_freq, axis=1)
 
+        if self._ri_jk_factors is not None:
+            lists = self._gather_ri_jk_factor_lists([
+                self._ri_jk_factors['second'][0],
+                self._ri_jk_factors['second'][1],
+                self._ri_jk_factors['third'][0],
+                self._ri_jk_factors['third'][1],
+            ])
+
+            if self.rank == mpi_master():
+                self._ri_jk_factors['second'] = (lists[0], lists[1])
+                self._ri_jk_factors['third'] = (lists[2], lists[3])
+            else:
+                self._ri_jk_factors = None
+
         self.ostream.print_info(f'Time spent in generating densities: {time.time() - dens_t0:.2f} sec')
         self.ostream.print_blank()
         self.ostream.flush()
@@ -747,22 +839,48 @@ class ThgDriver(NonlinearSolver):
         else:
             time_start_fock = time.time()
 
+            factors = self._ri_jk_factors
+
             if self._dft:
+                # NOTE: two arrays, each cut with a stride of its own, so the
+                # factors go as the two sets they were collected as.
+                split = None
+
+                if factors is not None:
+                    split = {
+                        'second': (factors['left_occ'], factors['second'][0],
+                                   factors['left_vir'], factors['second'][1]),
+                        'third': (factors['left_occ'], factors['third'][0],
+                                  factors['left_vir'], factors['third'][1]),
+                    }
+
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  dft_dict, density_list1,
                                                  density_list2, density_list3,
-                                                 'thg', profiler)
+                                                 'thg', profiler,
+                                                 dens_factors=split)
             else:
                 density_list_23 = DistributedArray(density_list2.data,
                                                    self.comm,
                                                    distribute=False)
                 density_list_23.append(density_list3, axis=1)
+
+                # NOTE: one array of the two orders laid end to end, cut with one
+                # stride, so the factors are one set joined in the same order.
+                joined = None
+
+                if factors is not None:
+                    joined = (factors['left_occ'],
+                              factors['second'][0] + factors['third'][0],
+                              factors['left_vir'],
+                              factors['second'][1] + factors['third'][1])
+
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  None, None, None,
                                                  density_list_23, 'thg',
-                                                 profiler)
+                                                 profiler, dens_factors=joined)
 
             self._print_fock_time(time.time() - time_start_fock)
 
@@ -1065,7 +1183,8 @@ class ThgDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk',
+            'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -1079,8 +1198,9 @@ class ThgDriver(NonlinearSolver):
 
         # commutpute second-order response vectors
 
-        N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
-                                              xy_dict)
+        with lend_ri(self, N_total_drv):
+            N_total_results = N_total_drv.compute(
+                molecule, ao_basis, scf_tensors, xy_dict)
 
         self._is_converged = (self._is_converged and N_total_drv.is_converged)
 
@@ -1163,6 +1283,14 @@ class ThgDriver(NonlinearSolver):
         dens_t0 = time.time()
 
         mo = self.comm.bcast(mo, root=mpi_master())
+
+        # NOTE: the factors of the densities which reach the Fock build. Only the
+        # two-time perturbed ones are built from here, so this is the one set of
+        # the general shape and not the two of the pass before.
+        self._ri_jk_factors = None
+
+        if self._uses_ri_jk():
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for task_id, rank in task_rank_pairs:
             # only go through the tasks that are associated with self.rank
@@ -1267,6 +1395,18 @@ class ThgDriver(NonlinearSolver):
                 # Dz += self.commut(kz, D_lamtau_zz)
                 # Dz += self.commut(k_lamtau_zz, Db_z)
 
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals and in the order the columns are laid out
+                # below. The first-order densities beside them are there for the
+                # quadrature alone and no Fock matrix is asked of them.
+                if self._ri_jk_factors is not None:
+                    for mat in (Dx, Dy, Dz):
+                        for part in (np.real, np.imag):
+                            ra, rb = ri_jk_general_factors(
+                                mo, nocc, part(mat))
+                            self._ri_jk_factors[1].append(ra)
+                            self._ri_jk_factors[3].append(rb)
+
                 # density transformation from MO to AO basis
 
                 Dx = np.linalg.multi_dot([mo, Dx, mo.T])
@@ -1335,6 +1475,16 @@ class ThgDriver(NonlinearSolver):
                                                          distribute=False)
             else:
                 distributed_density_2.append(dist_den_2_freq, axis=1)
+
+        if self._ri_jk_factors is not None:
+            lists = self._gather_ri_jk_factor_lists(
+                [self._ri_jk_factors[1], self._ri_jk_factors[3]])
+
+            if self.rank == mpi_master():
+                self._ri_jk_factors = (self._ri_jk_factors[0], lists[0],
+                                       self._ri_jk_factors[2], lists[1])
+            else:
+                self._ri_jk_factors = None
 
         self.ostream.print_info(f'Time spent in generating densities: {time.time() - dens_t0:.2f} sec')
         self.ostream.print_blank()
@@ -1522,16 +1672,15 @@ class ThgDriver(NonlinearSolver):
             time_start_fock = time.time()
 
             if self._dft:
-                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real_and_imag', eri_dict,
-                                                 dft_dict, density_list1,
-                                                 density_list2, None, 'thg_ii',
-                                                 profiler)
+                dist_focks = self._comp_nlr_fock(
+                    mo, molecule, ao_basis, 'real_and_imag', eri_dict, dft_dict,
+                    density_list1, density_list2, None, 'thg_ii', profiler,
+                    dens_factors=self._ri_jk_factors)
             else:
-                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real_and_imag', eri_dict,
-                                                 None, None, density_list2,
-                                                 None, 'thg_ii', profiler)
+                dist_focks = self._comp_nlr_fock(
+                    mo, molecule, ao_basis, 'real_and_imag', eri_dict, None,
+                    None, density_list2, None, 'thg_ii', profiler,
+                    dens_factors=self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 
@@ -2446,96 +2595,88 @@ class ThgDriver(NonlinearSolver):
 
     def _print_results2(self, rsp_results):
         """
-        Prints the results from the TPA calculation.
-
-        :param rsp_results:
-            A dictionary containing the results of response calculation.
+        Prints the THG summary and detailed contributions for debugging.
         """
 
-        freqs = rsp_results['frequencies']
-        components = ['THG', 't4_dict', 't3_dict', 'NaX3NyNz', 'NaA3NxNy', 'NaX2Nyz', 'NxA2Nyz']   # list of components to print
+        self._print_results(rsp_results)
 
+        components = (
+            ('t4_dict', 'T[4]'),
+            ('t3_dict', 'T[3]'),
+            ('NaX3NyNz', 'NaX[3]NyNz'),
+            ('NaA3NxNy', 'NaA[3]NxNy'),
+            ('NaX2Nyz', 'NaX[2]Nyz'),
+            ('NxA2Nyz', 'NxA[2]Nyz'),
+        )
+        available = [(label, rsp_results[key]) for key, label in components
+                     if rsp_results.get(key) is not None]
+        if not available:
+            return
+
+        width = 82
+        title = 'THG Response Contributions (a.u.)'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
-        # Title section
-        w_str = 'Isotropic Average of Re(gamma(-3w; w, w, w)) for Third-Harmonic Generation (THG) intensities'
-        self.ostream.print_header(w_str)
-        self.ostream.print_header('=' * (len(w_str) + 2))
-        self.ostream.print_blank()
+        header = '{:>15s} {:<20s}{:>22s}{:>22s}'.format(
+            'Photon Energy', 'Contribution', 'Re(value)', 'Im(value)')
+        self.ostream.print_header(header.ljust(width))
+        self.ostream.print_header('-' * width)
 
-        for component in components:
-            tensor = rsp_results.get(component)
-            if tensor is None:
-                continue
-
-            # Header for this component
-            component_title = f'Component: {component}'
-            self.ostream.print_header(component_title)
-            self.ostream.print_header('-' * len(component_title))
-            self.ostream.print_blank()
-
-            # Column headers
-            title = '{:>12s} {:>25s}'.format('Frequency', f'{component} value (a.u.)')
-            width = len(title)
-            self.ostream.print_header(title.ljust(width))
-            self.ostream.print_header(('-' * len(title)).ljust(width))
-
-            # Values
-            for w in freqs:
-                key = (w, w, w)
-                val = tensor.get(key)
-                if val is not None:
-                    value = val.real if hasattr(val, 'real') else val
-                    line = '{:>12.4f} {:>25.8f}'.format(w, value)
-                    self.ostream.print_header(line.ljust(width))
+        for w in rsp_results['frequencies']:
+            energy = '{:.5f} eV'.format(w * hartree_in_ev())
+            for index, (label, tensor) in enumerate(available):
+                energy_label = energy if index == 0 else ''
+                value = tensor.get((w, w, w))
+                if value is None:
+                    line = '{:>15s} {:<20s}{:>22s}{:>22s}'.format(
+                        energy_label, label, 'N/A', 'N/A')
                 else:
-                    self.ostream.print_header(f"{w:>12.4f} {'N/A':>25}")
-
+                    line = '{:>15s} {:<20s}{:>22.10e}{:>22.10e}'.format(
+                        energy_label, label, value.real, value.imag)
+                self.ostream.print_header(line.ljust(width))
             self.ostream.print_blank()
 
-        # Reference footer
-        self.ostream.print_header('Reference:'.ljust(width))
-        self.ostream.print_blank()
         self.ostream.flush()
 
     def _print_results(self, rsp_results):
         """
-        Prints the results from the TPA calculation.
+        Prints the complex isotropic THG response in a TPA-style summary.
 
-        :param rsp_results:
-            A dictionary containing the results of response calculation.
+        The magnitude |gamma| is included for comparison and is not the
+        third-harmonic generation intensity.
         """
 
-        freqs = rsp_results['frequencies']
-        component = 'THG'
+        width = 82
+        frequencies = rsp_results['frequencies']
+        thg = rsp_results.get('THG', {})
 
         self.ostream.print_blank()
-
-        w_str = 'Isotropic Average of Re(gamma(-3w; w, w, w)) for Thid-Harmonic Generation (THG) intensities'
-        self.ostream.print_header(w_str)
-        self.ostream.print_header('=' * (len(w_str) + 2))
+        title = 'THG Summary'
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+        self.ostream.print_header(
+            'Isotropic gamma(-3w; w, w, w) in atomic units')
         self.ostream.print_blank()
 
-        # Updated header with only two columns
-        title = '{:>12s} {:>25s}'.format('Frequency', 'THG intensity (a.u.)')
-        width = len(title)
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('-' * len(title)).ljust(width))
+        header = '{:>15s}{:>20s}{:>20s}{:>24s}'.format(
+            'Photon Energy', 'Re(gamma)', 'Im(gamma)', '|gamma|')
+        self.ostream.print_header(header.ljust(width))
+        self.ostream.print_header('-' * width)
 
-        tensor = rsp_results.get(component)
-        if tensor is not None:
-            for w in freqs:
-                key = (w, w, w)
-                val = tensor.get(key)
-                if val is not None:
-                    intensity = val.real if hasattr(val, 'real') else val
-                    line = '{:>12.4f} {:>25.8f}'.format(w, intensity)
-                    self.ostream.print_header(line.ljust(width))
-                else:
-                    self.ostream.print_header(f"{w:>12.4f} {'N/A':>25}")
+        for w in frequencies:
+            energy = '{:.5f} eV'.format(w * hartree_in_ev())
+            value = thg.get((w, w, w))
+            if value is None:
+                line = '{:>15s}{:>20s}{:>20s}{:>24s}'.format(
+                    energy, 'N/A', 'N/A', 'N/A')
+            else:
+                line = '{:>15s}{:>20.8f}{:>20.8f}{:>24.8f}'.format(
+                    energy, value.real, value.imag, abs(value))
+            self.ostream.print_header(line.ljust(width))
 
-        self.ostream.print_blank()
-        self.ostream.print_header('Reference:'.ljust(width))
         self.ostream.print_blank()
         self.ostream.flush()
 

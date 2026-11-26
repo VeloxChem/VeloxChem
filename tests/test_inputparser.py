@@ -54,6 +54,22 @@ def test_full_input(tmpdir):
     assert ip.input_dict == expected
 
 
+def test_input_from_string():
+
+    ip = InputParser.from_string("""
+        @source
+        schema_version: 1
+        origin: inline
+        @end
+    """, source='inline test')
+
+    assert ip.input_dict['source'] == {
+        'schema_version': '1',
+        'origin': 'inline',
+    }
+    assert ip.input_dict['filename'] == 'inline test'
+
+
 def test_error_in_input(tmpdir):
 
     if MPI.COMM_WORLD.Get_size() == 1:

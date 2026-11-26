@@ -42,15 +42,23 @@ from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
+                           dft_and_ri_sanity_check, pe_sanity_check,
                            gostshyp_sanity_check, solvation_model_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
 from .mathutils import safe_solve
 from .inputparser import parse_input
 from .checkpoint import write_rsp_hdf5, check_rsp_hdf5
-from .batchsize import get_batch_size
+from .batchsize import get_four_center_batch_size
+from .batchsize import get_ri_batch_size
 from .batchsize import get_number_of_batches
+
+# NOTE: the matrices of nao by nao which build_sigmas_single_comm holds on the
+# master for each density of a batch: the density (vec_list) and the Fock
+# matrix the build returns. build_sigmas_single_comm_unrestricted holds these
+# for each spin.
+_RI_BATCH_MATRICES = 2
+_RI_BATCH_MATRICES_UNRESTRICTED = 4
 
 
 class CphfSolver(LinearSolver):
@@ -154,11 +162,8 @@ class CphfSolver(LinearSolver):
             self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
                                     '_orbrsp.h5')
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -355,6 +360,8 @@ class CphfSolver(LinearSolver):
         self.cphf_results = self.compute_subspace_solver(
             molecule, basis, scf_results, *args)
 
+        self._release_freed_memory()
+
     def compute_subspace_solver(self, molecule, basis, scf_results, *args):
         """
         Performs CPHF calculation for a molecule and a basis set.
@@ -398,11 +405,8 @@ class CphfSolver(LinearSolver):
             self.checkpoint_file = (self.checkpoint_file[:-len('_rsp.h5')] +
                                     '_orbrsp.h5')
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -611,9 +615,9 @@ class CphfSolver(LinearSolver):
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
 
-        profiler.check_memory_usage(
-            'End of ComputeCPHF iterative subspace algorithm')
+        profiler.check_memory_usage('End of CPHF solver')
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
 
         # converged?
         if self.rank == mpi_master():
@@ -661,6 +665,8 @@ class CphfSolver(LinearSolver):
         :param method_type:
             The method type (restricted, unrestricted).
         """
+
+        self._disable_subcomms_for_ri()
 
         if self.use_subcomms:
             if method_type == 'restricted':
@@ -884,8 +890,8 @@ class CphfSolver(LinearSolver):
 
                 if is_local_master:
                     vec = vec_list[subcomm_index]
-                    vec_ao = np.linalg.multi_dot(
-                        [mo_occ, vec.reshape(nocc, nvir), mo_vir.T])
+                    vec = vec.reshape(nocc, nvir)
+                    vec_ao = np.linalg.multi_dot([mo_occ, vec, mo_vir.T])
                     dens = [vec_ao]
                 else:
                     dens = None
@@ -894,9 +900,20 @@ class CphfSolver(LinearSolver):
                     profiler.add_timing_info('PreProc', tm.time() - prep_t0)
 
                 # create Fock matrices and contract with two-electron integrals
-                fock = self._comp_lr_fock(dens, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict, profiler,
-                                          local_comm)
+                # NOTE: not with RI: build_sigmas turns subcomms off for RI-J
+                # and RI-JK (_disable_subcomms_for_ri).
+                # NOTE: the CPHF equations are those of the ground state,
+                # whose C-PCM reaction field is in equilibrium (the static
+                # dielectric constant), whatever non_equilibrium_solv is.
+                fock = self._comp_lr_fock(dens,
+                                          molecule,
+                                          basis,
+                                          eri_dict,
+                                          dft_dict,
+                                          pe_dict,
+                                          profiler,
+                                          local_comm,
+                                          cpcm_non_equilibrium=False)
 
                 if profiler is not None:
                     # only increment FockCount on local master
@@ -1033,7 +1050,34 @@ class CphfSolver(LinearSolver):
 
         num_vecs = dist_trials.shape(1)
 
-        batch_size = get_batch_size(self.batch_size, num_vecs, nao, self.comm)
+        # NOTE: the exchange-correlation integration holds this once for
+        # each build, whatever the number of its densities; both kinds of
+        # build take it off the room.
+        call_memory = None
+
+        if self.rank == mpi_master():
+            call_memory = self._xc_call_memory(molecule, basis, dft_dict,
+                                               False)
+
+        if self._uses_ri_jk() or self._uses_ri_coulomb():
+            # NOTE: an RI-JK build also holds the right factor of each density
+            # (ri_jk_factors below), nao by nocc.
+            density_memory = None
+
+            if self.rank == mpi_master():
+                density_memory = self._ri_density_memory(
+                    molecule, basis, dft_dict, nao, _RI_BATCH_MATRICES,
+                    nocc if self._uses_ri_jk() else 0, 1)
+
+            batch_size = get_ri_batch_size(self.batch_size, num_vecs, nao,
+                                           density_memory, self.comm,
+                                           call_memory)
+            self._note_ri_batch_memory(density_memory,
+                                       min(batch_size, num_vecs))
+        else:
+            batch_size = get_four_center_batch_size(self.batch_size, num_vecs,
+                                                    nao, self.comm,
+                                                    call_memory)
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
 
         if profiler is not None:
@@ -1057,8 +1101,14 @@ class CphfSolver(LinearSolver):
 
             if self.rank == mpi_master():
                 vec_list = []
+                # NOTE: the trial densities for the resolution of the identity,
+                # D = C(occ) U C(vir)^T = left right^T.  Built only where the
+                # RI-JK driver will use them.
+                ri_jk_factors = ((mo_occ, [])
+                                 if self._uses_ri_jk() else None)
             else:
                 vec_list = None
+                ri_jk_factors = None
 
             prep_t0 = tm.time()
 
@@ -1070,13 +1120,25 @@ class CphfSolver(LinearSolver):
                     vec = vec.reshape(nocc, nvir)
                     vec_ao = np.linalg.multi_dot([mo_occ, vec, mo_vir.T])
                     vec_list.append(vec_ao)
+                    if ri_jk_factors is not None:
+                        ri_jk_factors[1].append(np.matmul(mo_vir, vec.T))
 
             if profiler is not None:
                 profiler.add_timing_info('PreProc', tm.time() - prep_t0)
 
             # create Fock matrices and contract with two-electron integrals
-            fock = self._comp_lr_fock(vec_list, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict, profiler)
+            # NOTE: the CPHF equations are those of the ground state, whose
+            # C-PCM reaction field is in equilibrium (the static dielectric
+            # constant), whatever non_equilibrium_solv is.
+            fock = self._comp_lr_fock(vec_list,
+                                      molecule,
+                                      basis,
+                                      eri_dict,
+                                      dft_dict,
+                                      pe_dict,
+                                      profiler,
+                                      dens_factors=ri_jk_factors,
+                                      cpcm_non_equilibrium=False)
 
             if profiler is not None:
                 # only increment FockCount on master rank
@@ -1190,7 +1252,35 @@ class CphfSolver(LinearSolver):
 
         num_vecs = dist_trials.shape(1)
 
-        batch_size = get_batch_size(self.batch_size, num_vecs, nao, self.comm)
+        # NOTE: the exchange-correlation integration holds this once for
+        # each build, whatever the number of its densities; both kinds of
+        # build take it off the room.
+        call_memory = None
+
+        if self.rank == mpi_master():
+            call_memory = self._xc_call_memory(molecule, basis, dft_dict,
+                                               True)
+
+        if self._uses_ri_jk() or self._uses_ri_coulomb():
+            # NOTE: an RI-JK build also holds the right factor of each spin's
+            # density (ri_jk_factors below), nao by nocc_a and nao by nocc_b.
+            density_memory = None
+
+            if self.rank == mpi_master():
+                density_memory = self._ri_density_memory(
+                    molecule, basis, dft_dict, nao,
+                    _RI_BATCH_MATRICES_UNRESTRICTED,
+                    (nocc_a + nocc_b) if self._uses_ri_jk() else 0, 2)
+
+            batch_size = get_ri_batch_size(self.batch_size, num_vecs, nao,
+                                           density_memory, self.comm,
+                                           call_memory)
+            self._note_ri_batch_memory(density_memory,
+                                       min(batch_size, num_vecs))
+        else:
+            batch_size = get_four_center_batch_size(self.batch_size, num_vecs,
+                                                    nao, self.comm,
+                                                    call_memory)
         num_batches = get_number_of_batches(num_vecs, batch_size, self.comm)
 
         if profiler is not None:
@@ -1215,9 +1305,16 @@ class CphfSolver(LinearSolver):
             if self.rank == mpi_master():
                 vec_list_a = []
                 vec_list_b = []
+                # NOTE: one set of trial-density factors per spin for the
+                # resolution of the identity.
+                if self._uses_ri_jk():
+                    ri_jk_factors = ((mo_occ_a, []), (mo_occ_b, []))
+                else:
+                    ri_jk_factors = None
             else:
                 vec_list_a = None
                 vec_list_b = None
+                ri_jk_factors = None
 
             prep_t0 = tm.time()
 
@@ -1234,14 +1331,19 @@ class CphfSolver(LinearSolver):
                         [mo_occ_b, vec_b, mo_vir_b.T])
                     vec_list_a.append(vec_ao_a)
                     vec_list_b.append(vec_ao_b)
+                    if ri_jk_factors is not None:
+                        ri_jk_factors[0][1].append(
+                            np.matmul(mo_vir_a, vec_a.T))
+                        ri_jk_factors[1][1].append(
+                            np.matmul(mo_vir_b, vec_b.T))
 
             if profiler is not None:
                 profiler.add_timing_info('PreProc', tm.time() - prep_t0)
 
             # create Fock matrices and contract with two-electron integrals
-            fock = self._comp_lr_fock_unrestricted([vec_list_a, vec_list_b],
-                                                   molecule, basis, eri_dict,
-                                                   dft_dict, pe_dict, profiler)
+            fock = self._comp_lr_fock_unrestricted(
+                [vec_list_a, vec_list_b], molecule, basis, eri_dict, dft_dict,
+                pe_dict, profiler, dens_factors=ri_jk_factors)
 
             if profiler is not None:
                 # only increment FockCount on master rank
@@ -1556,8 +1658,10 @@ class CphfSolver(LinearSolver):
         t0 = tm.time()
 
         if self.rank == mpi_master():
+            # NOTE: no ostream, as the arrays are added below and the line
+            # about the file is printed after them.
             success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
-                                     basis, dft_dict, pe_dict, self.ostream)
+                                     basis, dft_dict, pe_dict, None)
         else:
             success = False
         success = self.comm.bcast(success, root=mpi_master())
@@ -1568,9 +1672,9 @@ class CphfSolver(LinearSolver):
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
-            checkpoint_text = 'Time spent in writing checkpoint file: '
-            checkpoint_text += f'{(tm.time() - t0):.2f} sec'
-            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_info(
+                f'Checkpoint written to file: {self.checkpoint_file} ' +
+                f'(took {tm.time() - t0:.2f} sec).')
             self.ostream.print_blank()
 
     def _read_checkpoint_for_cphf(self, labels):

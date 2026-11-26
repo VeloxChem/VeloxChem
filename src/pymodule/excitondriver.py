@@ -56,7 +56,7 @@ from .oneeints import (compute_nuclear_potential_integrals,
                        compute_angular_momentum_integrals)
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords
-from .dftutils import get_default_grid_level
+from .dftutils import get_default_grid_level, get_optimal_grid_box_size
 from .checkpoint import read_rsp_hdf5, write_rsp_hdf5
 from .spectrumplot import plot_uv_vis_spectrum, plot_ecd_spectrum
 
@@ -91,6 +91,7 @@ class ExcitonModelDriver:
         - natoms: The list containing number of atoms in each monomer.
         - charges: The list containing net charges of each monomer.
         - eri_thresh: The electron repulsion integrals screening threshold.
+        - ri: The flag for using the RI approximation.
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The name of XC functional.
@@ -145,6 +146,7 @@ class ExcitonModelDriver:
 
         # eri settings
         self.eri_thresh = 1.0e-12
+        self.ri = True
 
         # dft settings
         self._dft = False
@@ -199,6 +201,7 @@ class ExcitonModelDriver:
                 'checkpoint_file': ('str', 'name of checkpoint file'),
             },
             'method_settings': {
+                'ri': ('bool', 'use RI approximation'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
             },
@@ -416,6 +419,8 @@ class ExcitonModelDriver:
         else:
             dft_func_label = 'HF'
             method_dict = {}
+
+        method_dict['ri'] = self.ri
 
         rsp_vector_labels = [
             'dimer_indices',
@@ -1373,7 +1378,10 @@ class ExcitonModelDriver:
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
 
-            dimer_molgrid = grid_drv.generate(dimer)
+            xcfun_ldstaging = get_optimal_grid_box_size(
+                basis.get_dimensions_of_basis())
+
+            dimer_molgrid = grid_drv.generate(dimer, xcfun_ldstaging)
         else:
             dimer_molgrid = None
 
@@ -1406,6 +1414,7 @@ class ExcitonModelDriver:
         exchange_scaling_factor = 1.0
         if self._dft:
             xcfun = parse_xc_func(self.xcfun.upper())
+            xcfun._set_leading_dimension(xcfun_ldstaging)
             if xcfun.is_hybrid():
                 fock_type = '2jkx'
                 exchange_scaling_factor = xcfun.get_frac_exact_exchange()

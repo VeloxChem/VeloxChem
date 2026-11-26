@@ -123,12 +123,14 @@ class HessianOrbitalResponse(CphfSolver):
             density = scf_results['D_alpha']
             eocc = scf_results['E_alpha'][:nocc]
             mo = scf_results['C_alpha']
+            S = scf_results['S']
             point_charges = scf_results.get('point_charges', None)
             qm_vdw_params = scf_results.get('qm_vdw_params', None)
         else:
             density = None
             eocc = None
             mo = None
+            S = None
             point_charges = None
             qm_vdw_params = None
 
@@ -263,11 +265,17 @@ class HessianOrbitalResponse(CphfSolver):
         if self._dft:
             xc_mol_hess = XCMolecularHessian()
 
+            if self.xc_screening_threshold is not None:
+                xc_mol_hess.set_screening_threshold(
+                    self.xc_screening_threshold)
+
             naos = basis.get_dimensions_of_basis()
 
             if atom_pairs is None:
                 batch_size = get_batch_size(None, natm * 3, naos, self.comm)
-                batch_size = batch_size // 3
+                # NOTE: three Fock matrices for each atom, and at least one
+                # atom: get_batch_size gives 1 or 2 where little memory is free.
+                batch_size = max(batch_size // 3, 1)
 
                 num_batches = natm // batch_size
                 if natm % batch_size != 0:
@@ -275,10 +283,10 @@ class HessianOrbitalResponse(CphfSolver):
             else:
                 batch_size = get_batch_size(None, natm_in_pairs * 3, naos,
                                             self.comm)
-                batch_size = batch_size // 3
+                batch_size = max(batch_size // 3, 1)
 
                 num_batches = natm_in_pairs // batch_size
-                if natm % batch_size != 0:
+                if natm_in_pairs % batch_size != 0:
                     num_batches += 1
 
             for batch_ind in range(num_batches):
@@ -397,23 +405,36 @@ class HessianOrbitalResponse(CphfSolver):
             # the oo part of the CPHF coefficients in AO basis
             if self.rank == mpi_master():
                 uij_ao_list = []
+                # NOTE: the oo density for the resolution of the identity,
+                # uij_ao = C(occ) X C(occ)^T.  The overlap enters because the
+                # MOs are orthonormal in the S metric, so the X that reproduces
+                # uij_ao is C(occ)^T S uij_ao S C(occ).
+                ri_jk_factors_uij = ((mo_occ, [])
+                                     if self._uses_ri_jk()
+                                     else None)
             else:
                 uij_ao_list = None
+                ri_jk_factors_uij = None
 
             for x in range(3):
                 key_ix = (iatom, x)
                 ovlp_deriv_ao_ix = dist_ovlp_deriv_ao[key_ix].get_full_matrix()
 
                 if self.rank == mpi_master():
-                    uij_ao_list.append(
-                        np.linalg.multi_dot(
-                            [density, -0.5 * ovlp_deriv_ao_ix, density]))
+                    uij_ao = np.linalg.multi_dot(
+                        [density, -0.5 * ovlp_deriv_ao_ix, density])
+                    uij_ao_list.append(uij_ao)
+                    if ri_jk_factors_uij is not None:
+                        xmat = np.linalg.multi_dot(
+                            [mo_occ.T, S, uij_ao, S, mo_occ])
+                        ri_jk_factors_uij[1].append(mo_occ @ xmat.T)
 
             profiler.add_timing_info('UijAO', tm.time() - uij_t0)
 
             # create AODensity and Fock matrix objects, contract with ERI
             fock_uij = self._comp_lr_fock(uij_ao_list, molecule, basis,
-                                          eri_dict, dft_dict, pe_dict, profiler)
+                                          eri_dict, dft_dict, pe_dict, profiler,
+                                          dens_factors=ri_jk_factors_uij)
 
             if self.rank == mpi_master():
                 uij_ao_list.clear()
@@ -692,6 +713,9 @@ class HessianOrbitalResponse(CphfSolver):
         screener_atom = T4CScreener()
         screener_atom.partition_atom(basis, molecule, 'eri', i)
 
+        # NOTE: four-center also where the orbital response uses the
+        # resolution of the identity, as the derivative integrals of
+        # ScfHessianDriver are.
         # Fock gradient
         fock_grad_drv = FockGeom1000Driver()
         gmats_eri = fock_grad_drv.compute(basis, screener_atom, screener,

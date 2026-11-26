@@ -324,6 +324,12 @@ CMolecule::atom_basis_labels() const -> std::vector<std::pair<std::string, std::
 }
 
 auto
+CMolecule::coordinates() const -> const std::vector<TPoint<double>> &
+{
+    return _coordinates;
+}
+
+auto
 CMolecule::coordinates(const std::string &unit) const -> std::vector<TPoint<double>>
 {
     if (_is_angstrom(unit))

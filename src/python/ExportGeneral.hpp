@@ -51,7 +51,10 @@ namespace vlx_general {
  @param dimension the shape of numpy array.
  @return numpy array.
  */
-auto pointer_to_numpy(const double* ptr, const std::vector<int>& dimension) -> py::array_t<double>;
+/// @note The extents are py::ssize_t and not int, as a block of a sparse tensor
+/// reaches sixteen billion values and an int extent wraps to a negative one well
+/// before that.
+auto pointer_to_numpy(const double* ptr, const std::vector<py::ssize_t>& dimension) -> py::array_t<double>;
 
 /// @brief Exports classes/functions in src/orbdata to Python module.
 /// @param m The Python module.

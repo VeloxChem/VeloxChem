@@ -7,13 +7,16 @@ from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.dispersionmodel import DispersionModel
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.scfhessiandriver import ScfHessianDriver
+import veloxchem.batchsize as batchsize
 
 
 class TestHessianAtomPair:
 
     @pytest.mark.solvers
-    def test_hessian_atom_pair(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_atom_pair(self, ri):
 
         mol = Molecule.read_xyz_string("""15
 
@@ -38,9 +41,15 @@ class TestHessianAtomPair:
         atom_pairs = [(9, 6), (0, 3)]
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
-        scf_drv.acc_type = 'l2_c2diis'
-        scf_drv.compute(mol, basis)
+        scf_drv.acc_type = 'l2_diis'
+        scf_results = scf_drv.compute(mol, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         hess_drv = ScfHessianDriver(scf_drv)
         hess_drv.atom_pairs = atom_pairs
@@ -51,17 +60,25 @@ class TestHessianAtomPair:
 
         if scf_drv.rank == mpi_master():
             cwd = Path(__file__).parent
-            path = str(cwd / 'data' / 'water_hessian_pair_1-4_7-10.txt')
+            path = str(
+                cwd / 'data' / {
+                    False: 'water_hessian_pair_1-4_7-10.txt',
+                    True: 'water_hessian_pair_1-4_7-10_ri.txt'
+                }[ri])
             reference_hess = np.loadtxt(path)
             np.testing.assert_allclose(pair_hess,
                                        reference_hess,
                                        rtol=1e-8,
-                                       atol=1e-10)
+                                       atol=5e-7)
 
     @pytest.mark.solvers
     @pytest.mark.skipif(not DispersionModel.is_available(),
                         reason='dftd4-python not available')
-    def test_hessian_atom_pair_with_d4_matches_full_hessian(self):
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
+    def test_hessian_atom_pair_with_d4_matches_full_hessian(self, ri):
 
         mol = Molecule.read_xyz_string("""15
 
@@ -87,9 +104,15 @@ class TestHessianAtomPair:
         def run_hessian_with_dispersion(atom_pairs_input=None):
 
             scf_drv = ScfRestrictedDriver()
+            scf_drv.ri = ri
             scf_drv.ostream.mute()
             scf_drv.dispersion = True
-            scf_drv.compute(mol, basis)
+            scf_results = scf_drv.compute(mol, basis)
+
+            if scf_drv.rank == mpi_master():
+                if ri:
+                    assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                    assert not scf_results['ri_fallback']
 
             hess_drv = ScfHessianDriver(scf_drv)
             hess_drv.ostream.mute()
@@ -122,3 +145,122 @@ class TestHessianAtomPair:
                                                    0.0,
                                                    rtol=1.0e-7,
                                                    atol=1.0e-9)
+
+    @pytest.mark.solvers
+    @pytest.mark.parametrize('unrestricted', [False, True])
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hessian_atom_pair_dft_matches_full_hessian(self, ri, unrestricted):
+        """With DFT, the blocks kept for atom_pairs equal those of the full
+        Hessian and the other blocks are zero. The kept blocks include the
+        same-atom blocks of the atoms in pairs, which the XC energy term
+        rebuilds from all other blocks of their row, also those outside
+        atom_pairs."""
+
+        mol = Molecule.read_xyz_string("""4
+
+        N     0.000000000     0.000000000     0.000000000
+        H    -0.653401663     0.309213352     0.817609879
+        H     0.695693936     0.071283622    -0.702632331
+        H    -0.468651181    -0.844282500    -0.433152944""")
+
+        if unrestricted:
+            mol.set_charge(1)
+            mol.set_multiplicity(2)
+            scf_drv = ScfUnrestrictedDriver()
+        else:
+            scf_drv = ScfRestrictedDriver()
+
+        basis = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+
+        atom_pairs = [(0, 1), (1, 2)]
+
+        scf_drv.ri = ri
+        scf_drv.xcfun = 'b3lyp'
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        def run(atom_pairs_input):
+            hess_drv = ScfHessianDriver(scf_drv)
+            hess_drv.ostream.mute()
+            hess_drv.atom_pairs = atom_pairs_input
+            hess_drv.update_settings({}, cphf_dict={'conv_thresh': 1.0e-8})
+            hess_drv.compute(mol, basis)
+            return hess_drv.hessian
+
+        full_hessian = run(None)
+        pair_hessian = run(atom_pairs)
+
+        if scf_drv.rank == mpi_master():
+            kept_pairs = set(atom_pairs)
+            kept_pairs.update((i, i) for pair in atom_pairs for i in pair)
+
+            for i in range(mol.number_of_atoms()):
+                for j in range(mol.number_of_atoms()):
+                    block = pair_hessian[i * 3:(i + 1) * 3, j * 3:(j + 1) * 3]
+                    if (i, j) in kept_pairs or (j, i) in kept_pairs:
+                        np.testing.assert_allclose(
+                            block,
+                            full_hessian[i * 3:(i + 1) * 3, j * 3:(j + 1) * 3],
+                            rtol=1.0e-7,
+                            atol=1.0e-9)
+                    else:
+                        np.testing.assert_allclose(block,
+                                                   0.0,
+                                                   rtol=1.0e-7,
+                                                   atol=1.0e-9)
+
+    @pytest.mark.solvers
+    def test_batches_of_the_atoms_in_pairs(self, monkeypatch):
+        """The exchange-correlation part over the atoms in pairs takes every
+        one of them, also where they do not fill the last batch: four atoms,
+        three of them in pairs, two to a batch."""
+
+        mol = Molecule.read_xyz_string("""4
+
+        N     0.000000000     0.000000000     0.000000000
+        H    -0.653401663     0.309213352     0.817609879
+        H     0.695693936     0.071283622    -0.702632331
+        H    -0.468651181    -0.844282500    -0.433152944""")
+
+        basis = MolecularBasis.read(mol, 'sto-3g', ostream=None)
+        nao = basis.get_dimensions_of_basis()
+
+        atom_pairs = [(0, 1), (1, 2)]
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.xcfun = 'b3lyp'
+        scf_drv.ostream.mute()
+        scf_drv.compute(mol, basis)
+
+        def run():
+            hess_drv = ScfHessianDriver(scf_drv)
+            hess_drv.atom_pairs = atom_pairs
+            hess_drv.update_settings({}, cphf_dict={'conv_thresh': 1.0e-8})
+            hess_drv.compute(mol, basis)
+            return hess_drv.hessian
+
+        whole = run()
+
+        # NOTE: get_batch_size gives 6 Fock matrices for the 9 of the three
+        # atoms in pairs (an estimate of nao^2 doubles a thread for each, with
+        # four threads, and 6.5 of them free to the one rank on the node), so
+        # two atoms to a batch. Only the name get_available_memory in
+        # batchsize is replaced: the batch sizes follow it, the RI memory
+        # budgets, which read the free memory in environment, do not.
+        available = int(6.5 * nao * nao * 8 * 4)
+        monkeypatch.setattr(batchsize, 'get_available_memory',
+                            lambda: available)
+        monkeypatch.setenv('OMP_NUM_THREADS', '4')
+        monkeypatch.setenv('SLURM_NTASKS_PER_NODE', '1')
+
+        assert batchsize.get_batch_size(None, 9, nao, scf_drv.comm) == 6
+
+        batched = run()
+
+        if scf_drv.rank == mpi_master():
+            assert np.max(np.abs(whole - batched)) < 1.0e-8

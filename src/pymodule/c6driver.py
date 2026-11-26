@@ -42,7 +42,7 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
+                           dft_and_ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check, gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
@@ -262,11 +262,8 @@ class C6Driver(LinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -585,11 +582,8 @@ class C6Driver(LinearSolver):
 
             profiler.stop_timer('Orthonorm.')
 
-            if self.rank == mpi_master():
-                n_new_trials = new_trials_ger.shape(1) + new_trials_ung.shape(1)
-            else:
-                n_new_trials = None
-            n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
+            n_new_trials = self._get_num_trial_vectors(new_trials_ger,
+                                                       new_trials_ung)
 
             if iter_per_trial_in_hours is not None:
                 next_iter_in_hours = iter_per_trial_in_hours * n_new_trials
@@ -625,11 +619,14 @@ class C6Driver(LinearSolver):
 
         profiler.check_memory_usage('End of C6 solver')
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
 
         self._dist_bger = None
         self._dist_bung = None
         self._dist_e2bger = None
         self._dist_e2bung = None
+
+        self._release_freed_memory()
 
         # calculate response functions
         a_grad = self.get_complex_prop_grad(self.a_operator, self.a_components,
@@ -639,6 +636,8 @@ class C6Driver(LinearSolver):
             if self.rank == mpi_master():
                 va = {op: v for op, v in zip(self.a_components, a_grad)}
                 rsp_funcs = {}
+
+                solutions_write_time = 0.0
 
                 # final h5 file for response solutions
                 if self.filename is not None:
@@ -657,15 +656,18 @@ class C6Driver(LinearSolver):
 
                     # write solutions to h5 file
                     if (self.save_solutions and final_h5_fname is not None):
+                        write_t0 = tm.time()
                         write_rsp_full_solution_to_hdf5(
                             final_h5_fname, x, op_iw_ind, len(solutions))
+                        solutions_write_time += tm.time() - write_t0
 
             if self.rank == mpi_master():
                 # print information about h5 file for response solutions
                 if (self.save_solutions and final_h5_fname is not None):
                     self.ostream.print_info(
                         'Response solution vectors written to file: ' +
-                        final_h5_fname)
+                        f'{final_h5_fname} ' +
+                        f'(took {solutions_write_time:.2f} sec).')
                     self.ostream.print_blank()
                     self.ostream.flush()
 

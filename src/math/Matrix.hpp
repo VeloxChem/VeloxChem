@@ -43,11 +43,18 @@
 /// @brief Enumerate class mat_t: defines supported matrix types.
 /// mat::symmetric   - the symmetric square matrix
 /// mat::antisymmetric - the antisymmetric square matrix
+/// mat::lower_triangular - the lower triangular square matrix
 /// mat::general - the general square or rectangular matrix
+/// @note A lower triangular matrix is stored as the symmetric and the
+/// antisymmetric ones are, as its lower triangle including the diagonal, but its
+/// elements above the diagonal are zero rather than determined by those below
+/// it. Only CPackedMatrix holds one; the containers which expand a triangle into
+/// both halves of a matrix reject it, as mirroring it would be wrong.
 enum class mat_t
 {
     symmetric,
     antisymmetric,
+    lower_triangular,
     general
 };
 

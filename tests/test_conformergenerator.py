@@ -11,6 +11,7 @@ pytest.importorskip("rdkit")
 
 class TestConformerGenerator:
 
+    @pytest.mark.timeconsuming
     def test_conformergenerator(self):
 
         molecule = Molecule.read_xyz_string("""

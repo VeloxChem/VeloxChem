@@ -38,7 +38,7 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .lrsolverbase import LinearResponseSolverBase
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
+                           dft_and_ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check, gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
 from .mathutils import safe_solve
@@ -113,11 +113,8 @@ class LinearResponseSolver(LinearResponseSolverBase):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -309,14 +306,21 @@ class LinearResponseSolver(LinearResponseSolverBase):
 
                     dist_grad.update(extra_dist_grad)
 
+                    # projected onto the complement of the subspace restored
+                    # from the checkpoint; nothing may be left when it already
+                    # contains the guesses
                     bger, bung = self._setup_trials(extra_dist_grad,
-                                                    extra_precond)
+                                                    extra_precond,
+                                                    self._dist_bger,
+                                                    self._dist_bung,
+                                                    allow_empty=True)
 
-                    profiler.set_timing_key('Preparation')
+                    if self._get_num_trial_vectors(bger, bung) > 0:
+                        profiler.set_timing_key('Preparation')
 
-                    self._e2n_half_size(bger, bung, molecule, basis,
-                                        scf_results, eri_dict, dft_dict,
-                                        pe_dict, profiler)
+                        self._e2n_half_size(bger, bung, molecule, basis,
+                                            scf_results, eri_dict, dft_dict,
+                                            pe_dict, profiler)
 
         # generate initial guess from scratch
         else:
@@ -480,11 +484,8 @@ class LinearResponseSolver(LinearResponseSolverBase):
 
             profiler.stop_timer('Orthonorm.')
 
-            if self.rank == mpi_master():
-                n_new_trials = new_trials_ger.shape(1) + new_trials_ung.shape(1)
-            else:
-                n_new_trials = None
-            n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
+            n_new_trials = self._get_num_trial_vectors(new_trials_ger,
+                                                       new_trials_ung)
 
             if iter_per_trial_in_hours is not None:
                 next_iter_in_hours = iter_per_trial_in_hours * n_new_trials
@@ -520,11 +521,14 @@ class LinearResponseSolver(LinearResponseSolverBase):
 
         profiler.check_memory_usage('End of LR solver')
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
 
         self._dist_bger = None
         self._dist_bung = None
         self._dist_e2bger = None
         self._dist_e2bung = None
+
+        self._release_freed_memory()
 
         # calculate response functions
         if not self.has_external_rhs:
@@ -535,6 +539,8 @@ class LinearResponseSolver(LinearResponseSolverBase):
                 if self.rank == mpi_master():
                     va = {op: v for op, v in zip(self.a_components, a_grad)}
                     rsp_funcs = {}
+
+                    solutions_write_time = 0.0
 
                     # final h5 file for response solutions
                     if self.filename is not None:
@@ -557,15 +563,18 @@ class LinearResponseSolver(LinearResponseSolverBase):
 
                         # write solutions to h5 file
                         if (self.save_solutions and final_h5_fname is not None):
+                            write_t0 = tm.time()
                             write_rsp_full_solution_to_hdf5(
                                 final_h5_fname, x, op_w_ind, len(solutions))
+                            solutions_write_time += tm.time() - write_t0
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
                     if (self.save_solutions and final_h5_fname is not None):
                         self.ostream.print_info(
                             'Response solution vectors written to file: ' +
-                            final_h5_fname)
+                            f'{final_h5_fname} ' +
+                            f'(took {solutions_write_time:.2f} sec).')
                         self.ostream.print_blank()
                         self.ostream.flush()
 

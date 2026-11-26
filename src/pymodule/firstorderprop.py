@@ -49,12 +49,15 @@ class FirstOrderProperties:
         The MPI communicator.
     :param ostream:
         The output stream.
+    :param origin:
+        The origin of the dipole moment in bohr; None (the default) takes the
+        center of nuclear charge of the molecule passed to compute.
 
     Instance variables:
         - properties: The dictionary of properties.
     """
 
-    def __init__(self, comm=None, ostream=None):
+    def __init__(self, comm=None, ostream=None, origin=None):
         """
         Initializes SCF first-order properties.
         """
@@ -76,6 +79,7 @@ class FirstOrderProperties:
         self.properties = {}
 
         self._prop_drv = FirstOrderPropertyDriver(self.comm, self.ostream)
+        self._prop_drv.origin = origin
 
     def _set_dipole_moment(self, dipole_moment):
         """

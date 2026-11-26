@@ -1,0 +1,4 @@
+# Runs, kept on the machine they were taken on (see README.md).
+results/
+# The cases are input files, which the top-level .gitignore excludes.
+!cases/**/*.inp

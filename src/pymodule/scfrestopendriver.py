@@ -40,15 +40,13 @@ from .veloxchemlib import mpi_master, boltzmann_in_hartreeperkelvin
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
-from .c2diis import CTwoDiis
-from .diis import Diis
 from .mathutils import solve_in_orthogonal_basis
 
 
 class ScfRestrictedOpenDriver(ScfDriver):
     """
-    Implements spin restricted open shell SCF method with C2-DIIS and
-    two-level C2-DIIS convergence accelerators.
+    Implements spin restricted open shell SCF method with DIIS and
+    two-level DIIS convergence accelerators.
 
     :param comm:
         The MPI communicator.
@@ -91,7 +89,8 @@ class ScfRestrictedOpenDriver(ScfDriver):
             The orthogonalization matrix.
 
         :return:
-            The electronic gradient.
+            The error matrix (only populated on the master rank), the
+            electronic gradient and the maximum gradient.
         """
 
         if self.rank == mpi_master():
@@ -116,13 +115,14 @@ class ScfRestrictedOpenDriver(ScfDriver):
             e_grad = np.linalg.norm(e_mat)
             max_grad = np.max(np.abs(e_mat))
         else:
-            e_grad = 0.0
-            max_grad = 0.0
+            e_mat = None
+            e_grad = None
+            max_grad = None
 
-        e_grad = self.comm.bcast(e_grad, root=mpi_master())
-        max_grad = self.comm.bcast(max_grad, root=mpi_master())
+        e_grad, max_grad = self.comm.bcast((e_grad, max_grad),
+                                           root=mpi_master())
 
-        return e_grad, max_grad
+        return e_mat, e_grad, max_grad
 
     def _comp_density_change(self, den_mat, old_den_mat):
         """
@@ -152,106 +152,6 @@ class ScfRestrictedOpenDriver(ScfDriver):
         diff_den = self.comm.bcast(diff_den, root=mpi_master())
 
         return diff_den
-
-    def _store_diis_data(self, fock_mat, den_mat, ovl_mat, e_grad):
-        """
-        Stores spin restricted open shell Fock/Kohn-Sham and density matrices
-        for current iteration. Overloaded base class method.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        :param den_mat:
-            The density matrix.
-        :param ovl_mat:
-            The overlap matrix (used in ROSCF).
-        :param e_grad:
-            The electronic gradient.
-        """
-
-        if self.rank == mpi_master() and e_grad < self.diis_thresh:
-
-            if len(self._fock_matrices_alpha) == self.max_err_vecs:
-                self._fock_matrices_alpha.popleft()
-                self._fock_matrices_beta.popleft()
-                self._fock_matrices_proj.popleft()
-
-                self._density_matrices_alpha.popleft()
-                self._density_matrices_beta.popleft()
-
-            self._fock_matrices_alpha.append(fock_mat[0].copy())
-            self._fock_matrices_beta.append(fock_mat[1].copy())
-            self._fock_matrices_proj.append(
-                self.get_projected_fock(
-                    fock_mat[0],
-                    fock_mat[1],
-                    den_mat[0],
-                    den_mat[1],
-                    ovl_mat,
-                ))
-
-            self._density_matrices_alpha.append(den_mat[0].copy())
-            self._density_matrices_beta.append(den_mat[1].copy())
-
-    def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
-        """
-        Computes effective spin restricted open shell Fock/Kohn-Sham matrix
-        in the AO basis (by DIIS extrapolation of stored AO Fock/Kohn-Sham
-        matrices). Overloaded base class method.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        :param ovl_mat:
-            The overlap matrix.
-        :param oao_mat:
-            The orthogonalization matrix.
-
-        :return:
-            The effective Fock/Kohn-Sham matrices.
-        """
-
-        if self.rank == mpi_master():
-
-            if len(self._fock_matrices_alpha) == 1:
-                return (self._fock_matrices_proj[0],)
-
-            if len(self._fock_matrices_alpha) > 1:
-
-                if self.acc_type.upper() in ['C2DIIS', 'L2_C2DIIS']:
-                    acc_diis = CTwoDiis()
-                elif self.acc_type.upper() in ['DIIS', 'L2_DIIS']:
-                    acc_diis = Diis()
-
-                acc_diis.compute_error_vectors_restricted_openshell(
-                    self._fock_matrices_alpha, self._fock_matrices_beta,
-                    self._density_matrices_alpha, self._density_matrices_beta,
-                    ovl_mat, oao_mat)
-
-                weights = acc_diis.compute_weights()
-
-                return self._get_scaled_fock(weights)
-
-            return tuple(fock_mat)
-
-        return (None,)
-
-    def _get_scaled_fock(self, weights):
-        """
-        Computes effective spin restricted open shell Fock/Kohn-Sham matrix
-        by summing Fock/Kohn-Sham matrices scalwd with weigths.
-
-        :param weights:
-            The weights of Fock/Kohn-Sham matrices.
-
-        :return:
-            The scaled Fock/Kohn-Sham matrix.
-        """
-
-        effmat = np.zeros(self._fock_matrices_proj[0].shape)
-
-        for w, fmat in zip(weights, self._fock_matrices_proj):
-            effmat = effmat + w * fmat
-
-        return (effmat,)
 
     def _gen_molecular_orbitals(self, molecule, ao_basis, eff_fock_mat,
                                 oao_mat):
@@ -331,46 +231,6 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
         return MolecularOrbitals()
 
-    def get_projected_fock(self, fa, fb, da, db, s):
-        """
-        Generates projected Fock matrix.
-
-        :param fa:
-            The Fock matrix of alpha spin.
-        :param fb:
-            The Fock matrix of beta spin.
-        :param da:
-            The density matrix of alpha spin.
-        :param db:
-            The density matrix of beta spin.
-        :param s:
-            The overlap matrix.
-
-        :return:
-            The projected Fock matrix.
-        """
-
-        naos = s.shape[0]
-
-        inactive = np.matmul(s, db)
-        active = np.matmul(s, da - db)
-        virtual = np.eye(naos) - np.matmul(s, da)
-
-        #       occ   act   vir
-        #     +----------------+
-        # occ | f0    fb    f0 |
-        # act | fb    f0    fa |
-        # vir | f0    fa    f0 |
-        #     +----------------+
-
-        f0 = 0.5 * (fa + fb)
-
-        fcorr = np.linalg.multi_dot([inactive, fb - f0, active.T])
-        fcorr += np.linalg.multi_dot([active, fa - f0, virtual.T])
-        fcorr += fcorr.T
-
-        return f0 + fcorr
-
     def get_scf_type_str(self):
         """
         Gets string for spin restricted open shell SCF calculation.
@@ -381,7 +241,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
         """
 
         if self.embedding is not None:
-            emb_type = ' with ' + self.embedding['settings']['embedding_method']
+            emb_type = ' with PE'
         else:
             emb_type = ''
 
@@ -405,6 +265,13 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
+                continue
+            # NOTE: the RI driver the SCF formed is not copied. The simd RI
+            # drivers have no copy in Python, and the copy forms its own when it
+            # runs the SCF. A gradient of a copy which has not run the SCF stops
+            # with an error before any work (ScfGradientDriver.compute,
+            # TddftGradientDriver.compute).
+            if key == '_ri_drv':
                 continue
             setattr(new_scf_drv, key, deepcopy(val))
 

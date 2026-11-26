@@ -37,6 +37,10 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#ifdef __GLIBC__
+#include <malloc.h>
+#endif
+
 #include "AtomicRadii.hpp"
 #include "BatchFunc.hpp"
 #include "Codata.hpp"
@@ -60,22 +64,22 @@ namespace vlx_general {
 // Gets shape and strides from dimension
 
 static auto
-get_shape_and_strides(const std::vector<int>& dimension) -> std::tuple<std::vector<py::ssize_t>, std::vector<py::ssize_t>>
+get_shape_and_strides(const std::vector<py::ssize_t>& dimension) -> std::tuple<std::vector<py::ssize_t>, std::vector<py::ssize_t>>
 {
     std::vector<py::ssize_t> shape, strides;
 
     for (size_t i = 0; i < dimension.size(); i++)
     {
-        shape.push_back(static_cast<py::ssize_t>(dimension[i]));
+        shape.push_back(dimension[i]);
 
-        size_t strd = 1;
+        py::ssize_t strd = 1;
 
         for (size_t j = i + 1; j < dimension.size(); j++)
         {
             strd *= dimension[j];
         }
 
-        strides.push_back(static_cast<py::ssize_t>(strd * sizeof(double)));
+        strides.push_back(strd * static_cast<py::ssize_t>(sizeof(double)));
     }
 
     return {shape, strides};
@@ -85,7 +89,7 @@ get_shape_and_strides(const std::vector<int>& dimension) -> std::tuple<std::vect
 // Not a static function; used in other files
 
 auto
-pointer_to_numpy(const double* ptr, const std::vector<int>& dimension) -> py::array_t<double>
+pointer_to_numpy(const double* ptr, const std::vector<py::ssize_t>& dimension) -> py::array_t<double>
 {
     if (dimension.size() == 0)
     {
@@ -96,7 +100,7 @@ pointer_to_numpy(const double* ptr, const std::vector<int>& dimension) -> py::ar
         if (ptr == nullptr)
         {
             // double check that total number of elements is zero
-            int num_elems = 1;
+            py::ssize_t num_elems = 1;
             for (const auto& n : dimension)
             {
                 num_elems *= n;
@@ -125,6 +129,32 @@ export_general(py::module &m) -> void
         "mpi_size_limit",
         []() -> int { return static_cast<int>(1 << 30) / 5 * 9; },
         "Gets the size limit in MPI communication (below 2^31-1).");
+
+    // NOTE: the same call the RI Fock drivers make at the end of prepare. Memory
+    // freed in blocks below the allocator's mapping threshold, as the buffers of
+    // every thread are, is kept by the allocator for reuse and stays resident
+    // until it is returned this way.
+    //
+    // NOTE: **where to trim.** At the end of a phase, by the code which owns that
+    // end. When the memory freed and the peak it would raise belong to one C++
+    // driver, the driver trims itself, as the RI Fock drivers do after forming
+    // their B vectors or integrals, so that every caller of prepare is covered.
+    // When the memory spans several drivers or arrays held in Python, or what
+    // matters is what the next calculation finds free, the Python driver which
+    // runs the phases trims once, through this function, as the SCF gradient
+    // does after its two-electron term and the response solvers at the end of
+    // a solve. Either way the call is made from C++, where the allocator is
+    // known, rather than through ctypes.
+    m.def(
+        "release_free_memory",
+        []() -> bool {
+#ifdef __GLIBC__
+            return malloc_trim(0) != 0;
+#else
+            return false;
+#endif
+        },
+        "Returns memory the allocator holds free to the system, and tells whether any was returned.");
 
     /// exposing functions from StringFormat.hpp
     m.def("upper_case", &format::upper_case, "Creates upper cased copy of given string.");

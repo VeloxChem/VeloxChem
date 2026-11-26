@@ -1,0 +1,10 @@
+fika-force-field 1 tip3p nonpolarizable
+# TIP3P water: W. L. Jorgensen, J. Chandrasekhar, J. D. Madura, R. W. Impey and M. L. Klein,
+# J. Chem. Phys. 79, 926 (1983). Point charges (e) on O, H, H.
+
+residue hoh 3
+charges
+1 -0.834
+2  0.417
+3  0.417
+end

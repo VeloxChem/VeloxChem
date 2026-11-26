@@ -10,10 +10,9 @@ from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.cubicresponsedriver import CubicResponseDriver
 
 
-@pytest.mark.timeconsuming
 class TestCrfFDECP:
 
-    def run_crf_fd_with_ecp(self, components, freqs):
+    def run_crf_fd_with_ecp(self, components, freqs, *, ri):
 
         comm = MPI.COMM_WORLD
         ostream = OutputStream(None)
@@ -38,8 +37,14 @@ class TestCrfFDECP:
         method_settings = {'xcfun': 'hf'}
 
         scfdrv = ScfRestrictedDriver(comm, ostream)
+        scfdrv.ri = ri
         scfdrv.update_settings(scf_settings, method_settings)
         scf_result = scfdrv.compute(molecule, basis)
+
+        if scfdrv.rank == mpi_master():
+            if ri:
+                assert scf_result['ri_jk'] or scf_result['ri_coulomb']
+                assert not scf_result['ri_fallback']
 
         crf = CubicResponseDriver(comm, ostream)
 
@@ -137,6 +142,7 @@ class TestCrfFDECP:
         method_dict_minus['electric_field'] = efield_minus
 
         scf_drv_plus = ScfRestrictedDriver(comm, ostream)
+        scf_drv_plus.ri = ri
         scf_drv_plus.update_settings(scf_settings, method_dict_plus)
         scf_result_plus = scf_drv_plus.compute(molecule, basis)
 
@@ -145,6 +151,7 @@ class TestCrfFDECP:
         quad_result_plus = qrf_plus.compute(molecule, basis, scf_result_plus)
 
         scf_drv_minus = ScfRestrictedDriver(comm, ostream)
+        scf_drv_minus.ri = ri
         scf_drv_minus.update_settings(scf_settings, method_dict_minus)
         scf_result_minus = scf_drv_minus.compute(molecule, basis)
 
@@ -161,6 +168,8 @@ class TestCrfFDECP:
             gamma_0_fd = (beta_plus.real - beta_minus.real) / (2.0 * delta_ef)
             assert abs(gamma_0 - gamma_0_fd) / abs(gamma_0_fd) < 1.0e-5
 
-    def test_hf_crf_fd_with_ecp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    @pytest.mark.timeconsuming
+    def test_hf_crf_fd_with_ecp(self, ri):
 
-        self.run_crf_fd_with_ecp('zyyz', [0.11, -0.20, 0.05])
+        self.run_crf_fd_with_ecp('zyyz', [0.11, -0.20, 0.05], ri=ri)

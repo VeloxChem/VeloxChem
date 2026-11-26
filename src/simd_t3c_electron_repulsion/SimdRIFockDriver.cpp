@@ -1,0 +1,2769 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+#include "SimdRIFockDriver.hpp"
+
+#include <algorithm>
+#include <array>
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <limits>
+#include <memory>
+#include <numeric>
+#include <utility>
+#include <vector>
+
+#include "AtomBasisGroup.hpp"
+#include "AtomBasisTripleSparsity.hpp"
+#include "DenseIndexFunc.hpp"
+#include "ErrorHandler.hpp"
+#include "OpenMPFunc.hpp"
+#include "ScreeningFunc.hpp"
+#include "SimdAlign.hpp"
+#include "SimdRIFockCommon.hpp"
+#include "SimdT3CDistributor.hpp"
+#include "SimdT3CRsDistributor.hpp"
+#include "SimdThreeCenterElectronRepulsionDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionGradientRsDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionRsDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionGeom10BufferRows.hpp"
+#include "SimdTwoCenterElectronRepulsionGeom10RsBufferRows.hpp"
+#include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
+#include "ThreadedDenseLinearAlgebra.hpp"
+#include "TripleSparsityPattern.hpp"
+
+namespace {  // anonymous namespace
+
+/// @brief One basis function of one atom basis group on the auxiliary side, and
+/// the place its auxiliary functions occupy in the permuted metric.
+/// @note The values of a combination of basis functions are laid out as the
+/// angular component, then the atom on the auxiliary side, then the atom pair,
+/// so the auxiliary functions of a combination are the pairs of an angular
+/// component and an atom, in that order. The permuted metric is ordered the same
+/// way, so that the rows and the columns a contraction needs are one contiguous
+/// block of it rather than a gather.
+struct TAuxFunction
+{
+    /// @brief The index of the atom basis group on the auxiliary side.
+    size_t group;
+
+    /// @brief The angular momentum of the basis function.
+    int momentum;
+
+    /// @brief The index of the basis function within its angular momentum.
+    size_t index;
+
+    /// @brief The number of auxiliary functions, i.e. the angular components
+    /// times the atoms of the group.
+    size_t count;
+
+    /// @brief The first row or column of the permuted metric.
+    size_t offset;
+};
+
+/// @brief The fraction of the B vectors which is actually held.
+/// @param bq_vectors The B vectors.
+/// @param basis The molecular basis.
+/// @param aux_basis The auxiliary molecular basis.
+/// @return The number of values held over the number a dense tensor would hold.
+/// @note An off-diagonal pair of atoms is held once and fills two places of the
+/// square, and a diagonal pair is held with the basis functions of both sides and
+/// fills one. Counting the values twice over would put the density above one,
+/// which a fraction cannot be.
+/// @note It costs a walk over the combinations of every block, which is why the
+/// transformation asks for it only when the threshold makes it a question.
+auto
+_bq_density(const CSparseTensor   &bq_vectors,
+            const CMolecularBasis &basis,
+            const CMolecularBasis &aux_basis,
+            const size_t           held) -> double
+{
+    const auto nao = basis.dimensions_of_basis();
+
+    // NOTE: the auxiliary functions this tensor actually holds, which on more than
+    // one rank is a share of the basis and not the whole of it. Dividing by the
+    // whole reported a density smaller by the number of the ranks -- 0.0410 where
+    // the single rank trend gave 0.33 -- which reads as an extremely sparse tensor
+    // rather than as a tensor of which this rank holds an eighth.
+    const auto naux = (held > 0) ? held : aux_basis.dimensions_of_basis();
+
+    if ((nao == 0) || (naux == 0)) return 0.0;
+
+    const auto indices = denseidx::index_functions(basis);
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    size_t filled = 0;
+
+    for (size_t ib = 0; ib < bq_vectors.number_of_blocks(); ib++)
+    {
+        const auto &block = bq_vectors.block(ib);
+
+        const auto &a_atoms = block.a_atoms();
+
+        const auto &b_atoms = block.b_atoms();
+
+        const auto natoms = block.c_atoms().size();
+
+        if ((a_atoms.empty()) || (natoms == 0)) continue;
+
+        size_t ndiag = 0;
+
+        while ((ndiag < a_atoms.size()) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
+
+        for (const auto [la, ia] : indices[static_cast<size_t>(block.a_index())])
+        {
+            for (const auto [lb, jb] : indices[static_cast<size_t>(block.b_index())])
+            {
+                for (const auto [lc, kc] : aux_indices[static_cast<size_t>(block.c_index())])
+                {
+                    const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
+
+                    if (npairs == 0) continue;
+
+                    const auto ncomps = static_cast<size_t>((2 * la + 1) * (2 * lb + 1) * (2 * lc + 1));
+
+                    const auto diagonal = std::min(ndiag, npairs);
+
+                    filled += (2 * npairs - diagonal) * natoms * ncomps;
+                }
+            }
+        }
+    }
+
+    return static_cast<double>(filled) /
+           (static_cast<double>(naux) * static_cast<double>(nao) * static_cast<double>(nao));
+}
+
+/// @brief Describes the basis functions of the atom basis groups on the auxiliary
+/// side and the place they occupy in the permuted metric.
+/// @param groups The atom basis groups on the auxiliary side.
+/// @param indices The angular momenta and indices of the basis functions of each
+/// unique atom basis of the auxiliary molecular basis.
+/// @param dimension The number of auxiliary functions the groups carry, which the
+/// function sets.
+/// @return The vector of basis functions.
+auto
+_make_aux_functions(const std::vector<CAtomBasisGroup>  &groups,
+                    const denseidx::TBasisFunctionIndex &indices,
+                    size_t                              &dimension) -> std::vector<TAuxFunction>
+{
+    std::vector<TAuxFunction> functions;
+
+    size_t offset = 0;
+
+    for (size_t i = 0; i < groups.size(); i++)
+    {
+        const auto natoms = groups[i].number_of_atoms();
+
+        for (const auto [momentum, index] : indices[static_cast<size_t>(groups[i].index())])
+        {
+            const auto count = static_cast<size_t>(2 * momentum + 1) * natoms;
+
+            functions.push_back(TAuxFunction{i, momentum, index, count, offset});
+
+            offset += count;
+        }
+    }
+
+    dimension = offset;
+
+    return functions;
+}
+
+/// @brief Creates the dense indices of the auxiliary functions of the basis
+/// functions, in the order the permuted metric holds them.
+/// @param functions The basis functions on the auxiliary side.
+/// @param groups The atom basis groups on the auxiliary side.
+/// @param starts The dense index of the first angular component of the first basis
+/// function of each angular momentum of each atom.
+/// @param strides The distance between the dense indices of two consecutive angular
+/// components of a basis function of each angular momentum.
+/// @param nmoms The number of angular momenta of the auxiliary molecular basis.
+/// @param dimension The number of auxiliary functions the groups carry.
+/// @return The vector of dense indices.
+auto
+_make_dense_indices(const std::vector<TAuxFunction>    &functions,
+                    const std::vector<CAtomBasisGroup> &groups,
+                    const std::vector<size_t>          &starts,
+                    const std::vector<size_t>          &strides,
+                    const size_t                        nmoms,
+                    const size_t                        dimension) -> std::vector<size_t>
+{
+    std::vector<size_t> dense(dimension, 0);
+
+    for (const auto &function : functions)
+    {
+        const auto &atoms = groups[function.group].atoms();
+
+        const auto natoms = atoms.size();
+
+        const auto lval = static_cast<size_t>(function.momentum);
+
+        const auto ncomps = static_cast<size_t>(2 * function.momentum + 1);
+
+        for (size_t m = 0; m < ncomps; m++)
+        {
+            for (size_t n = 0; n < natoms; n++)
+            {
+                const auto atom = static_cast<size_t>(atoms[n]);
+
+                dense[function.offset + m * natoms + n] =
+                    starts[atom * nmoms + lval] + function.index + m * strides[lval];
+            }
+        }
+    }
+
+    return dense;
+}
+
+/// @brief One product of a contraction of the B vectors: the block of atom pairs
+/// and the combination of angular momenta whose integrals it multiplies.
+/// @note Every combination gathers and multiplies on its own and writes where no
+/// other one writes, so this is the unit the contraction divides over.
+struct TBqTask
+{
+    size_t block;
+    int    la;
+    size_t ia;
+    int    lb;
+    size_t jb;
+    size_t component;
+};
+
+/// @brief The clock the phases of the B vectors are timed on.
+using prof_clock = std::chrono::steady_clock;
+
+/// @brief The seconds since a mark.
+inline auto
+prof_since(const prof_clock::time_point &mark) -> double
+{
+    return std::chrono::duration<double>(prof_clock::now() - mark).count();
+}
+
+/// @brief The times of the phases of forming the B vectors.
+/// @note They are formed once, where the mode which holds them reads them on every
+/// iteration. What the phases are worth measuring against is the direct mode, which
+/// sweeps the same integrals on every build: the sweep here is the same work, so a
+/// phase of this which is many times that one is not the price of holding them.
+/// @brief How far one auxiliary entry of one item reaches, for the profile.
+/// @note The entry is named rather than its height carried, because a group holds
+/// several items and one entry may be reached by more than one of them. Counting
+/// the rows twice would say a band needs more of them than it does.
+struct TBqReach
+{
+    size_t entry;
+
+    size_t column;
+
+    size_t span;
+
+    size_t taken;
+};
+
+/// @brief One chunk of the atom pairs of one task, which is the unit the gather
+/// brings and the unit the scatter takes away.
+struct TBqItem
+{
+    size_t task;
+
+    size_t cfirst;
+
+    size_t count;
+};
+
+/// @brief A run of chunks gathered side by side into one buffer and handed to one
+/// product, holding at most the columns the buffer was allocated for.
+struct TBqGroup
+{
+    size_t first;
+
+    size_t last;
+
+    size_t columns;
+};
+
+struct CBqProfile
+{
+    double metric = 0.0;
+    double pattern = 0.0;
+    double allocate = 0.0;
+    double integrals = 0.0;
+    double contract = 0.0;
+    double total = 0.0;
+
+    size_t nrows = 0;
+    size_t ncols = 0;
+    size_t out_entries = 0;
+    size_t in_entries = 0;
+    size_t nproducts = 0;
+    size_t ngathered = 0;
+    size_t nread = 0;
+    size_t nkept = 0;
+    size_t nabsent = 0;
+
+    /// @brief How far an auxiliary entry reaches into its chunk, in tenths, weighted
+    /// by the rows the entry carries. The last bin is the entries which reach the
+    /// whole width and set it.
+    std::array<size_t, 10> reach_bins = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    std::array<size_t, 4> nfixed = {0, 0, 0, 0};
+    std::array<size_t, 4> nsorted = {0, 0, 0, 0};
+    size_t nblocks = 0;
+    size_t nbatches = 0;
+    size_t ntasks = 0;
+    size_t nchunk = 0;
+
+    /// @brief Writes the phases of the B vectors, and their share of them.
+    auto report(const size_t nbytes) const -> void
+    {
+        const auto accounted = metric + pattern + allocate + integrals + contract;
+
+        const char *names[] = {"metric", "pattern", "allocate", "integrals", "contract", "rest"};
+
+        const double times[] = {metric, pattern, allocate, integrals, contract, total - accounted};
+
+        std::printf("RIJK b vectors of %.2f GB on %d threads, %.3f s\n", static_cast<double>(nbytes) / 1.0e9, omp::get_number_of_threads(), total);
+
+        for (size_t i = 0; i < 6; i++)
+        {
+            std::printf("RIJK   %-12s %9.3f s %6.1f %%\n", names[i], times[i],
+                        (total > 0.0) ? 100.0 * times[i] / total : 0.0);
+        }
+
+        const auto gb = [](const size_t bytes) { return static_cast<double>(bytes) / 1.0e9; };
+
+        std::printf("RIJK   %zu rows in %zu entries, %zu columns in %zu entries\n", nrows, out_entries, ncols,
+                    in_entries);
+
+        std::printf("RIJK   %zu products, %.2f GB gathered, %.2f GB read back from it\n", nproducts, gb(ngathered),
+                    gb(nread));
+
+        // NOTE: a chunk is gathered to its full width and multiplied whole, while a
+        // group of the auxiliary side may keep fewer atom pairs than the widest of
+        // them. The difference is multiplied against zeros which are known to be
+        // zero. The share is reported because the contraction is 94% of forming the
+        // B vectors and runs at 84% of what the library gives on a dense product:
+        // there is no arithmetic to win back by running it better, only by not
+        // doing it, and this is the only place where some of it is provably idle.
+        const auto kept_bytes = nkept * sizeof(double);
+
+        const auto absent_bytes = nabsent * sizeof(double);
+
+        const auto share = [ngathered = ngathered](const size_t bytes) {
+            return (ngathered > 0) ? 100.0 * static_cast<double>(bytes) / static_cast<double>(ngathered) : 0.0;
+        };
+
+        std::printf("RIJK   %.2f GB of values in that, %.1f %% padding\n", gb(kept_bytes),
+                    100.0 - share(kept_bytes));
+
+        std::printf("RIJK   padding is %.1f %% groups which reach no pair of the chunk, %.1f %% tails\n",
+                    share(absent_bytes), 100.0 - share(kept_bytes) - share(absent_bytes));
+
+        // NOTE: what banding the product across the pairs would leave, against the
+        // whole rectangle. The metric's order is fixed once for every block, so the
+        // `fixed` figure is what a single global ordering recovers and the `sorted`
+        // one what a per block ordering would; the second is an upper bound nobody
+        // can reach without gathering the metric block by block.
+        size_t total_rows = 0;
+
+        for (const auto bin : reach_bins) total_rows += bin;
+
+        if (total_rows > 0)
+        {
+            std::printf("RIJK   how far a row reaches, by tenths of the chunk:\n");
+
+            size_t widest = 1;
+
+            for (const auto bin : reach_bins) widest = std::max(widest, bin);
+
+            for (size_t k = 0; k < 10; k++)
+            {
+                std::printf("RIJK     %3zu-%3zu %%  %5.1f %%  %s\n", k * 10, (k + 1) * 10,
+                            100.0 * static_cast<double>(reach_bins[k]) / static_cast<double>(total_rows),
+                            std::string(static_cast<size_t>(40.0 * reach_bins[k] / widest), '#').c_str());
+            }
+        }
+
+        const auto rectangle = static_cast<double>(ngathered / sizeof(double));
+
+        if (rectangle > 0.0)
+        {
+            constexpr std::array<size_t, 4> bands = {2, 4, 8, 16};
+
+            for (size_t k = 0; k < bands.size(); k++)
+            {
+                std::printf("RIJK   in %2zu bands: %5.1f %% saved on the metric's order, %5.1f %% on a per block "
+                            "one\n",
+                            bands[k], 100.0 * (1.0 - static_cast<double>(nfixed[k]) / rectangle),
+                            100.0 * (1.0 - static_cast<double>(nsorted[k]) / rectangle));
+            }
+        }
+
+        std::printf("RIJK   %zu blocks in %zu batches, %zu tasks, on %d threads, chunk %zu\n", nblocks, nbatches,
+                    ntasks, omp::get_number_of_threads(), nchunk);
+
+        std::fflush(stdout);
+    }
+};
+
+}  // anonymous namespace
+
+auto
+CSimdRIFockDriver::_compute_bq_vectors(const CMolecule                          &molecule,
+                                       const CMolecularBasis                    &basis,
+                                       const CMolecularBasis                    &aux_basis,
+                                       const std::vector<const CPackedMatrix *> &inverse_metrics,
+                                       const double                              threshold,
+                                       const double                              omega,
+                                       const std::vector<int>                   &aux_atoms) const
+    -> std::vector<CSparseTensor>
+{
+    // NOTE: one operator or two. Two is a hybrid range separated functional, whose
+    // exchange needs the attenuated B vectors beside the plain ones. The two are
+    // built together rather than by two calls because they share everything but the
+    // values: one sparsity pattern, one set of blocks, one walk of the indices of
+    // the gather and of the scatter. What is doubled is the integrals, the metric
+    // product and the storage, which is the work itself.
+
+    const auto nops = inverse_metrics.size();
+
+    errors::assertMsgCritical((nops == 1) || (nops == 2),
+                              std::string("RIJFockDriver: The B vectors are formed for one operator or two"));
+
+    errors::assertMsgCritical((nops == 1) == (omega == 0.0),
+                              std::string("RIJFockDriver: Two operators are the Coulomb one and the attenuated one, "
+                                          "which asks for a range separation parameter, and one is the Coulomb "
+                                          "operator alone, which does not"));
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    for (const auto *inverse_metric : inverse_metrics)
+    {
+        errors::assertMsgCritical((inverse_metric->number_of_rows() == naux) &&
+                                      (inverse_metric->number_of_columns() == naux),
+                                  std::string("RIJFockDriver: The inverse metric does not match the auxiliary basis"));
+
+        // NOTE: the metric is read as at(q, p), so the B vectors are the sum over p
+        // of M_qp times the integrals of p. A symmetric matrix makes the two orders
+        // of the index the same, and a lower triangular one does not: the inverted
+        // Cholesky factor L, with the matrix equal to L L transposed, is what makes
+        // B transposed times B the inverse of the matrix and closes the Coulomb
+        // matrix of the fitting.
+
+        errors::assertMsgCritical((inverse_metric->get_type() == mat_t::symmetric) ||
+                                      (inverse_metric->get_type() == mat_t::lower_triangular),
+                                  std::string("RIJFockDriver: The inverse metric must be symmetric or lower triangular"));
+    }
+
+    // a share of no atoms holds no B vectors, of either operator
+
+    if (aux_atoms.empty()) return std::vector<CSparseTensor>(nops);
+
+    // the blocks of atom pairs, which both the integrals and the B vectors carry
+
+    auto groups = basis.basis_pair_groups();
+
+    auto ab_blocks = sparsity::make_triple_blocks(molecule, groups, 0);
+
+    // the atom basis groups on the auxiliary side: every one of them for the sum
+    // over p, and the ones the caller asked for on q
+
+    std::vector<int> all_atoms(static_cast<size_t>(molecule.number_of_atoms()));
+
+    std::iota(all_atoms.begin(), all_atoms.end(), 0);
+
+    const auto in_groups = sparsity::select_aux_groups(molecule, aux_basis, all_atoms);
+
+    const auto out_groups = sparsity::select_aux_groups(molecule, aux_basis, aux_atoms);
+
+    CBqProfile profile;
+
+    const auto profile_start = prof_clock::now();
+
+    const auto profiled = (std::getenv("VLX_RIJK_PROFILE") != nullptr);
+
+    // the basis functions on the auxiliary side and the permuted metric
+
+    const auto mark_metric = prof_clock::now();
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    const auto aux_starts = denseidx::make_dense_starts(aux_basis);
+
+    const auto aux_strides = denseidx::make_dense_strides(aux_basis);
+
+    const auto nmoms = static_cast<size_t>(aux_basis.max_angular_momentum() + 1);
+
+    size_t nrows = 0, ncols = 0;
+
+    const auto out_functions = _make_aux_functions(out_groups, aux_indices, nrows);
+
+    const auto in_functions = _make_aux_functions(in_groups, aux_indices, ncols);
+
+    const auto out_dense = _make_dense_indices(out_functions, out_groups, aux_starts, aux_strides, nmoms, nrows);
+
+    const auto in_dense = _make_dense_indices(in_functions, in_groups, aux_starts, aux_strides, nmoms, ncols);
+
+    // NOTE: the metric is held in the order the values of a combination are laid
+    // out rather than in the order of the basis, so that the rows and the columns
+    // a contraction needs are a contiguous block of it. It is the square of the
+    // auxiliary basis, which is nothing beside the B vectors themselves.
+
+    // NOTE: the operators are permuted into one buffer, each holding its own
+    // metric, so that the product of an operator reads a contiguous block of it.
+
+    auto metric = std::make_unique_for_overwrite<double[]>(nops * nrows * ncols);
+
+    const auto nmetric = static_cast<int>(nrows);
+
+    for (size_t k = 0; k < nops; k++)
+    {
+        const auto &inverse_metric = *inverse_metrics[k];
+
+        auto *into = metric.get() + k * nrows * ncols;
+
+#pragma omp parallel for schedule(static) if (nmetric > 1)
+        for (int i = 0; i < nmetric; i++)
+        {
+            const auto irow = static_cast<size_t>(i);
+
+            auto *row = into + irow * ncols;
+
+            for (size_t j = 0; j < ncols; j++)
+            {
+                row[j] = inverse_metric.at(out_dense[irow], in_dense[j]);
+            }
+        }
+    }
+
+    profile.metric += prof_since(mark_metric);
+
+    profile.nrows = nrows;
+
+    profile.ncols = ncols;
+
+    profile.out_entries = out_functions.size();
+
+    profile.in_entries = in_functions.size();
+
+    // the sparsity pattern of the B vectors, and the block each pair of a block of
+    // atom pairs and a basis function on the auxiliary side is held in
+
+    const auto &bound = screenfunc::three_center_electron_repulsion_bound;
+
+    const auto npos = std::numeric_limits<size_t>::max();
+
+    const auto nab = ab_blocks.size();
+
+    const auto nout_groups = out_groups.size();
+
+    const auto nin_groups = in_groups.size();
+
+    const auto mark_out_blocks = prof_clock::now();
+
+    std::vector<CAtomBasisTripleSparsity> out_blocks;
+
+    std::vector<size_t> out_map(nab * nout_groups, npos);
+
+    for (size_t i = 0; i < nab; i++)
+    {
+        for (size_t j = 0; j < nout_groups; j++)
+        {
+            auto block = CAtomBasisTripleSparsity(ab_blocks[i], out_groups[j], bound, threshold);
+
+            if (block.number_of_pairs() > 0)
+            {
+                out_map[i * nout_groups + j] = out_blocks.size();
+
+                out_blocks.push_back(std::move(block));
+            }
+        }
+    }
+
+    profile.pattern += prof_since(mark_out_blocks);
+
+    const auto mark_allocate = prof_clock::now();
+
+    // NOTE: the tensors are built on one pattern, so an element of either is found
+    // at the same place in the other and the two can be read together. It is the
+    // pattern of the Coulomb bound for both, as the attenuated operator is bounded
+    // by the plain one everywhere.
+
+    const auto out_pattern = CTripleSparsityPattern(std::move(out_blocks), mat_t::symmetric, threshold);
+
+    std::vector<CSparseTensor> bq_vectors;
+
+    bq_vectors.reserve(nops);
+
+    for (size_t k = 0; k < nops; k++)
+    {
+        bq_vectors.emplace_back(out_pattern);
+
+        bq_vectors.back().allocate();
+
+        bq_vectors.back().zero();
+    }
+
+    profile.allocate += prof_since(mark_allocate);
+
+    // NOTE: the blocks of the integrals are described once rather than once per
+    // batch, so that the batches are formed from the memory they are known to
+    // need rather than from an estimate of it.
+
+    const auto mark_in_blocks = prof_clock::now();
+
+    std::vector<CAtomBasisTripleSparsity> in_blocks;
+
+    std::vector<size_t> in_map(nab * nin_groups, npos);
+
+    std::vector<size_t> in_elements(nab, 0);
+
+    for (size_t i = 0; i < nab; i++)
+    {
+        for (size_t j = 0; j < nin_groups; j++)
+        {
+            auto block = CAtomBasisTripleSparsity(ab_blocks[i], in_groups[j], bound, threshold);
+
+            if (block.number_of_pairs() > 0)
+            {
+                in_elements[i] += block.number_of_elements();
+
+                in_map[i * nin_groups + j] = in_blocks.size();
+
+                in_blocks.push_back(std::move(block));
+            }
+        }
+    }
+
+    profile.pattern += prof_since(mark_in_blocks);
+
+    const auto basis_indices = denseidx::index_functions(basis);
+
+    CSimdThreeCenterElectronRepulsionDriver eri_drv;
+
+    CSimdThreeCenterElectronRepulsionRsDriver eri_rs_drv;
+
+    // the batches of blocks of atom pairs the integrals are formed in
+
+    size_t first = 0;
+
+    size_t nproducts = 0, ngathered = 0, nread = 0, nkept = 0, nabsent = 0;
+
+    // NOTE: the shape of the staircase and not only its area. Whether the entries
+    // run out at a few places or at all of them decides whether the padding can be
+    // reached by cutting the product into a handful of pieces, which keeps the
+    // library's own kernel, or only one column at a time, which does not.
+    size_t bins[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+    // NOTE: what a banded product would touch, if the chunk were cut across the
+    // pairs into BANDS pieces and each piece multiplied against only the auxiliary
+    // rows which reach it. `sorted` orders the rows by how far they reach, which
+    // makes the rows of a band a prefix and recovers the whole staircase; `fixed`
+    // keeps the order the metric is permuted into once for every block, so a band
+    // must take every row up to the last one that reaches it. The gap between them
+    // is what a per block ordering would buy over a single global one, which is
+    // the cost that decides whether banding is worth doing.
+    // NOTE: swept rather than fixed. Fewer bands recover less of the staircase and
+    // leave the products wider, and which wins is a property of the library and not
+    // of the pattern, so the choice is made against a measurement of both curves
+    // rather than here.
+    constexpr std::array<size_t, 4> BANDS = {2, 4, 8, 16};
+
+    // NOTE: plain arrays and not std::array. An OpenMP array section reduction
+    // wants something it can subscript as a pointer, and a std::array is not that
+    // -- "subscripted value is not an array or pointer", from the reduction clause.
+    size_t nfixed[4] = {0, 0, 0, 0}, nsorted[4] = {0, 0, 0, 0};
+
+    // NOTE: the gathered integrals and the product of the metric with them are both
+    // the whole auxiliary basis deep, so a column of the pair costs the rows and
+    // the columns together, and the memory one thread may hold bounds the chunk
+    // from above.
+
+    const auto per_column = nops * (nrows + ncols) * sizeof(double);
+
+    const auto nchunk = std::max(size_t{1}, _bq_columns / std::max(per_column, size_t{1}));
+
+    size_t nbatches = 0, ntasks = 0;
+
+    while (first < nab)
+    {
+        auto last = first;
+
+        size_t memory = 0;
+
+        // NOTE: a block whose integrals exceed the budget on their own is still a
+        // batch of one, as the alternative is to compute nothing.
+
+        while ((last < nab) && ((last == first) || (memory + in_elements[last] * sizeof(double) <= _batch_budget)))
+        {
+            memory += in_elements[last] * sizeof(double);
+
+            last++;
+        }
+
+        std::vector<CAtomBasisTripleSparsity> batch_blocks;
+
+        std::vector<size_t> batch_map((last - first) * nin_groups, npos);
+
+        for (size_t i = first; i < last; i++)
+        {
+            for (size_t j = 0; j < nin_groups; j++)
+            {
+                if (const auto index = in_map[i * nin_groups + j]; index != npos)
+                {
+                    batch_map[(i - first) * nin_groups + j] = batch_blocks.size();
+
+                    batch_blocks.push_back(in_blocks[index]);
+                }
+            }
+        }
+
+        const auto mark_integrals = prof_clock::now();
+
+        const auto pattern = CTripleSparsityPattern(std::move(batch_blocks), mat_t::symmetric, threshold);
+
+        // NOTE: the two operators of a range separated build come out of one call
+        // on one pattern, which forms them over one set of primitive pairs and one
+        // chain of Boys values rather than sweeping the batch twice.
+
+        std::vector<CSparseTensor> integrals;
+
+        integrals.reserve(nops);
+
+        for (size_t k = 0; k < nops; k++)
+        {
+            integrals.emplace_back(pattern);
+
+            integrals.back().allocate();
+        }
+
+        if (nops == 1)
+        {
+            auto distributor = CSimdT3CDistributor<CSparseTensor>(&integrals[0]);
+
+            eri_drv.compute(pattern, molecule, basis, aux_basis, distributor);
+        }
+        else
+        {
+            auto distributor = CSimdT3CRsDistributor<CSparseTensor>(&integrals[0], &integrals[1]);
+
+            eri_rs_drv.compute(pattern, molecule, basis, aux_basis, distributor, omega);
+        }
+
+        profile.integrals += prof_since(mark_integrals);
+
+        // the contraction of the batch, over the blocks of atom pairs, which write
+        // into blocks of the B vectors of their own and never into a shared one
+
+        // NOTE: every basis function on the auxiliary side of the B vectors is a
+        // sum over every one of them in the integrals, so the sum over the input
+        // reaches across all of the atom basis groups. Taking one group at a time
+        // would make the depth of the product the functions of that group alone,
+        // which is forty on average and leaves the matrix unit idle. The integrals
+        // of all the groups are gathered into one buffer first, so that the depth
+        // is the whole auxiliary basis and one product replaces eighty one.
+
+        // NOTE: the same holds of the rows. Writing each group of the output with
+        // a product of its own reads the gathered buffer once for every group,
+        // which is eighty one passes over it and a product fifteen rows tall. The
+        // whole output is formed in one product into a dense buffer here and
+        // scattered into the blocks afterwards, so the buffer is read once and the
+        // product is as tall as the auxiliary basis. The rows of a block which was
+        // screened away are formed and dropped, which is a few per cent of them.
+
+        // NOTE: the blocks of atom pairs are the distinct pairs of atom bases, of
+        // which a molecule has a dozen or two whatever its size, so dividing the
+        // contraction over them alone leaves all but a dozen threads idle on a
+        // large machine. The chunks of columns of a block are independent of one
+        // another and write into disjoint columns of the same output, so the work
+        // is divided over every pair of a block and a chunk instead, which is
+        // hundreds of times as many.
+
+        // NOTE: the columns of a block are its atom pairs, of which a molecule of
+        // seventy atoms holds a hundred or so in a block, so they do not divide
+        // usefully. What is plentiful is the combinations of angular momenta: every
+        // one of them gathers and multiplies on its own and writes where no other
+        // one does, and a basis of triple zeta quality makes tens of thousands of
+        // them. The work is divided over those, one product each.
+
+        std::vector<TBqTask> tasks;
+
+    std::vector<TBqItem> items;
+
+    std::vector<TBqGroup> groups;
+
+        for (size_t b = 0; b < last - first; b++)
+        {
+            const auto iab = first + b;
+
+            const auto width = ab_blocks[iab].number_of_diagonal_atoms() + ab_blocks[iab].number_of_pairs();
+
+            if (width == 0) continue;
+
+            for (const auto [la, ia] : basis_indices[static_cast<size_t>(ab_blocks[iab].bra_index())])
+            {
+                for (const auto [lb, jb] : basis_indices[static_cast<size_t>(ab_blocks[iab].ket_index())])
+                {
+                    const auto ncomps = static_cast<size_t>((2 * la + 1) * (2 * lb + 1));
+
+                    for (size_t m = 0; m < ncomps; m++) tasks.push_back(TBqTask{b, la, ia, lb, jb, m});
+                }
+            }
+        }
+
+        nbatches++;
+
+        ntasks += tasks.size();
+
+        // NOTE: a task is one combination of basis functions of one pair block, and
+        // the pairs of a block are swept in chunks of at most nchunk. **The buffer
+        // is allocated for nchunk columns and a chunk holds thirty of them**: the
+        // widest block sets the allocation and the average block is far from it.
+        // So the chunks of several tasks are gathered side by side into the one
+        // buffer and handed to a single product, which costs no memory that was not
+        // already reserved and hands the library a shape it can work with -- thirty
+        // columns is a matrix multiply in name only.
+        items.clear();
+
+        for (size_t t = 0; t < tasks.size(); t++)
+        {
+            const auto jab = first + tasks[t].block;
+
+            const auto span = ab_blocks[jab].number_of_diagonal_atoms() + ab_blocks[jab].number_of_pairs();
+
+            for (size_t cfirst = 0; cfirst < span; cfirst += nchunk)
+            {
+                items.push_back(TBqItem{t, cfirst, std::min(nchunk, span - cfirst)});
+            }
+        }
+
+        groups.clear();
+
+        {
+            size_t gfirst = 0, gcols = 0;
+
+            for (size_t i = 0; i < items.size(); i++)
+            {
+                if ((gcols > 0) && (gcols + items[i].count > nchunk))
+                {
+                    groups.push_back(TBqGroup{gfirst, i, gcols});
+
+                    gfirst = i;
+
+                    gcols = 0;
+                }
+
+                gcols += items[i].count;
+            }
+
+            if (gcols > 0) groups.push_back(TBqGroup{gfirst, items.size(), gcols});
+        }
+
+        const auto nwork = static_cast<int>(groups.size());
+
+        const auto mark_contract = prof_clock::now();
+
+#pragma omp parallel reduction(+ : nproducts, ngathered, nread, nkept, nabsent) \
+    reduction(+ : nfixed[ : 4], nsorted[ : 4], bins[ : 10])
+        {
+            std::vector<double> gathered(nops * ncols * nchunk);
+
+            std::vector<double> product(nops * nrows * nchunk);
+
+            std::vector<TBqReach> reaches;
+
+            std::vector<char> used;
+
+#pragma omp for schedule(dynamic)
+            for (int g = 0; g < nwork; g++)
+            {
+                const auto &group = groups[static_cast<size_t>(g)];
+
+                // NOTE: the columns of the whole group. It is the leading dimension
+                // of the gathered buffer and of the product for every item of the
+                // group, where a chunk on its own used its own count.
+                const auto total = group.columns;
+
+                size_t column = 0;
+
+                // NOTE: the staircase now spans the whole group, so the bands are
+                // cut across every item of it and the reaches are collected for all
+                // of them before any of it is counted.
+                if (profiled) reaches.clear();
+
+                for (size_t it = group.first; it < group.last; it++)
+                {
+                    const auto &item = items[it];
+
+                    const auto &task = tasks[item.task];
+
+                    const auto iab = first + task.block;
+
+                    const auto la = task.la, lb = task.lb;
+
+                    const auto ia = task.ia, jb = task.jb, m = task.component;
+
+                    const auto width =
+                        ab_blocks[iab].number_of_diagonal_atoms() + ab_blocks[iab].number_of_pairs();
+
+                    const auto cfirst = item.cfirst;
+
+                    const auto count = item.count;
+
+                    // NOTE: a group whose block is absent, and the atom pairs a
+                    // group keeps fewer of than the widest, leave zeros. The pairs
+                    // are the leading ones of one ordered list, so a zero beyond the
+                    // last one a group keeps adds nothing, which is what the sum of
+                    // the group would have added.
+
+                    ngathered += nops * ncols * count * sizeof(double);
+
+                    // NOTE: the operators share the pattern of the batch, so which
+                    // block a function of the auxiliary side sits in, how many atom
+                    // pairs it keeps and how much of the chunk it reaches are the
+                    // same for both and are worked out once. Only the values differ,
+                    // and only the copy is repeated.
+
+                    // NOTE: (rows, reach) of every auxiliary entry of this chunk,
+                    // kept only while the profile is asked for. The vector lives
+                    // outside the loop over the entries and is cleared here, so the
+                    // allocation is paid once a thread and not once a chunk.
+
+                    for (size_t entry = 0; entry < in_functions.size(); entry++)
+                    {
+                        const auto &in_function = in_functions[entry];
+
+                        const auto iblock = batch_map[task.block * nin_groups + in_function.group];
+
+                        size_t npairs_in = 0;
+
+                        if (iblock != npos)
+                        {
+                            npairs_in = integrals[0].block(iblock).number_of_pairs(la, ia, lb, jb,
+                                                                                   in_function.momentum,
+                                                                                   in_function.index);
+                        }
+
+                        const auto kept = std::min(npairs_in, width);
+
+                        const auto taken = (kept > cfirst) ? std::min(kept - cfirst, count) : size_t{0};
+
+                        // NOTE: what the copy below actually brings, against the
+                        // in_function.count * count the product will read. One
+                        // operator's worth, counted once and scaled by nops to
+                        // match ngathered, the operators sharing the pattern.
+                        nkept += nops * in_function.count * taken;
+
+                        // NOTE: the padding is two different things and they want
+                        // two different answers. A group which reaches none of this
+                        // chunk's pairs contributes nothing but zeros to it, and its
+                        // rows need not be in the product at all -- the pairs a group
+                        // keeps are the leading ones of one ordered list, so a group
+                        // which ran out before this chunk began stays out for every
+                        // chunk after it. A group which reaches part of the chunk
+                        // leaves a tail of zeros, which is a packing question and is
+                        // worth less. `npairs_in == 0` was the first thing counted
+                        // here and it is always zero: no group is ever absent
+                        // outright, they run out at different places.
+                        if (taken == 0) nabsent += nops * in_function.count * count;
+
+                        if (profiled)
+                        {
+                            reaches.push_back(TBqReach{entry, column, count, taken});
+
+                            // NOTE: weighted by the rows the entry carries, because
+                            // the product pays for rows and not for entries. An
+                            // entry which reaches the whole width lands in the last
+                            // bin and is the one which set the width.
+                            const auto bin = (count > 0) ? std::min<size_t>(9, taken * 10 / count) : 0;
+
+                            bins[bin] += in_function.count;
+                        }
+
+                        for (size_t k = 0; k < nops; k++)
+                        {
+                            // NOTE: the buffer holds one operator after another, each
+                            // of nchunk columns, while a chunk fills only the leading
+                            // count of them. The stride between the operators is
+                            // therefore nchunk and the stride within one is count.
+                            // Taking count for both is right for the first operator
+                            // and for a full chunk, and wrong everywhere else, which
+                            // is a wrong answer that hides behind a correct one.
+                            auto *rows = gathered.data() + k * ncols * nchunk + in_function.offset * total + column;
+
+                            const double *in_values =
+                                (npairs_in > 0) ? integrals[k].values(iblock, la, ia, lb, jb, in_function.momentum,
+                                                                      in_function.index) +
+                                                      m * in_function.count * npairs_in
+                                                : nullptr;
+
+                            for (size_t r = 0; r < in_function.count; r++)
+                            {
+                                auto *row = rows + r * total;
+
+                                if (taken > 0)
+                                {
+                                    const auto *from = in_values + r * npairs_in + cfirst;
+
+                                    std::copy(from, from + taken, row);
+                                }
+
+                                std::fill(row + taken, row + count, 0.0);
+                            }
+                        }
+                    }
+
+                    column += count;
+                }
+
+                if (profiled)
+                {
+                    used.assign(in_functions.size(), 0);
+
+                    for (size_t k = 0; k < 4; k++)
+                    {
+                        const auto bands = BANDS[k];
+
+                        for (size_t b = 0; b < bands; b++)
+                        {
+                            const auto band_first = b * total / bands;
+
+                            const auto band_last = (b + 1) * total / bands;
+
+                            if (band_last <= band_first) continue;
+
+                            std::fill(used.begin(), used.end(), static_cast<char>(0));
+
+                            for (const auto &reach : reaches)
+                            {
+                                // does this item overlap the band at all, and does
+                                // the entry reach into the part of it that does
+                                if ((reach.column >= band_last) || (reach.column + reach.span <= band_first))
+                                {
+                                    continue;
+                                }
+
+                                const auto local =
+                                    (band_first > reach.column) ? band_first - reach.column : size_t{0};
+
+                                if (reach.taken > local) used[reach.entry] = 1;
+                            }
+
+                            // NOTE: the metric's own order can only take a prefix,
+                            // so it pays down to the last row any band needs; an
+                            // order chosen per group would take exactly the rows
+                            // which are needed and nothing between them.
+                            size_t prefix = 0, exact = 0;
+
+                            for (size_t e = 0; e < in_functions.size(); e++)
+                            {
+                                if (used[e] == 0) continue;
+
+                                prefix = std::max(prefix, in_functions[e].offset + in_functions[e].count);
+
+                                exact += in_functions[e].count;
+                            }
+
+                            nfixed[k] += nops * prefix * (band_last - band_first);
+
+                            nsorted[k] += nops * exact * (band_last - band_first);
+                        }
+                    }
+                }
+
+                nproducts += nops;
+
+                nread += nops * ncols * total * sizeof(double);
+
+                for (size_t k = 0; k < nops; k++)
+                {
+                    tdenblas::threadedMultAB(nrows, total, ncols, 1.0, metric.get() + k * nrows * ncols, ncols,
+                                             gathered.data() + k * ncols * nchunk, total, 0.0,
+                                             product.data() + k * nrows * nchunk, total);
+                }
+
+                column = 0;
+
+                for (size_t it = group.first; it < group.last; it++)
+                {
+                    const auto &item = items[it];
+
+                    const auto &task = tasks[item.task];
+
+                    const auto iab = first + task.block;
+
+                    const auto la = task.la, lb = task.lb;
+
+                    const auto ia = task.ia, jb = task.jb, m = task.component;
+
+                    const auto width =
+                        ab_blocks[iab].number_of_diagonal_atoms() + ab_blocks[iab].number_of_pairs();
+
+                    const auto cfirst = item.cfirst;
+
+                    const auto count = item.count;
+
+                    for (const auto &out_function : out_functions)
+                    {
+                        const auto oblock = out_map[iab * nout_groups + out_function.group];
+
+                        if (oblock == npos) continue;
+
+                        // NOTE: the outputs share their pattern as the integrals do,
+                        // so where a function lands and how much of it is kept is
+                        // worked out once here too.
+
+                        const auto npairs_out = bq_vectors[0].block(oblock).number_of_pairs(
+                            la, ia, lb, jb, out_function.momentum, out_function.index);
+
+                        if (npairs_out == 0) continue;
+
+                        const auto limit = std::min(npairs_out, width);
+
+                        if (limit <= cfirst) continue;
+
+                        const auto written = std::min(limit - cfirst, count);
+
+                        for (size_t k = 0; k < nops; k++)
+                        {
+                            auto *out_values = bq_vectors[k].values(oblock, la, ia, lb, jb, out_function.momentum,
+                                                                    out_function.index) +
+                                               m * out_function.count * npairs_out;
+
+                            for (size_t r = 0; r < out_function.count; r++)
+                            {
+                                const auto *from = product.data() + k * nrows * nchunk +
+                                                   (out_function.offset + r) * total + column;
+
+                                auto *into = out_values + r * npairs_out + cfirst;
+
+                                for (size_t c = 0; c < written; c++) into[c] += from[c];
+                            }
+                        }
+                    }
+
+                    column += count;
+                }
+            }
+        }
+
+        profile.contract += prof_since(mark_contract);
+
+        first = last;
+    }
+
+    profile.nblocks = nab;
+
+    profile.nbatches = nbatches;
+
+    profile.ntasks = ntasks;
+
+    profile.nchunk = nchunk;
+
+    profile.nproducts = nproducts;
+
+    profile.ngathered = ngathered;
+
+    profile.nread = nread;
+
+    profile.nkept = nkept;
+
+    profile.nabsent = nabsent;
+
+    for (size_t k = 0; k < 10; k++) profile.reach_bins[k] = bins[k];
+
+    for (size_t k = 0; k < 4; k++)
+    {
+        profile.nfixed[k] = nfixed[k];
+
+        profile.nsorted[k] = nsorted[k];
+    }
+
+    profile.total = prof_since(profile_start);
+
+    if (profiled)
+    {
+        size_t held = 0;
+
+        for (const auto &vectors : bq_vectors) held += vectors.memory_size();
+
+        profile.report(held);
+    }
+
+    return bq_vectors;
+}
+
+auto
+CSimdRIFockDriver::compute_bq_vectors(const CMolecule        &molecule,
+                                       const CMolecularBasis  &basis,
+                                       const CMolecularBasis  &aux_basis,
+                                       const CPackedMatrix    &inverse_metric,
+                                       const double            threshold,
+                                       const std::vector<int> &aux_atoms) const -> CSparseTensor
+{
+    auto formed = _compute_bq_vectors(molecule, basis, aux_basis, {&inverse_metric}, threshold, 0.0, aux_atoms);
+
+    return std::move(formed[0]);
+}
+
+auto
+CSimdRIFockDriver::compute_bq_vectors_rs(const CMolecule        &molecule,
+                                          const CMolecularBasis  &basis,
+                                          const CMolecularBasis  &aux_basis,
+                                          const CPackedMatrix    &inverse_metric,
+                                          const CPackedMatrix    &inverse_metric_erf,
+                                          const double            threshold,
+                                          const double            omega,
+                                          const std::vector<int> &aux_atoms) const
+    -> std::pair<CSparseTensor, CSparseTensor>
+{
+    errors::assertMsgCritical(omega > 0.0,
+                              std::string("RIJFockDriver: The range separation parameter must be positive"));
+
+    auto formed = _compute_bq_vectors(molecule, basis, aux_basis, {&inverse_metric, &inverse_metric_erf}, threshold,
+                                      omega, aux_atoms);
+
+    return {std::move(formed[0]), std::move(formed[1])};
+}
+
+auto
+CSimdRIFockDriver::compute_y_vector(const CSparseTensor   &bq_vectors,
+                                     const CMolecularBasis &basis,
+                                     const CMolecularBasis &aux_basis,
+                                     const CPackedMatrix   &density) const -> std::vector<double>
+{
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    errors::assertMsgCritical((density.number_of_rows() == nao) && (density.number_of_columns() == nao),
+                              std::string("RIJFockDriver: The density does not match the molecular basis"));
+
+    errors::assertMsgCritical((density.get_type() == mat_t::symmetric) || (density.get_type() == mat_t::general),
+                              std::string("RIJFockDriver: The density must be symmetric or general"));
+
+    // NOTE: a symmetric density is stored as one triangle and its transposed
+    // element is the element itself, so the off-diagonal pairs of atoms carry
+    // twice it. A general density is stored in full and carries the element and
+    // its transpose, which is what a response density needs.
+
+    const auto symmetric = (density.get_type() == mat_t::symmetric);
+
+    const auto indices = denseidx::index_functions(basis);
+
+    const auto starts = denseidx::make_dense_starts(basis);
+
+    const auto strides = denseidx::make_dense_strides(basis);
+
+    const auto nmoms = static_cast<size_t>(basis.max_angular_momentum() + 1);
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    const auto aux_starts = denseidx::make_dense_starts(aux_basis);
+
+    const auto aux_strides = denseidx::make_dense_strides(aux_basis);
+
+    const auto aux_nmoms = static_cast<size_t>(aux_basis.max_angular_momentum() + 1);
+
+    std::vector<double> yvector(naux, 0.0);
+
+    const auto nblocks = static_cast<int>(bq_vectors.number_of_blocks());
+
+    // NOTE: the blocks of the B vectors carry the auxiliary functions of any atom
+    // of their group, so two blocks add to the same element of the Y vector. Each
+    // thread sums into a vector of its own rather than through an atomic on every
+    // element, and the vectors are added up in the order of the threads, so that
+    // the result does not depend on the order the threads happen to finish in.
+
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    std::vector<double> buffers(nthreads * naux, 0.0);
+
+#pragma omp parallel
+    {
+        auto *partial = buffers.data() + static_cast<size_t>(omp_get_thread_num()) * naux;
+
+        std::vector<double> weights;
+
+        std::vector<size_t> aux_rows;
+
+#pragma omp for schedule(dynamic)
+        for (int i = 0; i < nblocks; i++)
+        {
+            const auto iblock = static_cast<size_t>(i);
+
+            const auto &block = bq_vectors.block(iblock);
+
+            const auto &a_atoms = block.a_atoms();
+
+            const auto &b_atoms = block.b_atoms();
+
+            const auto &c_atoms = block.c_atoms();
+
+            const auto npairs_max = a_atoms.size();
+
+            const auto natoms = c_atoms.size();
+
+            if ((npairs_max == 0) || (natoms == 0)) continue;
+
+            // NOTE: the diagonal pairs of atoms are at zero interatomic distance
+            // and lead the atom pairs of a block, so counting them is enough to
+            // tell the two kinds of pair apart.
+
+            size_t ndiag = 0;
+
+            while ((ndiag < npairs_max) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
+
+            weights.resize(npairs_max);
+
+            const auto &a_list = indices[static_cast<size_t>(block.a_index())];
+
+            const auto &b_list = indices[static_cast<size_t>(block.b_index())];
+
+            const auto &c_list = aux_indices[static_cast<size_t>(block.c_index())];
+
+            for (const auto [la, ia] : a_list)
+            {
+                for (const auto [lb, jb] : b_list)
+                {
+                    const auto ncomps_a = static_cast<size_t>(2 * la + 1);
+
+                    const auto ncomps_b = static_cast<size_t>(2 * lb + 1);
+
+                    const auto lval_a = static_cast<size_t>(la);
+
+                    const auto lval_b = static_cast<size_t>(lb);
+
+                    for (size_t ma = 0; ma < ncomps_a; ma++)
+                    {
+                        for (size_t mb = 0; mb < ncomps_b; mb++)
+                        {
+                            // NOTE: the elements of the density a combination needs
+                            // do not depend on the auxiliary side, so they are
+                            // gathered once and reused by every basis function of it.
+
+                            for (size_t k = 0; k < npairs_max; k++)
+                            {
+                                const auto row = starts[static_cast<size_t>(a_atoms[k]) * nmoms + lval_a] + ia +
+                                                 ma * strides[lval_a];
+
+                                const auto col = starts[static_cast<size_t>(b_atoms[k]) * nmoms + lval_b] + jb +
+                                                 mb * strides[lval_b];
+
+                                if (k < ndiag)
+                                {
+                                    weights[k] = density.at(row, col);
+                                }
+                                else if (symmetric)
+                                {
+                                    weights[k] = 2.0 * density.at(row, col);
+                                }
+                                else
+                                {
+                                    weights[k] = density.at(row, col) + density.at(col, row);
+                                }
+                            }
+
+                            for (const auto [lc, kc] : c_list)
+                            {
+                                const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
+
+                                if (npairs == 0) continue;
+
+                                const auto ncomps_c = static_cast<size_t>(2 * lc + 1);
+
+                                const auto lval_c = static_cast<size_t>(lc);
+
+                                const auto nq = ncomps_c * natoms;
+
+                                const auto *values =
+                                    bq_vectors.values(iblock, la, ia, lb, jb, lc, kc) + (ma * ncomps_b + mb) * nq * npairs;
+
+                                aux_rows.resize(nq);
+
+                                for (size_t mc = 0; mc < ncomps_c; mc++)
+                                {
+                                    for (size_t n = 0; n < natoms; n++)
+                                    {
+                                        aux_rows[mc * natoms + n] =
+                                            aux_starts[static_cast<size_t>(c_atoms[n]) * aux_nmoms + lval_c] + kc +
+                                            mc * aux_strides[lval_c];
+                                    }
+                                }
+
+                                for (size_t q = 0; q < nq; q++)
+                                {
+                                    const auto *row = values + q * npairs;
+
+                                    double sum = 0.0;
+
+#pragma omp simd reduction(+ : sum)
+                                    for (size_t p = 0; p < npairs; p++)
+                                    {
+                                        sum += row[p] * weights[p];
+                                    }
+
+                                    partial[aux_rows[q]] += sum;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
+    const auto nelems = static_cast<int>(naux);
+
+#pragma omp parallel for schedule(static) if (nelems > 1)
+    for (int k = 0; k < nelems; k++)
+    {
+        double sum = 0.0;
+
+        for (size_t t = 0; t < nthreads; t++)
+        {
+            sum += buffers[t * naux + static_cast<size_t>(k)];
+        }
+
+        yvector[static_cast<size_t>(k)] = sum;
+    }
+
+    return yvector;
+}
+
+auto
+CSimdRIFockDriver::compute_fock_matrix(const CSparseTensor       &bq_vectors,
+                                        const CMolecularBasis     &basis,
+                                        const CMolecularBasis     &aux_basis,
+                                        const std::vector<double> &y_vector) const -> CPackedMatrix
+{
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    errors::assertMsgCritical(y_vector.size() == naux,
+                              std::string("RIJFockDriver: The Y vector does not match the auxiliary basis"));
+
+    const auto indices = denseidx::index_functions(basis);
+
+    const auto starts = denseidx::make_dense_starts(basis);
+
+    const auto strides = denseidx::make_dense_strides(basis);
+
+    const auto nmoms = static_cast<size_t>(basis.max_angular_momentum() + 1);
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    const auto aux_starts = denseidx::make_dense_starts(aux_basis);
+
+    const auto aux_strides = denseidx::make_dense_strides(aux_basis);
+
+    const auto aux_nmoms = static_cast<size_t>(aux_basis.max_angular_momentum() + 1);
+
+    // NOTE: the constructor zeroes the values, and the triangle of an ordinary
+    // basis is under the chunk the packed matrix divides its zeroing by, so zeroing
+    // it again here would be a second sweep of it on the calling thread.
+
+    auto fock = CPackedMatrix(nao, nao, mat_t::symmetric);
+
+    auto *fock_values = fock.data();
+
+    const auto nblocks = static_cast<int>(bq_vectors.number_of_blocks());
+
+    // NOTE: one pair of atoms is carried by one block per atom basis group on the
+    // auxiliary side, and all of them add into the same element of the Coulomb
+    // matrix, so the blocks are not free of one another. Each thread sums into a
+    // matrix of its own, and they are added up in the order of the threads, so
+    // that the result does not depend on the order the threads finish in.
+
+    const auto nvalues = fock.number_of_elements();
+
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    // NOTE: there is a matrix for every thread, so zeroing them on the calling
+    // thread would be work which grows with the cores of the machine rather than
+    // falling with them, and it was the one phase of a build which took longer the
+    // more threads it was given. Each thread zeroes the one it owns instead, which
+    // also leaves the memory on the core which will read it.
+
+    auto buffers = std::make_unique_for_overwrite<double[]>(nthreads * nvalues);
+
+#pragma omp parallel
+    {
+        auto *partial = buffers.get() + static_cast<size_t>(omp_get_thread_num()) * nvalues;
+
+        std::fill(partial, partial + nvalues, 0.0);
+
+        std::vector<double> contributions;
+
+#pragma omp for schedule(dynamic)
+        for (int i = 0; i < nblocks; i++)
+        {
+            const auto iblock = static_cast<size_t>(i);
+
+            const auto &block = bq_vectors.block(iblock);
+
+            const auto &a_atoms = block.a_atoms();
+
+            const auto &b_atoms = block.b_atoms();
+
+            const auto &c_atoms = block.c_atoms();
+
+            const auto npairs_max = a_atoms.size();
+
+            const auto natoms = c_atoms.size();
+
+            if ((npairs_max == 0) || (natoms == 0)) continue;
+
+            // NOTE: the diagonal pairs of atoms lead the atom pairs of a block, and
+            // are the ones the tensor carries with the basis functions of both
+            // sides, so they deliver an element of the matrix and its transpose.
+
+            size_t ndiag = 0;
+
+            while ((ndiag < npairs_max) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
+
+            contributions.resize(npairs_max);
+
+            const auto &a_list = indices[static_cast<size_t>(block.a_index())];
+
+            const auto &b_list = indices[static_cast<size_t>(block.b_index())];
+
+            const auto &c_list = aux_indices[static_cast<size_t>(block.c_index())];
+
+            for (const auto [la, ia] : a_list)
+            {
+                for (const auto [lb, jb] : b_list)
+                {
+                    const auto ncomps_a = static_cast<size_t>(2 * la + 1);
+
+                    const auto ncomps_b = static_cast<size_t>(2 * lb + 1);
+
+                    const auto lval_a = static_cast<size_t>(la);
+
+                    const auto lval_b = static_cast<size_t>(lb);
+
+                    for (size_t ma = 0; ma < ncomps_a; ma++)
+                    {
+                        for (size_t mb = 0; mb < ncomps_b; mb++)
+                        {
+                            std::fill(contributions.begin(), contributions.end(), 0.0);
+
+                            auto touched = size_t{0};
+
+                            for (const auto [lc, kc] : c_list)
+                            {
+                                const auto npairs = block.number_of_pairs(la, ia, lb, jb, lc, kc);
+
+                                if (npairs == 0) continue;
+
+                                const auto ncomps_c = static_cast<size_t>(2 * lc + 1);
+
+                                const auto lval_c = static_cast<size_t>(lc);
+
+                                const auto nq = ncomps_c * natoms;
+
+                                const auto *values =
+                                    bq_vectors.values(iblock, la, ia, lb, jb, lc, kc) + (ma * ncomps_b + mb) * nq * npairs;
+
+                                touched = std::max(touched, npairs);
+
+                                for (size_t mc = 0; mc < ncomps_c; mc++)
+                                {
+                                    for (size_t n = 0; n < natoms; n++)
+                                    {
+                                        const auto gq = aux_starts[static_cast<size_t>(c_atoms[n]) * aux_nmoms + lval_c] +
+                                                        kc + mc * aux_strides[lval_c];
+
+                                        const auto factor = y_vector[gq];
+
+                                        const auto *row = values + (mc * natoms + n) * npairs;
+
+#pragma omp simd
+                                        for (size_t p = 0; p < npairs; p++)
+                                        {
+                                            contributions[p] += row[p] * factor;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // NOTE: the Coulomb matrix is symmetric and one triangle
+                            // of it is stored, so an element and its transpose share
+                            // a place. A diagonal pair of atoms delivers both of them
+                            // and one of the two is dropped, while an off-diagonal
+                            // pair delivers each unordered pair of orbitals once.
+
+                            for (size_t k = 0; k < touched; k++)
+                            {
+                                const auto row = starts[static_cast<size_t>(a_atoms[k]) * nmoms + lval_a] + ia +
+                                                 ma * strides[lval_a];
+
+                                const auto col = starts[static_cast<size_t>(b_atoms[k]) * nmoms + lval_b] + jb +
+                                                 mb * strides[lval_b];
+
+                                if ((k < ndiag) && (row < col)) continue;
+
+                                const auto upper = (row < col) ? col : row;
+
+                                const auto lower = (row < col) ? row : col;
+
+                                partial[upper * (upper + 1) / 2 + lower] += contributions[k];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
+    const auto nchunks = static_cast<int>(nvalues);
+
+#pragma omp parallel for schedule(static) if (nchunks > 1)
+    for (int k = 0; k < nchunks; k++)
+    {
+        double sum = 0.0;
+
+        for (size_t t = 0; t < nthreads; t++)
+        {
+            sum += buffers[t * nvalues + static_cast<size_t>(k)];
+        }
+
+        fock_values[static_cast<size_t>(k)] = sum;
+    }
+
+    return fock;
+}
+
+auto
+CSimdRIFockDriver::compute_fock_matrix(const CSparseTensor   &bq_vectors,
+                                        const CMolecularBasis &basis,
+                                        const CMolecularBasis &aux_basis,
+                                        const CPackedMatrix   &density) const -> CPackedMatrix
+{
+    const auto yvector = compute_y_vector(bq_vectors, basis, aux_basis, density);
+
+    return compute_fock_matrix(bq_vectors, basis, aux_basis, yvector);
+}
+
+namespace {  // anonymous namespace
+
+/// @brief One auxiliary basis function of one block of the B vectors, and where
+/// its values sit in that block.
+struct TAuxEntry
+{
+    /// @brief The index of the block.
+    size_t block;
+
+    /// @brief The angular momentum of the basis function on the auxiliary side.
+    int momentum;
+
+    /// @brief The index of the basis function within its angular momentum.
+    size_t index;
+
+    /// @brief The row of the values of a combination, i.e. the angular component
+    /// and the atom of the auxiliary function among those of the combination.
+    size_t row;
+};
+
+/// @brief The times of the phases of one half transformation.
+/// @note Both modes call it with the same arithmetic to do, the one from the B
+/// vectors it holds and the other from the integrals of a part it has just formed,
+/// so the two reports of one run are to be read against each other. The functions
+/// which carry nothing are counted apart, as the direct mode sweeps parts and most
+/// of the functions of a part are of that kind.
+struct CWProfile
+{
+    double entries = 0.0;
+    double fill = 0.0;
+    double scatter = 0.0;
+    double product = 0.0;
+    double total = 0.0;
+
+    size_t nrange = 0;
+    size_t nfilled = 0;
+    size_t nvalues = 0;
+
+    /// @brief Writes the phases of the transformation, and their share of it.
+    auto report(const bool dense) const -> void
+    {
+        const auto accounted = entries + fill + scatter + product;
+
+        const char *names[] = {"entries", "fill", "scatter", "product", "rest"};
+
+        const double times[] = {entries, fill, scatter, product, total - accounted};
+
+        std::printf("RIJK %s transform of %zu of %zu on %d threads, %.3f s\n", dense ? "dense" : "sparse", nfilled,
+                    nrange, omp::get_number_of_threads(), total);
+
+        for (size_t i = 0; i < 5; i++)
+        {
+            std::printf("RIJK   %-12s %9.3f s %6.1f %%\n", names[i], times[i],
+                        (total > 0.0) ? 100.0 * times[i] / total : 0.0);
+        }
+
+        std::printf("RIJK   %.2f GB scattered\n", static_cast<double>(nvalues * sizeof(double)) / 1.0e9);
+
+        std::fflush(stdout);
+    }
+};
+
+}  // anonymous namespace
+
+auto
+CSimdRIFockDriver::release_squares() const -> void
+{
+    _squares.clear();
+
+    _squares.shrink_to_fit();
+}
+
+auto
+CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
+                                      const CMolecularBasis      &basis,
+                                      const CMolecularBasis      &aux_basis,
+                                      const CPackedMatrix        &coefficients,
+                                      const size_t                qfirst,
+                                      const size_t                qlast,
+                                      std::vector<CPackedMatrix> &w_vectors,
+                                      const bool                  accumulate) const -> void
+{
+    errors::assertMsgCritical(qfirst <= qlast,
+                              std::string("RIJFockDriver: The range of the auxiliary basis is not a range"));
+
+    std::vector<size_t> functions(qlast - qfirst);
+
+    std::iota(functions.begin(), functions.end(), qfirst);
+
+    compute_w_vectors(bq_vectors, basis, aux_basis, coefficients, functions, w_vectors, accumulate);
+}
+
+auto
+CSimdRIFockDriver::compute_w_vectors(const CSparseTensor        &bq_vectors,
+                                      const CMolecularBasis      &basis,
+                                      const CMolecularBasis      &aux_basis,
+                                      const CPackedMatrix        &coefficients,
+                                      const std::vector<size_t>  &functions,
+                                      std::vector<CPackedMatrix> &w_vectors,
+                                      const bool                  accumulate) const -> void
+{
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto naux = aux_basis.dimensions_of_basis();
+
+    errors::assertMsgCritical(coefficients.get_type() == mat_t::general,
+                              std::string("RIJFockDriver: The orbital coefficients must be a general matrix"));
+
+    errors::assertMsgCritical(coefficients.number_of_rows() == nao,
+                              std::string("RIJFockDriver: The orbital coefficients do not match the molecular basis"));
+
+    const auto nocc = coefficients.number_of_columns();
+
+    const auto nrange = functions.size();
+
+    errors::assertMsgCritical(w_vectors.size() >= nrange,
+                              std::string("RIJFockDriver: The W matrices do not cover the range of the auxiliary basis"));
+
+    // NOTE: the W matrices are not zeroed here. The way below which scatters into a
+    // square hands the square to a product which writes with a factor of zero on
+    // the matrix, so a function which carries anything overwrites it and the zero
+    // would be undone at once -- 2.1 gigabytes of it for every call of a molecule
+    // of a thousand functions and two hundred orbitals. Only a function which
+    // carries nothing needs it, and it is done there. The way which sums into the
+    // matrix needs it always, and does it at the start of its own task, where the
+    // thread which writes the matrix is the one which touches it first.
+
+    for (auto &wmat : w_vectors)
+    {
+        errors::assertMsgCritical((wmat.get_type() == mat_t::general) && (wmat.number_of_rows() == nao) &&
+                                      (wmat.number_of_columns() == nocc),
+                                  std::string("RIJFockDriver: The W matrices do not match the basis and the orbitals"));
+    }
+
+    if ((nrange == 0) || (nocc == 0)) return;
+
+    CWProfile profile;
+
+    const auto profile_start = prof_clock::now();
+
+    const auto profiled = (std::getenv("VLX_RIJK_PROFILE") != nullptr);
+
+    profile.nrange = nrange;
+
+    const auto mark_entries = prof_clock::now();
+
+    const auto indices = denseidx::index_functions(basis);
+
+    const auto starts = denseidx::make_dense_starts(basis);
+
+    const auto strides = denseidx::make_dense_strides(basis);
+
+    const auto nmoms = static_cast<size_t>(basis.max_angular_momentum() + 1);
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    const auto aux_starts = denseidx::make_dense_starts(aux_basis);
+
+    const auto aux_strides = denseidx::make_dense_strides(aux_basis);
+
+    const auto aux_nmoms = static_cast<size_t>(aux_basis.max_angular_momentum() + 1);
+
+    // NOTE: the blocks are gathered by the auxiliary basis function they carry, so
+    // that the work is divided over the functions rather than over the blocks. A
+    // block adds into the rows of every atom it touches, and two blocks of one
+    // atom basis group on the auxiliary side add into the same rows, so dividing
+    // over the blocks would have the threads writing over one another. Dividing
+    // over the auxiliary functions gives each thread a matrix of its own.
+
+    std::vector<std::vector<TAuxEntry>> entries(nrange);
+
+    // NOTE: the functions are named rather than being a range, so where a function
+    // of a block belongs in this call is looked up rather than subtracted. The
+    // table is one entry per auxiliary function of the molecule, which is nothing
+    // beside one W matrix, and a function this call does not fill is marked as
+    // belonging nowhere.
+
+    std::vector<long> places(naux, -1);
+
+    for (size_t i = 0; i < nrange; i++)
+    {
+        errors::assertMsgCritical(functions[i] < naux,
+                                  std::string("RIJFockDriver: An auxiliary basis function to transform is not one of "
+                                              "the auxiliary basis"));
+
+        places[functions[i]] = static_cast<long>(i);
+    }
+
+    const auto nblocks = bq_vectors.number_of_blocks();
+
+    for (size_t ib = 0; ib < nblocks; ib++)
+    {
+        const auto &block = bq_vectors.block(ib);
+
+        const auto &c_atoms = block.c_atoms();
+
+        const auto natoms = c_atoms.size();
+
+        if ((natoms == 0) || (block.a_atoms().empty())) continue;
+
+        for (const auto [lc, kc] : aux_indices[static_cast<size_t>(block.c_index())])
+        {
+            const auto ncomps_c = static_cast<size_t>(2 * lc + 1);
+
+            const auto lval_c = static_cast<size_t>(lc);
+
+            for (size_t mc = 0; mc < ncomps_c; mc++)
+            {
+                for (size_t n = 0; n < natoms; n++)
+                {
+                    const auto gq = aux_starts[static_cast<size_t>(c_atoms[n]) * aux_nmoms + lval_c] + kc +
+                                    mc * aux_strides[lval_c];
+
+                    if (const auto place = places[gq]; place >= 0)
+                    {
+                        entries[static_cast<size_t>(place)].push_back(TAuxEntry{ib, lc, kc, mc * natoms + n});
+                    }
+                }
+            }
+        }
+    }
+
+    profile.entries += prof_since(mark_entries);
+
+    const auto *cvalues = coefficients.data();
+
+    const auto ntasks = static_cast<int>(nrange);
+
+    // NOTE: a threshold of zero or less takes the product always and one above one
+    // takes the sum always, and neither needs the density, which costs a walk over
+    // the combinations of every block to answer.
+
+    auto use_dense = (_dense_threshold <= 0.0);
+
+    if ((_dense_threshold > 0.0) && (_dense_threshold <= 1.0))
+    {
+        // NOTE: the rows of this transformation are the auxiliary functions this
+        // driver was given, which is what `nrows` counts, so the density is taken
+        // against those and not against the whole basis.
+        use_dense = (_bq_density(bq_vectors, basis, aux_basis, functions.size()) >= _dense_threshold);
+    }
+
+    if (use_dense)
+    {
+        // NOTE: the values of one auxiliary function are scattered into a square
+        // and the square is handed to a matrix product. That is more arithmetic
+        // than the sum below does, and the matrix unit of the machine runs it
+        // several times faster than a loop of the compiler runs the sum, which is
+        // why the trade is worth taking wherever the B vectors are not sparse.
+
+        double fill_time = 0.0, scatter_time = 0.0, product_time = 0.0;
+
+        size_t nfilled = 0, nvalues = 0;
+
+        // NOTE: the squares are kept between calls, so the allocation and the first
+        // touch of them are paid once rather than on every call. Each thread takes
+        // its own and touches it first, which is where it stays.
+
+        if (_squares.size() != static_cast<size_t>(omp::get_number_of_threads()))
+        {
+            _squares.resize(static_cast<size_t>(omp::get_number_of_threads()));
+        }
+
+#pragma omp parallel reduction(+ : fill_time, scatter_time, product_time, nfilled, nvalues)
+        {
+            auto &square = _squares[static_cast<size_t>(omp_get_thread_num())];
+
+            if (square.size() != nao * nao) square.assign(nao * nao, 0.0);
+
+#pragma omp for schedule(dynamic)
+            for (int t = 0; t < ntasks; t++)
+            {
+                const auto iq = static_cast<size_t>(t);
+
+                // NOTE: an auxiliary function which no block of this call carries
+                // has a square of zeros, whose product adds nothing. The direct
+                // mode sweeps parts of the auxiliary basis, so most of the
+                // functions of a part are of that kind and skipping them is what
+                // takes the half transform of a function once rather than once for
+                // every part.
+
+                if (entries[iq].empty())
+                {
+                    // NOTE: nothing writes this one, so it is what it must be only
+                    // if it is made so here.
+
+                    if (!accumulate)
+                    {
+                        auto *wvalues = w_vectors[iq].data();
+
+                        std::fill(wvalues, wvalues + nao * nocc, 0.0);
+                    }
+
+                    continue;
+                }
+
+                nfilled++;
+
+                const auto mark_fill = prof_clock::now();
+
+                std::fill(square.begin(), square.end(), 0.0);
+
+                fill_time += prof_since(mark_fill);
+
+                const auto mark_scatter = prof_clock::now();
+
+                for (const auto &entry : entries[iq])
+                {
+                    const auto &block = bq_vectors.block(entry.block);
+
+                    const auto &a_atoms = block.a_atoms();
+
+                    const auto &b_atoms = block.b_atoms();
+
+                    const auto natoms = block.c_atoms().size();
+
+                    size_t ndiag = 0;
+
+                    while ((ndiag < a_atoms.size()) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
+
+                    const auto nq_cell = static_cast<size_t>(2 * entry.momentum + 1) * natoms;
+
+                    for (const auto [la, ia] : indices[static_cast<size_t>(block.a_index())])
+                    {
+                        for (const auto [lb, jb] : indices[static_cast<size_t>(block.b_index())])
+                        {
+                            const auto npairs = block.number_of_pairs(la, ia, lb, jb, entry.momentum, entry.index);
+
+                            if (npairs == 0) continue;
+
+                            const auto ncomps_a = static_cast<size_t>(2 * la + 1);
+
+                            const auto ncomps_b = static_cast<size_t>(2 * lb + 1);
+
+                            const auto lval_a = static_cast<size_t>(la);
+
+                            const auto lval_b = static_cast<size_t>(lb);
+
+                            const auto *base =
+                                bq_vectors.values(entry.block, la, ia, lb, jb, entry.momentum, entry.index);
+
+                            for (size_t ma = 0; ma < ncomps_a; ma++)
+                            {
+                                for (size_t mb = 0; mb < ncomps_b; mb++)
+                                {
+                                    const auto *values = base + ((ma * ncomps_b + mb) * nq_cell + entry.row) * npairs;
+
+                                    for (size_t k = 0; k < npairs; k++)
+                                    {
+                                        const auto irow = starts[static_cast<size_t>(a_atoms[k]) * nmoms + lval_a] +
+                                                          ia + ma * strides[lval_a];
+
+                                        const auto rrow = starts[static_cast<size_t>(b_atoms[k]) * nmoms + lval_b] +
+                                                          jb + mb * strides[lval_b];
+
+                                        square[irow * nao + rrow] = values[k];
+
+                                        // an off-diagonal pair of atoms is held
+                                        // once and fills both halves of the square
+
+                                        if (k >= ndiag) square[rrow * nao + irow] = values[k];
+                                    }
+
+                                    nvalues += npairs;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                scatter_time += prof_since(mark_scatter);
+
+                const auto mark_product = prof_clock::now();
+
+                tdenblas::threadedMultAB(nao, nocc, nao, 1.0, square.data(), nao, cvalues, nocc,
+                                         accumulate ? 1.0 : 0.0, w_vectors[iq].data(), nocc);
+
+                product_time += prof_since(mark_product);
+            }
+        }
+
+        if (profiled)
+        {
+            const auto share = static_cast<double>(omp::get_number_of_threads());
+
+            profile.fill = fill_time / share;
+
+            profile.scatter = scatter_time / share;
+
+            profile.product = product_time / share;
+
+            profile.nfilled = nfilled;
+
+            profile.nvalues = nvalues;
+
+            profile.total = prof_since(profile_start);
+
+            profile.report(true);
+        }
+
+        return;
+    }
+
+#pragma omp parallel for schedule(dynamic) if (ntasks > 1)
+    for (int t = 0; t < ntasks; t++)
+    {
+        const auto iq = static_cast<size_t>(t);
+
+        auto *wvalues = w_vectors[iq].data();
+
+        if (!accumulate) std::fill(wvalues, wvalues + nao * nocc, 0.0);
+
+        for (const auto &entry : entries[iq])
+        {
+            const auto &block = bq_vectors.block(entry.block);
+
+            const auto &a_atoms = block.a_atoms();
+
+            const auto &b_atoms = block.b_atoms();
+
+            const auto natoms = block.c_atoms().size();
+
+            // NOTE: the diagonal pairs of atoms lead the atom pairs of a block and
+            // are carried with the basis functions of both sides, so the sum over r
+            // reaches them from both. An off-diagonal pair is carried once and adds
+            // into the rows of the atoms of both of its sides.
+
+            size_t ndiag = 0;
+
+            while ((ndiag < a_atoms.size()) && (a_atoms[ndiag] == b_atoms[ndiag])) ndiag++;
+
+            const auto ncomps_c = static_cast<size_t>(2 * entry.momentum + 1);
+
+            const auto nq_cell = ncomps_c * natoms;
+
+            for (const auto [la, ia] : indices[static_cast<size_t>(block.a_index())])
+            {
+                for (const auto [lb, jb] : indices[static_cast<size_t>(block.b_index())])
+                {
+                    const auto npairs = block.number_of_pairs(la, ia, lb, jb, entry.momentum, entry.index);
+
+                    if (npairs == 0) continue;
+
+                    const auto ncomps_a = static_cast<size_t>(2 * la + 1);
+
+                    const auto ncomps_b = static_cast<size_t>(2 * lb + 1);
+
+                    const auto lval_a = static_cast<size_t>(la);
+
+                    const auto lval_b = static_cast<size_t>(lb);
+
+                    const auto *base = bq_vectors.values(entry.block, la, ia, lb, jb, entry.momentum, entry.index);
+
+                    for (size_t ma = 0; ma < ncomps_a; ma++)
+                    {
+                        for (size_t mb = 0; mb < ncomps_b; mb++)
+                        {
+                            const auto *values = base + ((ma * ncomps_b + mb) * nq_cell + entry.row) * npairs;
+
+                            for (size_t k = 0; k < npairs; k++)
+                            {
+                                const auto factor = values[k];
+
+                                if (factor == 0.0) continue;
+
+                                const auto irow = starts[static_cast<size_t>(a_atoms[k]) * nmoms + lval_a] + ia +
+                                                  ma * strides[lval_a];
+
+                                const auto rrow = starts[static_cast<size_t>(b_atoms[k]) * nmoms + lval_b] + jb +
+                                                  mb * strides[lval_b];
+
+                                auto       *wrow = wvalues + irow * nocc;
+
+                                const auto *crow = cvalues + rrow * nocc;
+
+#pragma omp simd
+                                for (size_t s = 0; s < nocc; s++)
+                                {
+                                    wrow[s] += factor * crow[s];
+                                }
+
+                                if (k < ndiag) continue;
+
+                                auto       *wrow_t = wvalues + rrow * nocc;
+
+                                const auto *crow_t = cvalues + irow * nocc;
+
+#pragma omp simd
+                                for (size_t s = 0; s < nocc; s++)
+                                {
+                                    wrow_t[s] += factor * crow_t[s];
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+auto
+CSimdRIFockDriver::compute_w_vectors(const CSparseTensor   &bq_vectors,
+                                      const CMolecularBasis &basis,
+                                      const CMolecularBasis &aux_basis,
+                                      const CPackedMatrix   &coefficients,
+                                      const size_t           qfirst,
+                                      const size_t           qlast) const -> std::vector<CPackedMatrix>
+{
+    errors::assertMsgCritical(qfirst <= qlast,
+                              std::string("RIJFockDriver: The range of the auxiliary basis is out of range"));
+
+    const auto nao = basis.dimensions_of_basis();
+
+    const auto nocc = coefficients.number_of_columns();
+
+    std::vector<CPackedMatrix> w_vectors;
+
+    w_vectors.reserve(qlast - qfirst);
+
+    for (size_t q = qfirst; q < qlast; q++)
+    {
+        w_vectors.emplace_back(nao, nocc, mat_t::general);
+    }
+
+    compute_w_vectors(bq_vectors, basis, aux_basis, coefficients, qfirst, qlast, w_vectors);
+
+    return w_vectors;
+}
+
+auto
+CSimdRIFockDriver::compute_exchange_matrix(std::span<const CPackedMatrix> w_vectors,
+                                            CPackedMatrix                 &matrix,
+                                            const double                   factor) const -> void
+{
+    if (w_vectors.empty()) return;
+
+    errors::assertMsgCritical(matrix.get_type() == mat_t::symmetric,
+                              std::string("RIJFockDriver: The exchange is added to a symmetric matrix"));
+
+    const auto nao = matrix.number_of_rows();
+
+    const auto nocc = w_vectors.front().number_of_columns();
+
+    for (const auto &wmat : w_vectors)
+    {
+        errors::assertMsgCritical((wmat.get_type() == mat_t::general) && (wmat.number_of_rows() == nao) &&
+                                      (wmat.number_of_columns() == nocc),
+                                  std::string("RIJFockDriver: The W matrices do not match the matrix of the exchange"));
+    }
+
+    if (nocc == 0) return;
+
+    // NOTE: the update of one auxiliary function writes the whole triangle of the
+    // basis, so the functions cannot be divided over the threads without dividing
+    // what they write as well. Each thread is therefore given a triangle of its
+    // own and a share of the functions, and the triangles are summed into the
+    // matrix at the end. The library is left to run the update on one thread: the
+    // triangle is the square of the basis and holds too few blocks to spread a
+    // single update over many cores, where the auxiliary functions are thousands
+    // and spread perfectly.
+
+    // NOTE: the W matrices are row major, and the column major matrix of a row
+    // major array is its transpose, so the array of W is W transposed and the
+    // update of it transposed times itself is W times W transposed. The upper
+    // triangle of the library is the lower triangle of the array, which is the
+    // triangle the packed matrix stores.
+
+    // NOTE: the functions are still gathered into chunks before the update, so that
+    // one update reads the triangle once for the whole chunk rather than once for
+    // every function. The chunk is chosen from what a thread may stage, and the
+    // number of triangles from what they may hold together.
+
+    // NOTE: the chunk is the smaller of what a thread may stage and what leaves a
+    // chunk for every thread. Taking the staging alone would give a caller with few
+    // W matrices, as the way which holds the B vectors has, fewer chunks than
+    // threads and leave most of them with nothing to do.
+
+    const auto shape = _exchange_shape(nao, nocc, w_vectors.size());
+
+    const auto nchunk = shape.first;
+
+    const auto ntriangles = shape.second;
+
+    const auto nchunks = (w_vectors.size() + nchunk - 1) / nchunk;
+
+    std::vector<std::vector<double>> triangles(ntriangles);
+
+    double staging_time = 0.0, update_time = 0.0;
+
+    const auto profiled = (std::getenv("VLX_RIJK_PROFILE") != nullptr);
+
+    const auto ntasks = static_cast<int>(nchunks);
+
+#pragma omp parallel num_threads(static_cast<int>(ntriangles)) reduction(+ : staging_time, update_time)
+    {
+        const auto mine = static_cast<size_t>(omp_get_thread_num());
+
+        auto &triangle = triangles[mine];
+
+        triangle.assign(nao * nao, 0.0);
+
+        // NOTE: every value the update reads is written by the staging below before
+        // it is read, so the buffer is left with the content of its allocation
+        // rather than zeroed first.
+
+        auto staged = std::make_unique_for_overwrite<double[]>(nchunk * nocc * nao);
+
+#pragma omp for schedule(dynamic)
+        for (int itask = 0; itask < ntasks; itask++)
+        {
+            const auto first = static_cast<size_t>(itask) * nchunk;
+
+            const auto count = std::min(nchunk, w_vectors.size() - first);
+
+            const auto depth = count * nocc;
+
+            const auto mark_staging = profiled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+
+            for (size_t j = 0; j < count; j++)
+            {
+                const auto *values = w_vectors[first + j].data();
+
+                for (size_t irow = 0; irow < nao; irow++)
+                {
+                    std::copy(values + irow * nocc, values + (irow + 1) * nocc, staged.get() + irow * depth + j * nocc);
+                }
+            }
+
+            if (profiled)
+            {
+                staging_time += std::chrono::duration<double>(std::chrono::steady_clock::now() - mark_staging).count();
+            }
+
+            const auto mark_update = profiled ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+
+            tdenblas::threadedRankUpdate(nao, depth, 1.0, staged.get(), depth, triangle.data(), nao);
+
+            if (profiled)
+            {
+                update_time += std::chrono::duration<double>(std::chrono::steady_clock::now() - mark_update).count();
+            }
+        }
+    }
+
+    // NOTE: only the lower triangle of each dense matrix has been written, and it
+    // is the triangle the packed matrix holds, so the triangles are summed into it
+    // row by row.
+
+    auto *values = matrix.data();
+
+    const auto nrows = static_cast<int>(nao);
+
+#pragma omp parallel for schedule(static, 1) if (nrows > 1)
+    for (int i = 0; i < nrows; i++)
+    {
+        const auto irow = static_cast<size_t>(i);
+
+        auto *packed = values + irow * (irow + 1) / 2;
+
+        for (const auto &triangle : triangles)
+        {
+            const auto *row = triangle.data() + irow * nao;
+
+            for (size_t j = 0; j <= irow; j++)
+            {
+                packed[j] += factor * row[j];
+            }
+        }
+    }
+
+    if (profiled)
+    {
+        const auto share = static_cast<double>(ntriangles);
+
+        std::printf("RIJK   exchange on %zu triangles, chunk %zu: staging %.3f s, update %.3f s\n", ntriangles, nchunk,
+                    staging_time / share, update_time / share);
+
+        std::fflush(stdout);
+    }
+}
+
+auto
+CSimdRIFockDriver::bq_density(const CSparseTensor   &bq_vectors,
+                              const CMolecularBasis &basis,
+                              const CMolecularBasis &aux_basis,
+                              const size_t           held) const -> double
+{
+    return _bq_density(bq_vectors, basis, aux_basis, held);
+}
+
+auto
+CSimdRIFockDriver::set_dense_threshold(const double threshold) -> void
+{
+    _dense_threshold = threshold;
+}
+
+auto
+CSimdRIFockDriver::get_dense_threshold() const -> double
+{
+    return _dense_threshold;
+}
+
+auto
+CSimdRIFockDriver::bq_vectors_memory(const CMolecule        &molecule,
+                                     const CMolecularBasis  &basis,
+                                     const CMolecularBasis  &aux_basis,
+                                     const double            threshold,
+                                     const std::vector<int> &aux_atoms,
+                                     const size_t            nops) const -> CBqMemory
+{
+    // a share of no atoms forms nothing and holds nothing
+
+    if (aux_atoms.empty()) return CBqMemory();
+
+    // NOTE: the B vectors of the whole molecule have the blocks of the integrals,
+    // so they are counted from those rather than described a second time. The
+    // order the atoms are named in changes neither count.
+
+    const auto holds_all = simdri::names_every_atom(aux_atoms, static_cast<size_t>(molecule.number_of_atoms()));
+
+    // NOTE: the blocks are those _compute_bq_vectors describes, of the default size
+    // and not of the size the integral driver chooses for itself, as the values of a
+    // block run to its last surviving atom pair and the two sizes do not hold the
+    // same number of them.
+
+    auto groups = basis.basis_pair_groups();
+
+    const auto ab_blocks = sparsity::make_triple_blocks(molecule, groups, 0);
+
+    std::vector<int> all_atoms(static_cast<size_t>(molecule.number_of_atoms()));
+
+    std::iota(all_atoms.begin(), all_atoms.end(), 0);
+
+    const auto in_groups = sparsity::select_aux_groups(molecule, aux_basis, all_atoms);
+
+    const auto out_groups = sparsity::select_aux_groups(molecule, aux_basis, aux_atoms);
+
+    const auto aux_indices = denseidx::index_functions(aux_basis);
+
+    size_t nrows = 0, ncols = 0;
+
+    _make_aux_functions(out_groups, aux_indices, nrows);
+
+    _make_aux_functions(in_groups, aux_indices, ncols);
+
+    const auto &bound = screenfunc::three_center_electron_repulsion_bound;
+
+    const auto nab = ab_blocks.size();
+
+    CBqMemory memory;
+
+    // the B vectors, and the entries of the index of the half transformation, which
+    // is one entry for every auxiliary function of every block
+
+    size_t nentries = 0;
+
+    // NOTE: the descriptions of the blocks are counted beside their values: a
+    // block itself, which a pattern or a tensor holds in a vector, and its atoms,
+    // counts and offsets on the heap.
+
+    const auto described = [](const CAtomBasisTripleSparsity &block) {
+        return sizeof(CAtomBasisTripleSparsity) + block.description_memory();
+    };
+
+    size_t out_described = 0;
+
+    auto hold = [&](const CAtomBasisTripleSparsity &block) {
+        memory.held += nops * block.number_of_elements() * sizeof(double);
+
+        out_described += described(block);
+
+        if (block.a_atoms().empty()) return;
+
+        for (const auto [lc, kc] : aux_indices[static_cast<size_t>(block.c_index())])
+        {
+            nentries += static_cast<size_t>(2 * lc + 1) * block.c_atoms().size();
+        }
+    };
+
+    // the integrals of every block of atom pairs, which the batches are cut from.
+    // A driver which holds every atom holds the blocks of the integrals, which are
+    // counted in the same pass rather than described a second time.
+
+    std::vector<CAtomBasisTripleSparsity> in_blocks;
+
+    std::vector<size_t> in_elements(nab, 0);
+
+    std::vector<size_t> in_described(nab, 0);
+
+    for (size_t i = 0; i < nab; i++)
+    {
+        for (const auto &group : in_groups)
+        {
+            auto block = CAtomBasisTripleSparsity(ab_blocks[i], group, bound, threshold);
+
+            if (block.number_of_pairs() == 0) continue;
+
+            if (holds_all) hold(block);
+
+            in_elements[i] += block.number_of_elements();
+
+            in_described[i] += described(block);
+
+            in_blocks.push_back(std::move(block));
+        }
+    }
+
+    if (!holds_all)
+    {
+        for (size_t i = 0; i < nab; i++)
+        {
+            for (const auto &group : out_groups)
+            {
+                const auto block = CAtomBasisTripleSparsity(ab_blocks[i], group, bound, threshold);
+
+                if (block.number_of_pairs() > 0) hold(block);
+            }
+        }
+    }
+
+    // NOTE: the entries of a function are pushed one at a time, so the vector which
+    // holds them may have reached twice what it holds.
+
+    memory.index = 2 * nentries * sizeof(TAuxEntry);
+
+    // NOTE: the largest batch, cut as _compute_bq_vectors cuts them: blocks are
+    // added while the batch stays within the budget, and a block over the budget on
+    // its own is a batch of one.
+
+    size_t nbatch = 0, batch_described = 0;
+
+    for (size_t first = 0; first < nab;)
+    {
+        auto last = first;
+
+        size_t batch = 0, batch_blocks = 0;
+
+        while ((last < nab) && ((last == first) || ((batch + in_elements[last]) * sizeof(double) <= _batch_budget)))
+        {
+            batch += in_elements[last];
+
+            batch_blocks += in_described[last];
+
+            last++;
+        }
+
+        nbatch = std::max(nbatch, batch);
+
+        batch_described = std::max(batch_described, batch_blocks);
+
+        first = last;
+    }
+
+    // NOTE: every thread holds the arena of the integral driver while a batch is
+    // formed, and the gathered integrals and their product with the metric while it
+    // is contracted. The two are not held at once, but they are added rather than
+    // the larger taken: the arena is freed into the allocator of its thread, which
+    // keeps it, and the buffers of the contraction are not carved out of it, so the
+    // larger alone would fall short of the resident peak.
+
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto in_pattern = CTripleSparsityPattern(std::move(in_blocks), mat_t::symmetric, threshold);
+
+    const auto arena = (nops == 1)
+                           ? CSimdThreeCenterElectronRepulsionDriver::arena_memory(in_pattern, basis, aux_basis)
+                           : CSimdThreeCenterElectronRepulsionRsDriver::arena_memory(in_pattern, basis, aux_basis);
+
+    const auto per_column = nops * (nrows + ncols) * sizeof(double);
+
+    const auto nchunk = std::max(size_t{1}, _bq_columns / std::max(per_column, size_t{1}));
+
+    const auto metric = nops * nrows * ncols * sizeof(double);
+
+    // NOTE: while the B vectors are formed, the descriptions alive beside their own
+    // are those of the pattern they are built on, of every block of the integrals,
+    // and of the batch, which is described once by its pattern and once by the
+    // integrals of each operator.
+
+    const auto all_described = std::accumulate(in_described.begin(), in_described.end(), size_t{0});
+
+    const auto forming_described = out_described + all_described + (1 + nops) * batch_described;
+
+    memory.forming = metric + nops * nbatch * sizeof(double) + forming_described +
+                     nthreads * (arena + nchunk * per_column + _thread_allowance);
+
+    if (std::getenv("VLX_RIJK_PROFILE") != nullptr)
+    {
+        const auto gb = [](const size_t n) { return static_cast<double>(n) / 1.0e9; };
+
+        std::printf("RIJK memory forming: permuted metric %.3f GB, batch %.3f GB, descriptions %.3f GB, threads %zu "
+                    "x (arena %.3f + chunk %.3f + allowance %.3f) GB\n",
+                    gb(metric), gb(nops * nbatch * sizeof(double)), gb(forming_described), nthreads, gb(arena),
+                    gb(nchunk * per_column), gb(_thread_allowance));
+    }
+
+    // NOTE: each operator's B vectors are a tensor which holds a copy of the
+    // blocks of the pattern they were built on.
+
+    memory.pattern = nops * out_described;
+
+    return memory;
+}
+
+auto
+CSimdRIFockDriver::build_memory(const size_t nao, const size_t naux, const size_t norbitals, const size_t nfunctions)
+    const -> size_t
+{
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto square = nao * nao * sizeof(double);
+
+    // NOTE: the squares of the half transformation are kept between calls, and the
+    // buffers of the Coulomb matrix are one row of the auxiliary basis a thread.
+
+    const auto squares = nthreads * square;
+
+    const auto coulomb = (nthreads + 1) * naux * sizeof(double);
+
+    const auto [nchunk, ntriangles] = _exchange_shape(nao, norbitals, nfunctions);
+
+    const auto exchange = ntriangles * (square + nchunk * norbitals * nao * sizeof(double));
+
+    // the Fock matrix of a build and the copy the caller expands it into
+
+    const auto fock = 2 * square;
+
+    // NOTE: the caller hands over the density, packed, and the orbitals the
+    // exchange is formed from, which it holds twice, as an array and packed.
+
+    const auto handed = nao * (nao + 1) / 2 * sizeof(double) + 2 * nao * norbitals * sizeof(double);
+
+    return squares + coulomb + exchange + fock + handed + nthreads * _thread_allowance;
+}
+
+auto
+CSimdRIFockDriver::integrals_memory(const CTripleSparsityPattern &pattern,
+                                    const CMolecularBasis        &basis,
+                                    const CMolecularBasis        &aux_basis) const -> size_t
+{
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto arena = CSimdThreeCenterElectronRepulsionDriver::arena_memory(pattern, basis, aux_basis);
+
+    return nthreads * (arena + _thread_allowance);
+}
+
+auto
+CSimdRIFockDriver::coulomb_build_memory(const size_t nao, const size_t naux) const -> size_t
+{
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto triangle = nao * (nao + 1) / 2 * sizeof(double);
+
+    // NOTE: a row of the auxiliary basis a thread and the sum of them for the right
+    // hand side, and a triangle a thread and the sum of them for the Coulomb matrix
+    // of a part.
+
+    const auto sweeps = (nthreads + 1) * (naux * sizeof(double) + triangle);
+
+    // NOTE: the caller hands over the density and the matrix the parts are added
+    // into, both packed, and expands the result into a square.
+
+    const auto caller = 2 * triangle + nao * nao * sizeof(double);
+
+    return sweeps + caller + nthreads * _thread_allowance;
+}
+
+auto
+CSimdRIFockDriver::derivative_memory(const CMolecule        &molecule,
+                                     const CMolecularBasis  &basis,
+                                     const CMolecularBasis  &aux_basis,
+                                     const double            threshold,
+                                     const std::vector<int> &aux_atoms,
+                                     const size_t            nops,
+                                     const size_t            per_function) const -> size_t
+{
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const CSimdThreeCenterElectronRepulsionDriver eri_drv;
+
+    size_t peak = 0;
+
+    // the atom, its functions, and its pattern, derivative and arena, of the largest
+
+    std::array<size_t, 5> largest{};
+
+    for (const auto iaux : aux_atoms)
+    {
+        // NOTE: the pattern of this atom alone, as the gradient describes it, so the
+        // derivative counted is over the atom pairs it will be formed over.
+
+        const auto pattern = eri_drv.make_pattern(molecule, basis, aux_basis, threshold, {iaux});
+
+        const auto described = sizeof(CTripleSparsityPattern) + pattern.description_memory();
+
+        // NOTE: six values an element, and each tensor holds a copy of the blocks of
+        // the pattern. The attenuated tensor of a range separated derivative is a
+        // copy of the plain one.
+
+        const auto derivatives = nops * (6 * simdri::pattern_memory(pattern) + pattern.description_memory());
+
+        // NOTE: the arena is freed into the allocator of its thread before the
+        // exchange is back transformed, and is added rather than the larger taken,
+        // for the reason bq_vectors_memory gives.
+
+        const auto arena =
+            (nops == 1) ? CSimdThreeCenterElectronRepulsionGradientDriver::arena_memory(pattern, basis, aux_basis)
+                        : CSimdThreeCenterElectronRepulsionGradientRsDriver::arena_memory(pattern, basis, aux_basis);
+
+        const auto nfunctions = simdri::aux_functions_of(aux_basis, {iaux}).size();
+
+        const auto atom = described + derivatives + nthreads * (arena + _thread_allowance) + nfunctions * per_function;
+
+        if (atom > peak)
+        {
+            peak = atom;
+
+            largest = {static_cast<size_t>(iaux), nfunctions, described, derivatives, arena};
+        }
+    }
+
+    if ((std::getenv("VLX_RIJK_PROFILE") != nullptr) && (peak > 0))
+    {
+        const auto gb = [](const size_t n) { return static_cast<double>(n) / 1.0e9; };
+
+        const auto [iaux, nfunctions, described, derivatives, arena] = largest;
+
+        std::printf("RI derivative memory: atom %zu of %zu functions, pattern %.3f, derivative %.3f, threads %zu x "
+                    "(arena %.3f + allowance %.3f), functions %.3f GB\n",
+                    iaux, nfunctions, gb(described), gb(derivatives), nthreads, gb(arena), gb(_thread_allowance),
+                    gb(nfunctions * per_function));
+    }
+
+    return peak;
+}
+
+auto
+CSimdRIFockDriver::metric_derivative_memory(const CMolecularBasis &aux_basis, const size_t natoms, const size_t nops)
+    const -> size_t
+{
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto lmax = aux_basis.max_angular_momentum();
+
+    const auto rows = (nops == 1) ? simdt2ceri::number_of_geom_10_buffer_rows(lmax, lmax)
+                                  : simdt2ceri::number_of_geom_10_rs_buffer_rows(lmax, lmax);
+
+    // NOTE: a block is a group of atom pairs divided to at most the largest size
+    // the derivative driver chooses, and a single thread leaves the groups whole.
+
+    size_t npairs = 0;
+
+    for (const auto &group : aux_basis.basis_pair_groups()) npairs = std::max(npairs, group.number_of_pairs());
+
+    const auto ncols = (nthreads < 2) ? npairs
+                                      : std::min(npairs, CSimdTwoCenterElectronRepulsionGradientDriver::max_block_size);
+
+    const auto arena = rows * simd::pitch_of(ncols) * sizeof(double);
+
+    return nthreads * (arena + natoms * 3 * sizeof(double) + _thread_allowance);
+}
+
+auto
+CSimdRIFockDriver::_exchange_shape(const size_t nao, const size_t nocc, const size_t nfunctions) const
+    -> std::pair<size_t, size_t>
+{
+    const auto row_bytes = nocc * nao * sizeof(double);
+
+    const auto nthreads = static_cast<size_t>(omp::get_number_of_threads());
+
+    const auto staged_limit = std::max(size_t{1}, _syrk_staging / std::max(row_bytes, size_t{1}));
+
+    const auto shared_limit = std::max(size_t{1}, (nfunctions + nthreads - 1) / nthreads);
+
+    const auto nchunk = std::max(size_t{1}, std::min({nfunctions, staged_limit, shared_limit}));
+
+    const auto nchunks = (nfunctions + nchunk - 1) / nchunk;
+
+    const auto square_bytes = nao * nao * sizeof(double);
+
+    const auto ntriangles =
+        std::max(size_t{1}, std::min({nthreads, nchunks, _syrk_triangles / std::max(square_bytes, size_t{1})}));
+
+    return {nchunk, ntriangles};
+}

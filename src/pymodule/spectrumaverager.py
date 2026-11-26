@@ -38,8 +38,10 @@ from .outputstream import OutputStream
 
 from .veloxchemlib import (hartree_in_ev, fine_structure_constant,
                            avogadro_constant, bohr_in_angstrom,
-                           hartree_in_wavenumber)
-from .spectrumplot import lorentzian_absorption, gaussian_absorption
+                           hartree_in_wavenumber, rotatory_strength_in_cgs,
+                           extinction_coefficient_from_beta)
+from .spectrumplot import (lorentzian_absorption, gaussian_absorption,
+                           lorentzian_ecd, gaussian_ecd)
 
 
 class SpectrumAverager:
@@ -258,6 +260,151 @@ class SpectrumAverager:
             "oscillator_strengths": all_f,
         }
 
+    def compute_ecd(
+        self,
+        rsp_all,
+        *,
+        energy_min_ev=None,
+        energy_max_ev=None,
+    ):
+        """
+        Compute an averaged ECD spectrum from multiple response results.
+
+        Uses the same broadening conventions and wavelength grid as
+        :meth:`compute`, but broadens the rotatory strengths instead of the
+        oscillator strengths.
+
+        :param rsp_all:
+            A list of response results dictionaries, or a list of
+            (frame, rsp_results) tuples.
+        :param energy_min_ev:
+            Minimum photon energy in eV for the common grid. If None, it is set
+            to (global min excitation energy - padding).
+        :param energy_max_ev:
+            Maximum photon energy in eV for the common grid. If None, it is set
+            to (global max excitation energy + padding).
+        :return:
+            A dictionary containing the averaged ECD spectrum and auxiliary
+            data:
+              - frames: frame indices (or None)
+              - xgrid_au / xgrid_ev: energy grids in a.u. and eV
+              - wavelength_nm: wavelength axis in nm (ascending)
+              - mask_wavelength_finite: finite-wavelength mask
+              - delta_eps_all: per-snapshot delta epsilon on the energy grid
+              - delta_eps_mean_ev / delta_eps_std_ev: mean/std vs energy
+              - delta_eps_mean_wl / delta_eps_std_wl: mean/std vs wavelength
+              - transitions_au: excitation energies per snapshot (a.u.)
+              - rotatory_strengths: rotatory strengths per snapshot
+        """
+        au2ev = hartree_in_ev()
+        ev2au = 1.0 / au2ev
+        auxnm = 1.0e7 / hartree_in_wavenumber()
+
+        frames, results = self.unpack_snapshots(rsp_all)
+
+        if len(results) == 0:
+            raise ValueError("No snapshots provided")
+
+        all_e_au = []
+        all_r = []
+        for rsp in results:
+            e = np.asarray(rsp["eigenvalues"], dtype=float)
+            r = np.asarray(rsp["rotatory_strengths"], dtype=float)
+            all_e_au.append(e)
+            all_r.append(r)
+
+        if energy_min_ev is None:
+            emin_au = (min(np.min(e) for e in all_e_au) -
+                       float(self.padding_ev) * ev2au)
+        else:
+            emin_au = float(energy_min_ev) * ev2au
+
+        if energy_max_ev is None:
+            emax_au = (max(np.max(e) for e in all_e_au) +
+                       float(self.padding_ev) * ev2au)
+        else:
+            emax_au = float(energy_max_ev) * ev2au
+
+        emin_au = max(0.0, float(emin_au))
+
+        xstep_au = float(self.xstep_ev) * ev2au
+        broad_au = float(self.broadening_value_ev) * ev2au
+
+        rotatory_factor = (extinction_coefficient_from_beta() / 3.0 /
+                           rotatory_strength_in_cgs())
+
+        delta_eps_all = []
+        bt = self.broadening_type.lower()
+
+        xgrid_au = None
+
+        for e, r in zip(all_e_au, all_r):
+            if bt == "lorentzian":
+                xi, yi = lorentzian_ecd(e, r, emin_au, emax_au, xstep_au,
+                                        broad_au)
+            elif bt == "gaussian":
+                xi, yi = gaussian_ecd(e, r, emin_au, emax_au, xstep_au,
+                                      broad_au)
+            else:
+                raise ValueError(
+                    f"Unknown broadening_type: {self.broadening_type}")
+
+            if xgrid_au is None:
+                xgrid_au = xi
+            else:
+                if (xi.shape != xgrid_au.shape or
+                        not np.allclose(xi, xgrid_au)):
+                    raise ValueError(
+                        "Internal error: snapshot spectrum grid differs "
+                        "from common grid")
+
+            delta_eps_all.append(rotatory_factor * xi * yi)
+
+        nsnaps = len(delta_eps_all)
+        if nsnaps == 0:
+            raise ValueError("No snapshots to average")
+
+        de0 = np.asarray(delta_eps_all[0], dtype=float)
+        de_sum = np.zeros_like(de0)
+        de_sq_sum = np.zeros_like(de0)
+
+        for de in delta_eps_all:
+            de = np.asarray(de, dtype=float)
+            if de.shape != de0.shape:
+                raise ValueError(
+                    "All snapshots must have the same shape, "
+                    f"got {de.shape} vs {de0.shape}")
+            de_sum += de
+            de_sq_sum += de * de
+
+        de_avg = de_sum / nsnaps
+        de_std = np.sqrt(np.maximum(0.0, de_sq_sum / nsnaps - de_avg * de_avg))
+
+        xgrid_ev = xgrid_au * au2ev
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            wl_nm = auxnm / xgrid_au
+
+        mask = np.isfinite(wl_nm)
+        wl_nm_f = wl_nm[mask][::-1]
+        de_mean_wl = de_avg[mask][::-1]
+        de_std_wl = de_std[mask][::-1]
+
+        return {
+            "frames": frames,
+            "xgrid_au": xgrid_au,
+            "xgrid_ev": xgrid_ev,
+            "wavelength_nm": wl_nm_f,
+            "mask_wavelength_finite": mask,
+            "delta_eps_all": delta_eps_all,
+            "delta_eps_mean_ev": de_avg,
+            "delta_eps_std_ev": de_std,
+            "delta_eps_mean_wl": de_mean_wl,
+            "delta_eps_std_wl": de_std_wl,
+            "transitions_au": all_e_au,
+            "rotatory_strengths": all_r,
+        }
+
     def plot_uv_vis_spectra(
         self,
         rsp_all,
@@ -375,6 +522,135 @@ class SpectrumAverager:
                 data,
                 delimiter=",",
                 header="Wavelength [nm],epsilon [L mol^-1 cm^-1]",
+                comments="",
+            )
+
+        return ax
+
+    def plot_ecd_spectra(
+        self,
+        rsp_all,
+        energy_min_ev=None,
+        energy_max_ev=None,
+        show_individual=False,
+        show_sticks=True,
+        show_std=False,
+        title="ECD Spectrum (Averaged)",
+        ax=None,
+        xlim_nm=None,
+        save_averaged_spectra=True,
+        averaged_spectra_filename="averaged_ecd_spectra.csv",
+    ):
+        """
+        Plot an averaged ECD spectrum from multiple response results.
+
+        :param rsp_all:
+            A list of response results dictionaries: (frame, rsp_results) tuples
+            (as returned by the compute method).
+        :param energy_min_ev:
+            Minimum photon energy in eV for the common grid. If None, it is set
+            to (min excitation energy - padding).
+        :param energy_max_ev:
+            Maximum photon energy in eV for the common grid. If None, it is set
+            to (max excitation energy + padding).
+        :param show_individual:
+            If True, plot individual broadened spectra for each snapshot.
+        :param show_sticks:
+            If True, plot rotatory-strength sticks at transition wavelengths.
+        :param show_std:
+            If True, show a shaded +/- one standard deviation band.
+        :param title:
+            Title of the plot.
+        :param ax:
+            Matplotlib Axes object to plot on. If None, a new figure and axes
+            are created.
+        :param xlim_nm:
+            Tuple (xmin, xmax) to set x-axis limits in nm.
+        :param save_averaged_spectra:
+            If True, save the averaged ECD spectra data to a CSV file.
+        :param averaged_spectra_filename:
+            Filename for saving the averaged ECD spectra CSV.
+        :return:
+            The Matplotlib Axes object containing the plot.
+        :raises ImportError:
+            If matplotlib is not available.
+        """
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError("matplotlib is required for plotting")
+
+        auxnm = 1.0e7 / hartree_in_wavenumber()
+
+        spectrum = self.compute_ecd(
+            rsp_all,
+            energy_min_ev=energy_min_ev,
+            energy_max_ev=energy_max_ev,
+        )
+
+        if ax is None:
+            _, ax = plt.subplots()
+
+        wl = spectrum["wavelength_nm"]
+        ymean = spectrum["delta_eps_mean_wl"]
+        ystd = spectrum["delta_eps_std_wl"]
+        mask = spectrum.get("mask_wavelength_finite", None)
+
+        if show_individual:
+            xgrid_au = spectrum["xgrid_au"]
+            with np.errstate(divide="ignore", invalid="ignore"):
+                wl_forward = auxnm / xgrid_au
+
+            if mask is None:
+                mask = np.isfinite(wl_forward)
+
+            wl_forward = wl_forward[mask][::-1]
+            for de in spectrum["delta_eps_all"]:
+                de = np.asarray(de, dtype=float)
+                ax.plot(wl_forward, de[mask][::-1], linewidth=1, alpha=0.45)
+
+        ax.plot(wl, ymean, linewidth=2, color=self.spectrum_color)
+        ax.axhline(0.0, color='0.5', linewidth=0.8, linestyle=':')
+        ax.set_title(title)
+        ax.set_xlabel("Wavelength [nm]")
+        ax.set_ylabel(r"$\Delta\epsilon$ [L mol$^{-1}$ cm$^{-1}$]")
+
+        if show_std:
+            ax.fill_between(wl, ymean - ystd, ymean + ystd, alpha=0.2)
+
+        if xlim_nm is not None:
+            if len(xlim_nm) != 2:
+                raise ValueError("xlim_nm must be a tuple of (xmin, xmax)")
+            ax.set_xlim(float(xlim_nm[0]), float(xlim_nm[1]))
+
+        if show_sticks:
+            ax2 = ax.twinx()
+            ax2.set_ylabel("Rotatory strength [10$^{-40}$ cgs]")
+
+            max_strength = 0.0
+            for e_au, r in zip(spectrum["transitions_au"],
+                               spectrum["rotatory_strengths"]):
+                e_au = np.asarray(e_au, dtype=float)
+                r = np.asarray(r, dtype=float)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    wl_t = auxnm / e_au
+                ax2.vlines(wl_t, 0.0, r, alpha=0.35, linewidth=2,
+                           color=self.stick_color)
+                if r.size > 0:
+                    max_strength = max(max_strength,
+                                       float(np.max(np.abs(r))))
+
+            max_strength = max(0.2, max_strength)
+            ax2.set_ylim(-1.1 * max_strength, 1.1 * max_strength)
+            ax2.set_xlim(ax.get_xlim())
+
+        if save_averaged_spectra:
+            data = np.column_stack((wl, ymean))
+            np.savetxt(
+                averaged_spectra_filename,
+                data,
+                delimiter=",",
+                header="Wavelength [nm],Delta epsilon [L mol^-1 cm^-1]",
                 comments="",
             )
 

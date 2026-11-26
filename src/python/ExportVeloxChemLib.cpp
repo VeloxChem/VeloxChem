@@ -33,11 +33,15 @@
 #include <pybind11/pybind11.h>
 
 #include "ExportDft.hpp"
+#include "ExportFika.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "ExportMoldata.hpp"
 #include "ExportOneElecInts.hpp"
 #include "ExportOrbdata.hpp"
+#include "ExportSimdIntegrals.hpp"
+#include "ExportPacked.hpp"
+#include "ExportSparse.hpp"
 #include "ExportVisualization.hpp"
 #include "ExportT2CIntegrals.hpp"
 #include "ExportT3CIntegrals.hpp"
@@ -53,6 +57,10 @@ PYBIND11_MODULE(veloxchemlib, m)
 
     vlx_orbdata::export_orbdata(m);
 
+    vlx_packed::export_packed(m);
+
+    vlx_sparse::export_sparse(m);
+
     vlx_dft::export_dft(m);
 
     vlx_oneeints::export_oneeints(m);
@@ -64,4 +72,8 @@ PYBIND11_MODULE(veloxchemlib, m)
     vlx_t3cintegrals::export_t3cintegrals(m);
 
     vlx_t4cintegrals::export_t4cintegrals(m);
+
+    vlx_simdintegrals::export_simdintegrals(m);
+
+    vlx_fika::export_fika(m);
 }

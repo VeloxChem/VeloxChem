@@ -3,6 +3,7 @@ import pytest
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.veloxchemlib import mpi_master
 
 pytest.importorskip('py3Dmol')
 
@@ -10,7 +11,8 @@ pytest.importorskip('py3Dmol')
 @pytest.mark.solvers
 class TestCpcmVisualization:
 
-    def test_cpcm_visualize_grid(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_cpcm_visualize_grid(self, ri):
         xyz_string = """6
         xyz
         O   -0.1858140  -1.1749469   0.7662596
@@ -26,19 +28,26 @@ class TestCpcmVisualization:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = ri
 
         scf_drv.solvation_model = 'cpcm'
         scf_drv.cpcm_grid_per_sphere = (110, 110)
 
         scf_drv.ostream.mute()
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         assert scf_drv.cpcm_drv.cpcm_grid is not None
         assert scf_drv.cpcm_drv.cpcm_grid.shape[1] == 6
 
         scf_drv.cpcm_drv.visualize_cpcm_grid(mol)
 
-    def test_cpcm_visualize_cpcm_charges(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_cpcm_visualize_cpcm_charges(self, ri):
         pytest.importorskip('matplotlib.pyplot')
 
         xyz_string = """6
@@ -56,12 +65,18 @@ class TestCpcmVisualization:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = ri
 
         scf_drv.solvation_model = 'cpcm'
         scf_drv.cpcm_grid_per_sphere = (110, 110)
 
         scf_drv.ostream.mute()
-        scf_drv.compute(mol, bas)
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         assert scf_drv.cpcm_drv.cpcm_grid is not None
         assert scf_drv.cpcm_drv.cpcm_q is not None
@@ -69,4 +84,3 @@ class TestCpcmVisualization:
                 scf_drv.cpcm_drv.cpcm_grid.shape[0])
 
         scf_drv.cpcm_drv.visualize_cpcm_charges(mol)
-

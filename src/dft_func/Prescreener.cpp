@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "GtoFunc.hpp"
 #include "GtoValuesRecD.hpp"
@@ -116,114 +117,81 @@ preScreenGtoBlock(const CGtoBlock& gtoBlock, const int gtoDeriv, const double gt
 
         if (r2 > 1.0)
         {
-            int firstprim = 0 * ncgtos + i;
+            // Sum the bounds of the primitives, each evaluated with its own
+            // exponent and coefficient. By the triangle inequality the sum
+            // bounds the contraction and its derivatives.
 
-            auto minexp = gto_exps[firstprim];
+            auto r = std::sqrt(r2);
 
-            auto maxexp = gto_exps[firstprim];
+            auto rpow = 1.0;
 
-            auto maxcoef = std::fabs(gto_norms[firstprim]);
+            for (int ipow = 0; ipow < gto_ang; ipow++)
+            {
+                rpow *= r;
+            }
+
+            double gtolimit = 0.0;
+
+            auto minexp = std::numeric_limits<double>::max();
 
             for (int j = 0; j < npgtos; j++)
             {
                 int iprim = j * ncgtos + i;
 
-                auto prim_exp = gto_exps[iprim];
+                const auto prim_exp = gto_exps[iprim];
 
-                auto prim_norm = std::fabs(gto_norms[iprim]);
+                const auto prim_norm = std::fabs(gto_norms[iprim]);
 
                 minexp = std::min(minexp, prim_exp);
 
-                maxexp = std::max(maxexp, prim_exp);
+                const auto base = prim_norm * std::exp(-prim_exp * r2) * rpow;
 
-                maxcoef = std::max(maxcoef, prim_norm);
-            }
+                auto limit = base;
 
-            // 0th-order derivative
-            // gto:                    r^{ang}   |C| exp(-alpha r^2)
-
-            // 1st-order derivative
-            // gto_m:              ang r^{ang-1} |C| exp(-alpha r^2)
-            // gto_p:           2alpha r^{ang+1} |C| exp(-alpha r^2)
-
-            // 2nd-order derivative
-            // gto_m2:     ang (ang-1) r^{ang-2} |C| exp(-alpha r^2)
-            // gto   : 2alpha (2ang+1) r^{ang}   |C| exp(-alpha r^2)
-            // gto_p2:        4alpha^2 r^{ang+2} |C| exp(-alpha r^2)
-
-            // 3rd-order derivative
-            // gto_m3: ang (ang-1) (ang-2) r^{ang-3} |C| exp(-alpha r^2)
-            // gto_m1: 2alpha 3ang^2       r^{ang-1} |C| exp(-alpha r^2)
-            // gto_p1: 4alpha^2 (3ang+3)   r^{ang+1} |C| exp(-alpha r^2)
-            // gto_p3: 8alpha^3            r^{ang+3} |C| exp(-alpha r^2)
-
-            auto gtolimit_base = maxcoef * std::exp(-minexp * r2);
-
-            auto r = std::sqrt(r2);
-
-            for (int ipow = 0; ipow < gto_ang; ipow++)
-            {
-                gtolimit_base *= r;
-            }
-
-            auto gtolimit = gtolimit_base;
-
-            if (gtoDeriv > 0)
-            {
-                auto gtolimit_p = 2.0 * maxexp * r * gtolimit_base;  // gto_p
-
-                gtolimit = std::max(gtolimit, gtolimit_p);
-
-                if (gto_ang > 0)
+                if (gtoDeriv > 0)
                 {
-                    auto gtolimit_m = gtolimit_base / r * gto_ang;  // gto_m
+                    limit = std::max(limit, 2.0 * prim_exp * r * base);
 
-                    gtolimit = std::max(gtolimit, gtolimit_m);
-                }
-            }
-
-            if (gtoDeriv > 1)
-            {
-                auto gtolimit_p2 = 4.0 * maxexp * maxexp * r2 * gtolimit_base;  // gto_p2
-
-                auto gtolimit_0 = 2.0 * maxexp * (2 * gto_ang + 1) * gtolimit_base;  // gto
-
-                gtolimit = std::max({gtolimit, gtolimit_0, gtolimit_p2});
-
-                if (gto_ang > 1)
-                {
-                    auto gtolimit_m2 = gtolimit_base / r2 * gto_ang * (gto_ang - 1);  // gto_m2
-
-                    gtolimit = std::max(gtolimit, gtolimit_m2);
-                }
-            }
-
-            if (gtoDeriv > 2)
-            {
-                auto r3 = r * r2;
-
-                auto gtolimit_p3 = 8.0 * maxexp * maxexp * maxexp * r3 * gtolimit_base;  // gto_p3
-
-                auto gtolimit_p1 = 4.0 * maxexp * maxexp * (3 * gto_ang + 3) * r * gtolimit_base;  // gto_p1
-
-                gtolimit = std::max({gtolimit, gtolimit_p1, gtolimit_p3});
-
-                if (gto_ang > 0)
-                {
-                    auto gtolimit_m1 = 2.0 * maxexp * gtolimit_base / r * (3 * gto_ang * gto_ang);  // gto_m1
-
-                    gtolimit = std::max(gtolimit, gtolimit_m1);
+                    if (gto_ang > 0) limit = std::max(limit, base / r * gto_ang);
                 }
 
-                if (gto_ang > 2)
+                if (gtoDeriv > 1)
                 {
-                    auto gtolimit_m3 = gtolimit_base / r3 * gto_ang * (gto_ang - 1) * (gto_ang - 2);  // gto_m3
+                    limit = std::max({limit,
+                                      2.0 * prim_exp * (2 * gto_ang + 1) * base,
+                                      4.0 * prim_exp * prim_exp * r2 * base});
 
-                    gtolimit = std::max(gtolimit, gtolimit_m3);
+                    if (gto_ang > 1) limit = std::max(limit, base / r2 * gto_ang * (gto_ang - 1));
                 }
+
+                if (gtoDeriv > 2)
+                {
+                    const auto r3 = r * r2;
+
+                    limit = std::max({limit,
+                                      4.0 * prim_exp * prim_exp * (3 * gto_ang + 3) * r * base,
+                                      8.0 * prim_exp * prim_exp * prim_exp * r3 * base});
+
+                    if (gto_ang > 0)
+                    {
+                        limit = std::max(limit, 2.0 * prim_exp * base / r * (3 * gto_ang * gto_ang));
+                    }
+
+                    if (gto_ang > 2)
+                    {
+                        limit = std::max(limit, base / r3 * gto_ang * (gto_ang - 1) * (gto_ang - 2));
+                    }
+                }
+
+                gtolimit += limit;
             }
 
-            if (gtolimit < gtoThreshold)
+            // The bound is taken at the closest point, so screen only past the
+            // radial peak sqrt((gto_ang + gtoDeriv) / (2 * minexp)).
+
+            const auto past_peak = ((2.0 * minexp * r2) >= static_cast<double>(gto_ang + gtoDeriv));
+
+            if ((gtolimit < gtoThreshold) && past_peak)
             {
                 cgto_mask[i] = 0;
 

@@ -1,0 +1,265 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+
+#ifndef SimdRIJFockDriver_hpp
+#define SimdRIJFockDriver_hpp
+
+#include <cstddef>
+#include <vector>
+
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
+#include "PackedMatrix.hpp"
+#include "SimdRIFockCommon.hpp"
+#include "SimdRIFockDriver.hpp"
+#include "SparseTensor.hpp"
+#include "TripleSparsityPattern.hpp"
+
+/// @brief The Coulomb matrix of the resolution of the identity, for a functional
+/// which asks for no exact exchange.
+///
+/// @note This is three steps and the middle one is why it is cheap:
+///
+///     g(P)     = sum over mn of (mn|P) D(mn)
+///     gamma    = J inverse g
+///     J(mn)    = sum over P of (mn|P) gamma(P)
+///
+/// **The metric never multiplies the tensor.** It multiplies a vector of one value
+/// per auxiliary function, twice a build, which is the square of the auxiliary basis
+/// against one right hand side and is nothing beside either sweep. The driver which
+/// also forms the exchange cannot do this: an exchange needs the fitting closed for
+/// every orbital, so it folds a factor of the metric into the integrals themselves
+/// and pays the square of the auxiliary basis for every pair of orbital functions.
+/// That transformation is ninety per cent of what its setup costs and none of it is
+/// here.
+///
+/// @note So a pure functional wants this driver and a hybrid wants the other one,
+/// and the difference between them is not the exchange it adds but the work it does
+/// not have to do to get the Coulomb.
+class CSimdRIJFockDriver
+{
+   public:
+    /// @brief The default constructor.
+    CSimdRIJFockDriver() = default;
+
+    CSimdRIJFockDriver(const CSimdRIJFockDriver &) = delete;
+    CSimdRIJFockDriver(CSimdRIJFockDriver &&) noexcept = delete;
+    ~CSimdRIJFockDriver() = default;
+    auto operator=(const CSimdRIJFockDriver &) -> CSimdRIJFockDriver & = delete;
+    auto operator=(CSimdRIJFockDriver &&) noexcept -> CSimdRIJFockDriver & = delete;
+
+    /// @brief Gets the memory the driver would hold for a molecule and its bases.
+    /// @param aux_atoms The atoms of the auxiliary side this rank holds, a list of
+    /// every atom for the whole molecule. An empty list holds nothing.
+    /// @return The memory, in bytes.
+    /// @note One tensor, where the driver which forms the exchange holds one or two
+    /// of them and says so. Nothing else is held: there is no transformation of the
+    /// integrals to keep.
+    auto required_memory(const CMolecule        &molecule,
+                         const CMolecularBasis  &basis,
+                         const CMolecularBasis  &aux_basis,
+                         const double            threshold,
+                         const std::vector<int> &aux_atoms) const -> size_t;
+
+    /// @brief Gets the most memory the way which holds the integrals reaches on
+    /// this rank.
+    /// @param threshold The screening threshold of the integrals.
+    /// @param memory_budget The budget the driver will be prepared with, which sets
+    /// the parts.
+    /// @param rank This rank, which decides which parts it holds.
+    /// @param nodes The ranks which divide the parts.
+    /// @return The memory in bytes, for the number of threads of the caller.
+    /// @note The parts are cut and dealt as prepare cuts and deals them, so what is
+    /// counted is what this rank will hold rather than an estimate of it. It is the
+    /// larger of two peaks. Forming the integrals holds those of the parts formed so
+    /// far beside the arena of each thread and two copies of the metric, the
+    /// caller's and the driver's; a build holds them beside the buffers of the two
+    /// sweeps and the matrices the caller hands over and expands.
+    /// @note A margin of a tenth is added to what is counted, so that the answer is
+    /// above the peak and a calculation it says fits does not run out of memory.
+    /// @note The memory is that of the driver alone, and not of the process: what a
+    /// calculation holds outside it, such as the grid of the exchange-correlation
+    /// functional, is not counted.
+    auto peak_memory(const CMolecule       &molecule,
+                     const CMolecularBasis &basis,
+                     const CMolecularBasis &aux_basis,
+                     const double           threshold,
+                     const size_t           memory_budget,
+                     const size_t           rank,
+                     const size_t           nodes) const -> size_t;
+
+    /// @brief Forms the metric of the auxiliary basis, prepared for the fitting.
+    /// @param metric_threshold The threshold of the linear dependence.
+    /// @return The Cholesky factor of the metric, as a lower triangular matrix, or
+    /// for a metric which is close to singular its pseudo inverse, as a symmetric one.
+    /// @note The factor rather than the inverse, as the fitting solves with it. The
+    /// metric is ill conditioned and an inverse formed outright loses that much of
+    /// the precision: 1e-7 to 1e-6 Hartree of the Coulomb energy of a molecule of
+    /// sixty atoms, against 1e-11 for the solves.
+    /// @note Formed once by whoever prepares the calculation and handed to prepare,
+    /// so that the ranks of a communicator build with the same matrix rather than
+    /// each inverting and risking a different fallback.
+    auto make_metric(const CMolecule       &molecule,
+                     const CMolecularBasis &aux_basis,
+                     const double           metric_threshold) const -> CPackedMatrix;
+
+    /// @brief Prepares the driver for a molecule and its bases.
+    /// @param threshold The screening threshold of the integrals.
+    /// @param memory_budget The memory a part's integrals may take, in bytes.
+    /// @param mode The way to build. Automatic chooses from the memory.
+    /// @param metric The metric make_metric answers, or an inverted one (symmetric),
+    /// or an empty matrix to form it here.
+    /// @param rank This rank, which decides which parts it owns.
+    /// @param nodes The ranks which divide the parts, so that there are at least as
+    /// many parts as there are of them.
+    /// @note **A rank holds only the parts it sweeps.** The two sweeps are divided
+    /// over the parts, so a rank never reads another's; holding them all would cost
+    /// the memory of the whole molecule on every one of them, and would send the
+    /// automatic choice to the direct way for a calculation each rank holds a
+    /// fitting share of.
+    auto prepare(const CMolecule       &molecule,
+                 const CMolecularBasis &basis,
+                 const CMolecularBasis &aux_basis,
+                 const double           threshold,
+                 const size_t           memory_budget,
+                 const double           metric_threshold,
+                 const rimode           mode,
+                 const CPackedMatrix   &metric,
+                 const size_t           rank,
+                 const size_t           nodes) -> void;
+
+    /// @brief Checks that the driver has been prepared.
+    auto is_prepared() const -> bool;
+
+    /// @brief Gets the way the driver builds, which is never automatic once prepared.
+    auto get_mode() const -> rimode;
+
+    /// @brief Gets the metric the driver holds: the Cholesky factor of the metric
+    /// (lower triangular) or an inverse of it (symmetric).
+    auto get_metric() const -> const CPackedMatrix &;
+
+    /// @brief Gets the parts of the auxiliary basis the sweeps take.
+    /// @return The number of parts, which bounds the indices the sweeps accept.
+    auto number_of_parts() const -> size_t;
+
+    /// @brief Gets the parts this rank owns, which are the ones it is to sweep.
+    /// @return The indices, as the sweeps take them.
+    /// @note Asked of the driver rather than worked out again by the caller. The
+    /// driver held these parts and no others, so a caller which divided them its own
+    /// way would ask a rank for a part whose integrals it does not have.
+    auto owned_parts() const -> std::vector<int>;
+
+    /// @brief Computes the Coulomb matrix of a density, on one rank.
+    /// @param density The density matrix.
+    /// @return The Coulomb matrix, J(mn) = sum over P of (mn|P) gamma(P).
+    /// @note **Once and not twice.** The caller of a restricted calculation hands
+    /// the density of one spin and doubles what comes back, which is what the
+    /// conventional driver of this approximation does and what the Fock build
+    /// expects of a matrix of the `j` kind.
+    auto compute(const CPackedMatrix &density) -> CPackedMatrix;
+
+    /// @brief Sweeps the given parts and sums the right hand side of the fitting.
+    /// @param parts The parts to sweep, as their indices.
+    /// @return The right hand side, of one value per auxiliary basis function, of
+    /// those parts alone.
+    /// @note The ranks of a communicator take some parts each and **add theirs
+    /// together** before the fitting: the solve reaches across the whole auxiliary
+    /// basis and needs a right hand side which is complete.
+    auto compute_gamma(const CPackedMatrix &density, const std::vector<int> &parts) -> std::vector<double>;
+
+    /// @brief Solves the fitting for the right hand side.
+    /// @param gamma The right hand side, summed over every part there is.
+    /// @return The coefficients of the fitting.
+    /// @note With the Cholesky factor this is two triangular solves, and with an
+    /// inverse one multiply, each the square of the auxiliary basis in work.
+    /// @note Every rank holds the metric and solves, rather than one solving and
+    /// sending: it is the square of the auxiliary basis against a single right hand
+    /// side.
+    auto solve_fitting(const std::vector<double> &gamma) const -> std::vector<double>;
+
+    /// @brief Adds the Coulomb matrix of the given parts to a matrix.
+    /// @param gamma The coefficients of the fitting.
+    /// @param parts The parts to sweep, as their indices.
+    /// @param matrix The matrix to add to.
+    auto compute_coulomb(const std::vector<double> &gamma, const std::vector<int> &parts, CPackedMatrix &matrix) -> void;
+
+   private:
+    /// @brief Points at the integrals of one part, forming them if they are not held.
+    /// @param index The part.
+    /// @param formed Where to form them when they are not held, which the caller owns
+    /// and which is left alone when they are.
+    /// @return A pointer to the integrals, either the held ones or the formed ones.
+    /// @note A pointer and not a value. Handing back a copy would give the two ways
+    /// one signature, and it would copy the whole of a part on every sweep of every
+    /// iteration: at 32 waters that was most of the gap between this driver and the
+    /// conventional one, which holds its integrals and reads them where they are.
+    auto _part_integrals(const size_t index, CSparseTensor &formed) -> const CSparseTensor *;
+
+    /// @brief Checks that an index names a part this driver sweeps.
+    auto _check_part(const int index) const -> void;
+
+    /// @brief Gets the parts this rank owns, dealt round robin over the ranks.
+    /// @param nparts The parts there are.
+    /// @param rank This rank.
+    /// @param nodes The ranks which divide the parts.
+    /// @return The indices of the parts this rank owns.
+    static auto _deal_parts(const size_t nparts, const size_t rank, const size_t nodes) -> std::vector<int>;
+
+    /// @brief The margin peak_memory adds to the memory it counts, as the divisor
+    /// of it.
+    /// @note A tenth, twice that of the driver which also forms the exchange.
+    /// Held against the measured peak of the largest rank of eight cluster runs
+    /// (780 to 3336 functions), what is counted was 0.6 to 4 per cent above it
+    /// from 1824 functions up, 19 to 25 per cent above it under that, and never
+    /// below it.
+    /// The rest of the SCF took up to 55 nao^2 on that rank, a little more than
+    /// the caller reserves for it, and this margin covers the difference.
+    static constexpr size_t _peak_margin_divisor = 10;
+
+    /// @brief The least margin peak_memory adds, whatever a tenth of the peak is.
+    /// @note The driver holds its integrals for the whole SCF, so what the rest of
+    /// the SCF allocates between builds lands on top of them on the rank which also
+    /// does the master's work. Where a tenth of the peak is under half a gigabyte it
+    /// is too little to cover that: for water clusters in def2-SVPD with BLYP (closed shell, two
+    /// nodes of eight ranks with sixteen threads each), at 1248 functions that rank
+    /// grew 0.43 GB past the prediction with a margin of 0.11 GB, and prediction and
+    /// reserve together were 0.17 to 0.21 GB above the growth. With this floor, every
+    /// such run from 120 to 4560 functions keeps at least 0.5 GB above its growth.
+    static constexpr size_t _peak_margin_floor = size_t{512} * 1024 * 1024;
+
+    bool _prepared = false;
+
+    rimode _mode = rimode::automatic;
+
+    CMolecule _molecule;
+
+    CMolecularBasis _basis;
+
+    CMolecularBasis _aux_basis;
+
+    /// @brief The metric of the auxiliary basis: its Cholesky factor, or an inverse.
+    CPackedMatrix _metric;
+
+    /// @brief The sparsity pattern of each part of the auxiliary basis.
+    std::vector<CTripleSparsityPattern> _parts;
+
+    /// @brief The integrals of each part, held only by the way which holds them and
+    /// only for the parts this rank owns. The entries of the others stay empty, so
+    /// that an index means the same thing here as it does in the parts.
+    std::vector<CSparseTensor> _integrals;
+
+    /// @brief The parts this rank owns.
+    std::vector<int> _owned;
+
+    /// @brief The driver of the sweeps, which the two ways share.
+    CSimdRIFockDriver _drv;
+};
+
+#endif /* SimdRIJFockDriver_hpp */

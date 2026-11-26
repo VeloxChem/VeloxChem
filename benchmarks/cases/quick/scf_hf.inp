@@ -1,0 +1,15 @@
+# Caffeine, HF, def2-SVP: closed-shell SCF (RI-JK).
+@jobs
+task: scf
+@end
+
+@method settings
+xcfun: hf
+basis: def2-svp
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end

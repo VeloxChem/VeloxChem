@@ -235,6 +235,13 @@ class TddftHessianDriver(HessianDriver):
             "TddftHessianDriver: response did not converge",
         )
 
+        # NOTE: the analytical gradient below reads the response's results
+        # and the type of its solver; the response's RI set is released so
+        # that the orbital response (CPHF) decides RI or four-center with that
+        # memory free. The next displacement computes the response again,
+        # which sets up the RI anew.
+        self.rsp_driver.release_ri()
+
         # Calculate the excited state gradient.
         tddft_gradient_driver = TddftGradientDriver(self.scf_driver)
         tddft_gradient_driver.update_settings(
@@ -246,6 +253,10 @@ class TddftHessianDriver(HessianDriver):
         # Calculate excited-state relaxed dipole moment
         if self.do_dipole_gradient:
             tddft_gradient_driver.do_first_order_prop = True
+            # NOTE: a fixed origin for the finite differences of
+            # compute_numerical, as in
+            # ScfHessianDriver._compute_electric_dipole_moment.
+            tddft_gradient_driver.dipole_moment_origin = [0.0, 0.0, 0.0]
 
         tddft_gradient_driver.ostream.mute()
         tddft_gradient_driver.compute(
@@ -264,10 +275,11 @@ class TddftHessianDriver(HessianDriver):
     # The relaxed dipole moment is calculated at the same time as
     # the gradient so, to avoid re-calculating everything, here the value
     # is simply returned. Used by compute_numerical in HessianDriver.
-    def compute_electric_dipole_moment(self, molecule, basis):
+    def _compute_electric_dipole_moment(self, molecule, basis):
         """
-        Returns the electric dipole moment calculated with the
-        TDDFT gradient in compute_gradient.
+        Returns the relaxed electric dipole moment calculated with the
+        TDDFT gradient in compute_gradient, about the fixed origin (0,0,0),
+        for the dipole gradient of compute_numerical.
 
         :param molecule:
             The molecule.

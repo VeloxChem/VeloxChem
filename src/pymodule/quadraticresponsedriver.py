@@ -48,9 +48,11 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check,
+                           dft_and_ri_sanity_check,
                            nonlinear_response_environment_sanity_check)
 from .errorhandler import assert_msg_critical
+from .riresponse import lend_ri
+from .rijkresponse import initialize_ri_jk
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
@@ -133,6 +135,16 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
+    def _get_nonlinear_fock_modes(self):
+        """
+        Gets the modes of the nonlinear Fock builds this driver makes.
+
+        :return:
+            A tuple of modes.
+        """
+
+        return ('qrf',)
+
     def compute(self, molecule, ao_basis, scf_results):
         """
         Computes a quadratic response function.
@@ -208,11 +220,8 @@ class QuadraticResponseDriver(NonlinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute', 'nonlinear')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute', 'nonlinear')
 
         profiler = Profiler({
             'timing': False,
@@ -354,6 +363,19 @@ class QuadraticResponseDriver(NonlinearSolver):
             self.comp = None
 
         # Computing the first-order response vectors (3 per frequency)
+        # NOTE: the B vectors are formed before the solvers this driver drives
+        # are made and lent to each of them (riresponse.lend_ri), rather than
+        # formed by each. The integral setup in compute_quad_components
+        # uses them again. Not gated on _uses_ri_jk(), for the reason given
+        # in _init_eri.
+        # NOTE: before the RI-JK B vectors or the RI-J integrals are set up,
+        # which keep back from what they may hold the smallest batch of the
+        # nonlinear Fock builds.
+        self._set_ri_reserve_floor(molecule, ao_basis, scf_results)
+
+        if self.ri_jk and not self._ri_fallback:
+            initialize_ri_jk(self, molecule, ao_basis)
+
         N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = {
@@ -361,7 +383,8 @@ class QuadraticResponseDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk',
+            'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -372,7 +395,8 @@ class QuadraticResponseDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             N_drv.checkpoint_file = str(fpath) + '_qrf.h5'
 
-        N_results = N_drv.compute(molecule, ao_basis, scf_results, ABC)
+        with lend_ri(self, N_drv):
+            N_results = N_drv.compute(molecule, ao_basis, scf_results, ABC)
 
         self._is_converged = N_drv.is_converged
 
@@ -392,6 +416,12 @@ class QuadraticResponseDriver(NonlinearSolver):
         self.ostream.flush()
 
         profiler.end(self.ostream)
+
+        # NOTE: the RI memory check of this driver's own Fock builds; the
+        # solvers it drives print their own.
+        self._print_ri_memory_check()
+
+        self._release_freed_memory()
 
         return quad_dict
 
@@ -435,20 +465,30 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
-        eri_dict = self._init_eri(molecule, ao_basis)
+        eri_dict = self._init_eri(molecule, ao_basis, reuse_ri_jk=True)
 
         dft_dict = self._init_dft(molecule, scf_results)
 
         # computing all compounded first-order densities
-        first_order_dens, second_order_dens = self.get_densities(
+        first_order_dens, second_order_dens, ri_jk_factors = self.get_densities(
             freqpairs, Nx, mo, nocc, norb)
 
         profiler.check_memory_usage('Densities')
 
+        fock_profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqpairs, first_order_dens,
                                        second_order_dens, F0, mo, molecule,
-                                       ao_basis, eri_dict, dft_dict)
+                                       ao_basis, eri_dict, dft_dict,
+                                       ri_jk_factors, fock_profiler)
+
+        fock_profiler.end(self.ostream)
 
         profiler.check_memory_usage('Focks')
 
@@ -583,6 +623,14 @@ class QuadraticResponseDriver(NonlinearSolver):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the second-order densities, collected beside them.
+        # None where this way of building cannot be taken, and then nothing looks
+        # for them.
+        ri_jk_factors = None
+
+        if self.rank == mpi_master() and self._uses_ri_jk():
+            ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for (wb, wc) in freqpairs:
 
             Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
@@ -601,6 +649,25 @@ class QuadraticResponseDriver(NonlinearSolver):
                 # create the first order two indexed densities #
 
                 Dbc = self.commut(kb, Dc) + self.commut(kc, Db)
+
+                # NOTE: a density of second order is block diagonal in the
+                # orbitals, the occupied block carrying the occupied orbitals on
+                # both sides and the virtual block the virtual ones. The blocks
+                # are taken here, before the transformation to the atomic
+                # orbitals throws the structure away, so that the resolution of
+                # the identity contracts the factors rather than the matrix. The
+                # orbitals are real and only the block is complex, so the real
+                # and the imaginary density are the real and the imaginary block
+                # with the same orbitals on either side of them.
+                if ri_jk_factors is not None:
+                    block_oo = Dbc[:nocc, :nocc]
+                    block_vv = Dbc[nocc:, nocc:]
+                    mo_occ = mo[:, :nocc]
+                    mo_vir = mo[:, nocc:]
+                    for block in (block_oo.real, block_oo.imag):
+                        ri_jk_factors[1].append(np.matmul(mo_occ, block.T))
+                    for block in (block_vv.real, block_vv.imag):
+                        ri_jk_factors[3].append(np.matmul(mo_vir, block.T))
 
                 # density transformation from MO to AO basis
 
@@ -641,7 +708,7 @@ class QuadraticResponseDriver(NonlinearSolver):
             else:
                 distributed_density_2.append(dist_den_2_freq, axis=1)
 
-        return distributed_density_1, distributed_density_2
+        return distributed_density_1, distributed_density_2, ri_jk_factors
 
     def get_fock_dict(self,
                       wi,
@@ -652,7 +719,9 @@ class QuadraticResponseDriver(NonlinearSolver):
                       molecule,
                       ao_basis,
                       eri_dict,
-                      dft_dict=None):
+                      dft_dict=None,
+                      ri_jk_factors=None,
+                      profiler=None):
         """
         Computes the Fock matrices for a quadratic response function
 
@@ -672,6 +741,8 @@ class QuadraticResponseDriver(NonlinearSolver):
             The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
+        :param profiler:
+            The profiler.
 
         :return:
             A dictonary of compounded first-order Fock-matrices
@@ -714,7 +785,9 @@ class QuadraticResponseDriver(NonlinearSolver):
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                              'real_and_imag', eri_dict,
                                              dft_dict, first_order_dens,
-                                             second_order_dens, None, 'qrf')
+                                             second_order_dens, None, 'qrf',
+                                             profiler,
+                                             dens_factors=ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 

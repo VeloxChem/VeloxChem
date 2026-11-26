@@ -3,6 +3,10 @@ target_sources(vlxobjs
     AODensityMatrix.cpp
     AOIndices.cpp
     AtomBasis.cpp
+    AtomBasisDiagonalSparsity.cpp
+    AtomBasisPairGroup.cpp
+    AtomBasisPairSparsity.cpp
+    AtomBasisTripleSparsity.cpp
     AtomCorePotential.cpp
     BaseCorePotential.cpp
     BasisFunction.cpp
@@ -12,6 +16,7 @@ target_sources(vlxobjs
     GtoPairBlock.cpp
     GtoPairBlockFunc.cpp
     MolecularBasis.cpp
+    PackedLinearAlgebra.cpp
   )
 
 target_include_directories(vlxobjs

@@ -1,0 +1,643 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+#ifndef SparseTensor_hpp
+#define SparseTensor_hpp
+
+#include <algorithm>
+#include <cstddef>
+#include <iterator>
+#include <optional>
+#include <ranges>
+#include <unordered_set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "AtomBasisGroup.hpp"
+#include "AtomBasisPairGroup.hpp"
+#include "AtomBasisTripleSparsity.hpp"
+#include "ErrorHandler.hpp"
+#include "Matrix.hpp"
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
+#include "ScreeningFunc.hpp"
+#include "TripleSparsityPattern.hpp"
+#include "ValuesState.hpp"
+
+/// @brief Class CSparseTensor stores the sparsity pattern of a three-dimensional
+/// tensor in atomic orbital basis, as the sparsity patterns of its partially
+/// sparse blocks. Each block is described by CAtomBasisTripleSparsity, which is
+/// sparse along the a and b sides and dense along the c side. The atom pairs of
+/// the diagonal atom pairs on the a and b sides are part of those blocks, so no
+/// separate diagonal blocks are needed.
+/// @note The type of tensor refers to the a and b sides only, as the c side is
+/// never interchangeable with them. A symmetric or antisymmetric tensor has a
+/// single molecular basis on the a and b sides, while a general tensor has a
+/// molecular basis on each of them.
+/// @note The blocks without atom pairs are dropped, so a block index is not an
+/// index of the atom basis pair group and atom basis group it originates from.
+/// @note The values blocks are not allocated by the constructors, which set up
+/// the sparsity patterns only. The values blocks are addressed as one pointer per
+/// block, and the state of the values blocks is reported by get_values_state().
+class CSparseTensor
+{
+   public:
+    /// @brief The default constructor.
+    CSparseTensor()
+
+        : _blocks{}
+
+        , _values{}
+
+        , _type(mat_t::general)
+
+        , _values_state(valstat::empty)
+
+        , _ncomponents(1)
+    {
+    }
+
+    /// @brief The constructor with sparsity patterns of the blocks and tensor type.
+    /// @param blocks The sparsity patterns of the blocks.
+    /// @param mat_type The type of tensor.
+    /// @param ncomponents The number of values each element carries. One for an
+    /// integral, and more for a quantity with components of its own -- six for
+    /// the derivative of a three-center integral, which carries the three
+    /// Cartesian directions of each of the two centers on bra side.
+    /// @note The components multiply the elements: every offset inside a block
+    /// scales by the count, and the components of one combination are
+    /// consecutive. A caller reading one component of one combination therefore
+    /// reads a run, and nothing about the layout of the elements changes.
+    CSparseTensor(const std::vector<CAtomBasisTripleSparsity> &blocks, const mat_t mat_type)
+
+        : _blocks(blocks)
+
+        , _values(blocks.size(), nullptr)
+
+        , _type(mat_type)
+
+        , _values_state(valstat::empty)
+
+        , _ncomponents(1)
+    {
+    }
+
+    /// @brief The constructor with a prepared sparsity pattern.
+    /// @param pattern The sparsity pattern of the blocks of the tensor.
+    /// @note This is the constructor the drivers use, as the pattern is formed once
+    /// by sparsity::make_triple_pattern and may be shared with the consumers of the
+    /// values.
+    explicit CSparseTensor(const CTripleSparsityPattern &pattern)
+
+        : _blocks(pattern.blocks())
+
+        , _values(pattern.number_of_blocks(), nullptr)
+
+        , _type(pattern.get_type())
+
+        , _values_state(valstat::empty)
+
+        , _ncomponents(1)
+    {
+    }
+
+    /// @brief The constructor with molecule, molecular basis on a and b sides,
+    /// molecular basis on c side, integral screener and screening threshold. All
+    /// atoms on c side are described.
+    /// @param molecule The molecule to compute interatomic distances from.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The molecular basis on c side.
+    /// @param screener The integral bound, evaluated as screener(a_function,
+    /// b_function, c_function, distance).
+    /// @param threshold The screening threshold.
+    /// @param mat_type The type of tensor.
+    template <typename B>
+    CSparseTensor(const CMolecule       &molecule,
+                  const CMolecularBasis &basis,
+                  const CMolecularBasis &aux_basis,
+                  const B               &screener,
+                  const double           threshold,
+                  const mat_t            mat_type)
+
+        : CSparseTensor(sparsity::make_triple_pattern(molecule, basis, aux_basis, screener, threshold, mat_type))
+    {
+    }
+
+    /// @brief The constructor with the atoms on c side to describe. The tensor holds
+    /// the part of the whole which those atoms carry.
+    /// @param aux_atoms The atoms on c side to describe, as their indices in the
+    /// molecule and without repetition.
+    template <typename B>
+    CSparseTensor(const CMolecule        &molecule,
+                  const CMolecularBasis  &basis,
+                  const CMolecularBasis  &aux_basis,
+                  const B                &screener,
+                  const double            threshold,
+                  const mat_t             mat_type,
+                  const std::vector<int> &aux_atoms)
+
+        : CSparseTensor(sparsity::make_triple_pattern(molecule, basis, aux_basis, screener, threshold, mat_type, aux_atoms))
+    {
+    }
+
+    /// @brief The constructor with a named integral bound and the atoms on c side.
+    CSparseTensor(const CMolecule        &molecule,
+                  const CMolecularBasis  &basis,
+                  const CMolecularBasis  &aux_basis,
+                  const screener          bound,
+                  const double            threshold,
+                  const mat_t             mat_type,
+                  const std::vector<int> &aux_atoms)
+
+        : CSparseTensor(molecule,
+                        basis,
+                        aux_basis,
+                        screenfunc::three_center_electron_repulsion_bound,
+                        threshold,
+                        mat_type,
+                        aux_atoms)
+    {
+        errors::assertMsgCritical(bound == screener::electron_repulsion,
+                                  std::string("SparseTensor: Integral bound is not a three-center bound"));
+    }
+
+    /// @brief The copy constructor.
+    /// @param other The sparse tensor to be copied.
+    CSparseTensor(const CSparseTensor &other)
+
+        : _blocks(other._blocks)
+
+        , _values(other._values.size(), nullptr)
+
+        , _type(other._type)
+
+        , _values_state(other._values_state)
+
+        , _ncomponents(other._ncomponents)
+    {
+        if (_values_state == valstat::allocated) _copy_values(other);
+    }
+
+    /// @brief The move constructor.
+    /// @param other The sparse tensor to be moved.
+    CSparseTensor(CSparseTensor &&other) noexcept
+
+        : _blocks(std::move(other._blocks))
+
+        , _values(std::move(other._values))
+
+        , _type(other._type)
+
+        , _values_state(other._values_state)
+
+        , _ncomponents(other._ncomponents)
+    {
+        other._values.clear();
+
+        other._values_state = valstat::empty;
+    }
+
+    /// @brief The destructor.
+    ~CSparseTensor()
+    {
+        _deallocate();
+    }
+
+    /// @brief The copy assignment operator.
+    /// @param other The sparse tensor to be copy assigned.
+    /// @return The assigned sparse tensor.
+    auto
+    operator=(const CSparseTensor &other) -> CSparseTensor &
+    {
+        if (this != &other)
+        {
+            _deallocate();
+
+            _blocks = other._blocks;
+
+            _ncomponents = other._ncomponents;
+
+            _values.assign(other._values.size(), nullptr);
+
+            _type = other._type;
+
+            _values_state = other._values_state;
+
+            if (_values_state == valstat::allocated) _copy_values(other);
+        }
+
+        return *this;
+    }
+
+    /// @brief The move assignment operator.
+    /// @param other The sparse tensor to be move assigned.
+    /// @return The assigned sparse tensor.
+    auto
+    operator=(CSparseTensor &&other) noexcept -> CSparseTensor &
+    {
+        if (this != &other)
+        {
+            _deallocate();
+
+            _blocks = std::move(other._blocks);
+
+            _ncomponents = other._ncomponents;
+
+            _values = std::move(other._values);
+
+            _type = other._type;
+
+            _values_state = other._values_state;
+
+            other._values.clear();
+
+            other._values_state = valstat::empty;
+        }
+
+        return *this;
+    }
+
+    /// @brief Allocates the values blocks of tensor, leaving their content
+    /// undefined. Each values block is allocated separately, so no single
+    /// allocation spans the whole tensor.
+    /// @note A tensor reaches hundreds of gigabytes, so an allocation which
+    /// throws is an outcome to handle rather than one to ignore. The blocks
+    /// already allocated are freed before the exception leaves, so the tensor is
+    /// left empty and consistent: without that the pointers would survive behind
+    /// a state of empty, and the next call would overwrite and leak them.
+    auto
+    allocate() -> void
+    {
+        if (_values_state == valstat::allocated) return;
+
+        try
+        {
+            std::ranges::for_each(std::views::iota(size_t{0}, _values.size()),
+                                  [&](const auto i) { _values[i] = new double[number_of_elements(i)]; });
+        }
+        catch (...)
+        {
+            _deallocate();
+
+            throw;
+        }
+
+        _values_state = valstat::allocated;
+    }
+
+    /// @brief Deallocates the values blocks of tensor, leaving its sparsity
+    /// patterns intact.
+    auto
+    deallocate() -> void
+    {
+        _deallocate();
+    }
+
+    /// @brief Sets the values of all values blocks of tensor to zero.
+    /// @note The blocks are divided over the threads, and not only to go quicker.
+    /// A large allocation is handed back untouched, so this is what first touches
+    /// the pages and where they are touched is where they stay. Zeroed on one
+    /// thread, a tensor of fifteen gigabytes lands wholly on the memory of one
+    /// socket, and every thread of the other one reads it across the link
+    /// afterwards -- which halved the rate at which the half transformation read
+    /// the B vectors, against the integrals the direct way forms in place and
+    /// never zeroes.
+    auto
+    zero() -> void
+    {
+        errors::assertMsgCritical(_values_state == valstat::allocated,
+                                  std::string("SparseTensor.zero: Values blocks of tensor are not allocated"));
+
+        const auto nblocks = static_cast<int>(_values.size());
+
+#pragma omp parallel for schedule(dynamic) if (nblocks > 1)
+        for (int i = 0; i < nblocks; i++)
+        {
+            const auto iblock = static_cast<size_t>(i);
+
+            std::fill(_values[iblock], _values[iblock] + number_of_elements(iblock), 0.0);
+        }
+    }
+
+    /// @brief Scales the values of all values blocks of tensor.
+    /// @param factor The scaling factor.
+    auto
+    scale(const double factor) -> void
+    {
+        errors::assertMsgCritical(_values_state == valstat::allocated,
+                                  std::string("SparseTensor.scale: Values blocks of tensor are not allocated"));
+
+        std::ranges::for_each(std::views::iota(size_t{0}, _values.size()), [&](const auto i) {
+            std::ranges::for_each(std::views::iota(size_t{0}, number_of_elements(i)), [&](const auto k) { _values[i][k] *= factor; });
+        });
+    }
+
+    /// @brief Sets type of tensor.
+    /// @param mat_type The type of tensor.
+    auto
+    set_type(const mat_t mat_type) -> void
+    {
+        _type = mat_type;
+    }
+
+    /// @brief Gets type of tensor.
+    /// @return The type of tensor.
+    auto
+    get_type() const -> mat_t
+    {
+        return _type;
+    }
+
+    /// @brief Gets state of the values blocks of tensor.
+    /// @return The state of the values blocks.
+    auto
+    get_values_state() const -> valstat
+    {
+        return _values_state;
+    }
+
+    /// @brief Gets sparsity patterns of the blocks.
+    /// @return The constant reference to vector of sparsity patterns.
+    auto
+    blocks() const -> const std::vector<CAtomBasisTripleSparsity> &
+    {
+        return _blocks;
+    }
+
+    /// @brief Gets sparsity pattern of the block with specific index.
+    /// @param index The index of block.
+    /// @return The constant reference to sparsity pattern.
+    auto
+    block(const size_t index) const -> const CAtomBasisTripleSparsity &
+    {
+        errors::assertMsgCritical(index < _blocks.size(), std::string("SparseTensor.block: Index of block is out of range"));
+
+        return _blocks[index];
+    }
+
+    /// @brief Gets number of blocks in tensor.
+    /// @return The number of blocks.
+    auto
+    number_of_blocks() const -> size_t
+    {
+        return _blocks.size();
+    }
+
+    /// @brief Gets values of the block with specific index.
+    /// @param index The index of block.
+    /// @return The pointer to the values of the block.
+    auto
+    values(const size_t index) -> double *
+    {
+        _check_values(index, "values");
+
+        return _values[index];
+    }
+
+    /// @brief Gets values of the block with specific index.
+    /// @param index The index of block.
+    /// @return The constant pointer to the values of the block.
+    auto
+    values(const size_t index) const -> const double *
+    {
+        _check_values(index, "values");
+
+        return _values[index];
+    }
+
+    /// @brief Gets values of specific combination of basis functions in the
+    /// block with specific index.
+    /// @param index The index of block.
+    /// @param a_angular_momentum The angular momentum of basis function on a side.
+    /// @param a_index The index of basis function on a side.
+    /// @param b_angular_momentum The angular momentum of basis function on b side.
+    /// @param b_index The index of basis function on b side.
+    /// @param c_angular_momentum The angular momentum of basis function on c side.
+    /// @param c_index The index of basis function on c side.
+    /// @return The pointer to the values of the combination of basis functions.
+    auto
+    values(const size_t index,
+           const int    a_angular_momentum,
+           const size_t a_index,
+           const int    b_angular_momentum,
+           const size_t b_index,
+           const int    c_angular_momentum,
+           const size_t c_index) -> double *
+    {
+        // NOTE: every offset inside a block scales by the components, as the
+        // components of a combination are consecutive. With one component, which
+        // is an integral, this is the offset itself.
+
+        return values(index) + _ncomponents * _blocks[index].element_offset(a_angular_momentum, a_index, b_angular_momentum,
+                                                                           b_index, c_angular_momentum, c_index);
+    }
+
+    /// @brief Gets values of specific combination of basis functions in the
+    /// block with specific index.
+    /// @param index The index of block.
+    /// @param a_angular_momentum The angular momentum of basis function on a side.
+    /// @param a_index The index of basis function on a side.
+    /// @param b_angular_momentum The angular momentum of basis function on b side.
+    /// @param b_index The index of basis function on b side.
+    /// @param c_angular_momentum The angular momentum of basis function on c side.
+    /// @param c_index The index of basis function on c side.
+    /// @return The constant pointer to the values of the combination of basis functions.
+    auto
+    values(const size_t index,
+           const int    a_angular_momentum,
+           const size_t a_index,
+           const int    b_angular_momentum,
+           const size_t b_index,
+           const int    c_angular_momentum,
+           const size_t c_index) const -> const double *
+    {
+        // NOTE: every offset inside a block scales by the components, as the
+        // components of a combination are consecutive. With one component, which
+        // is an integral, this is the offset itself.
+
+        return values(index) + _ncomponents * _blocks[index].element_offset(a_angular_momentum, a_index, b_angular_momentum,
+                                                                           b_index, c_angular_momentum, c_index);
+    }
+
+    /// @brief Gets number of values required to store the integrals of specific
+    /// block.
+    /// @param index The index of block.
+    /// @return The number of values.
+    auto
+    number_of_elements(const size_t index) const -> size_t
+    {
+        errors::assertMsgCritical(index < _blocks.size(), std::string("SparseTensor.number_of_elements: Index of block is out of range"));
+
+        return _ncomponents * _blocks[index].number_of_elements();
+    }
+
+    /// @brief Gets the number of values each element of the tensor carries.
+    /// @return The number of components.
+    auto
+    number_of_components() const -> size_t
+    {
+        return _ncomponents;
+    }
+
+    /// @brief Sets the number of values each element carries.
+    /// @param ncomponents The number of components.
+    /// @note The values are freed if they were allocated, as their size changes
+    /// with the components and a block allocated for one count cannot hold
+    /// another. Set the components before allocating.
+    auto
+    set_number_of_components(const size_t ncomponents) -> void
+    {
+        errors::assertMsgCritical(ncomponents > 0, std::string("SparseTensor.set_number_of_components: Expecting components"));
+
+        if (_ncomponents == ncomponents) return;
+
+        deallocate();
+
+        _ncomponents = ncomponents;
+    }
+
+    /// @brief Gets number of values required to store the integrals of all blocks.
+    /// @return The number of values.
+    auto
+    number_of_elements() const -> size_t
+    {
+        size_t nvals = 0;
+
+        // NOTE: through the accessor of a block, which scales by the components.
+        // Summing the blocks directly reported the elements of a tensor of six
+        // components as though it held one, and memory_size() below with it.
+
+        std::ranges::for_each(std::views::iota(size_t{0}, _blocks.size()),
+                              [&](const auto index) { nvals += number_of_elements(index); });
+
+        return nvals;
+    }
+
+    /// @brief Gets memory required to store the values blocks of tensor.
+    /// @return The memory in bytes.
+    /// @note Only the values blocks are counted, as they are what allocate()
+    /// reserves. The sparsity patterns describing the blocks are not included.
+    auto
+    memory_size() const -> size_t
+    {
+        return number_of_elements() * sizeof(double);
+    }
+
+   private:
+    /// @brief Checks that the values blocks are allocated and that a block index
+    /// is in range.
+    /// @param index The index of block.
+    /// @param label The name of the accessor requesting the check.
+    auto
+    _check_values(const size_t index, const char *label) const -> void
+    {
+        // NOTE: the message of a check is formed only where the check fails. The
+        // accessors guarded here are called once for every combination of basis
+        // functions of every block, and forming two messages on every call, which
+        // the arguments of the assertions would do, costs two turns of the allocator
+        // on a call which otherwise reads one pointer out of a vector.
+
+        if (_values_state != valstat::allocated)
+        {
+            errors::assertMsgCritical(false,
+                                      std::string("SparseTensor.") + label +
+                                          std::string(": Values blocks of tensor are not allocated"));
+        }
+
+        if (index >= _blocks.size())
+        {
+            errors::assertMsgCritical(false,
+                                      std::string("SparseTensor.") + label + std::string(": Index of block is out of range"));
+        }
+    }
+
+    /// @brief Deallocates the values blocks of tensor.
+    auto
+    _deallocate() -> void
+    {
+        std::ranges::for_each(_values, [](double *block) { delete[] block; });
+
+        std::ranges::fill(_values, nullptr);
+
+        _values_state = valstat::empty;
+    }
+
+    /// @brief Allocates the values blocks of tensor and copies the values of
+    /// another tensor into them.
+    /// @param other The sparse tensor to copy the values of.
+    /// @note The blocks already allocated are freed before an exception leaves,
+    /// as this runs from the copy constructor as well, where a tensor whose
+    /// construction did not complete is never destroyed and would leak all of
+    /// them.
+    auto
+    _copy_values(const CSparseTensor &other) -> void
+    {
+        try
+        {
+            std::ranges::for_each(std::views::iota(size_t{0}, _values.size()), [&](const auto i) {
+                const auto nvals = number_of_elements(i);
+
+                _values[i] = new double[nvals];
+
+                std::copy(other._values[i], other._values[i] + nvals, _values[i]);
+            });
+        }
+        catch (...)
+        {
+            _deallocate();
+
+            throw;
+        }
+    }
+
+    /// @brief The sparsity patterns of the blocks.
+    std::vector<CAtomBasisTripleSparsity> _blocks;
+
+    /// @brief The values blocks of tensor, one pointer per block. The pointers
+    /// are null while the values blocks are not allocated.
+    std::vector<double *> _values;
+
+    /// @brief The type of tensor.
+    mat_t _type;
+
+    /// @brief The state of the values blocks of tensor.
+    valstat _values_state;
+
+    /// @brief The number of values each element of the tensor carries.
+    /// @note One for an integral. A derivative of a three-center integral
+    /// carries six, three directions for each of the two centers on bra side.
+    size_t _ncomponents;
+};
+
+#endif /* SparseTensor_hpp */

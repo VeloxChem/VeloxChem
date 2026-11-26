@@ -34,6 +34,7 @@ from mpi4py import MPI
 from pathlib import PurePath
 from datetime import datetime
 from random import getrandbits
+from io import StringIO
 import numpy as np
 import h5py
 import sys
@@ -78,6 +79,24 @@ class InputParser:
 
         self.parse()
 
+    @classmethod
+    def from_string(cls, text, source='<string>', outname=None):
+        """Parses VeloxChem input text without creating a temporary file."""
+
+        if not isinstance(text, str):
+            raise TypeError('InputParser.from_string expects text as a string')
+
+        parser = cls.__new__(cls)
+        parser.input_dict = {}
+        parser.inpname = str(source)
+        parser.outname = outname
+        parser.is_basis_set = False
+        parser.basis_set_name = ''
+        parser._input_text = text
+        parser.parse()
+        del parser._input_text
+        return parser
+
     def parse(self):
         """
         Parses the input file.
@@ -90,7 +109,12 @@ class InputParser:
         input_groups = {}
         group = None
 
-        with open(str(self.inpname), 'r') as f_inp:
+        if hasattr(self, '_input_text'):
+            input_source = StringIO(self._input_text)
+        else:
+            input_source = open(str(self.inpname), 'r')
+
+        with input_source as f_inp:
             input_lines = f_inp.readlines()
 
             # process the lines before the first group marked by "@"

@@ -39,6 +39,8 @@
 #include <vector>
 
 #include "AtomBasis.hpp"
+#include "AtomBasisGroup.hpp"
+#include "AtomBasisPairGroup.hpp"
 #include "Molecule.hpp"
 #include "AtomCorePotential.hpp"
 
@@ -100,9 +102,34 @@ class CMolecularBasis
     /// @return The molecular basis for selected atoms.
     auto slice(const std::vector<int> &atoms) const -> CMolecularBasis;
 
+    /// @brief Gets vector of atom basis groups, one per unique atom basis in
+    /// molecular basis. Groups refer to atom bases owned by this molecular
+    /// basis and are invalidated by any modification of it.
+    /// @return The vector of atom basis groups.
+    auto basis_groups() const -> std::vector<CAtomBasisGroup>;
+
+    /// @brief Gets vector of atom basis pair groups for unique pairs of atom
+    /// bases in molecular basis. Groups refer to atom bases owned by this
+    /// molecular basis and are invalidated by any modification of it.
+    /// @return The vector of atom basis pair groups.
+    auto basis_pair_groups() const -> std::vector<CAtomBasisPairGroup>;
+
+    /// @brief Gets vector of atom basis pair groups pairing atom bases of this
+    /// molecular basis on bra side with atom bases of other molecular basis on
+    /// ket side. Groups refer to atom bases owned by both molecular bases, which
+    /// must outlive the groups and invalidate them when modified.
+    /// @param other The molecular basis on ket side.
+    /// @return The vector of atom basis pair groups.
+    auto basis_pair_groups(const CMolecularBasis &other) const -> std::vector<CAtomBasisPairGroup>;
+
     /// @brief Gets vector of unique atom bases.
     /// @return The vector of atom bases.
-    auto basis_sets() const -> std::vector<CAtomBasis>;
+    auto basis_sets() const -> const std::vector<CAtomBasis> &;
+
+    /// @brief Gets unique atom basis with specific index.
+    /// @param index The index of unique atom basis.
+    /// @return The constant reference to atom basis.
+    auto basis_set(const int index) const -> const CAtomBasis &;
 
     /// @brief Gets vector of indices for atom bases.
     /// @return The vector of indices for atom bases.
@@ -194,6 +221,10 @@ class CMolecularBasis
     /// @param npgtos The number of primitive basis functions in basis function.
     /// @return The vector of atomic indices.
     auto atomic_indices(const std::vector<int> &atoms, const int angular_momentum, const size_t npgtos) const -> std::vector<int>;
+
+    /// @brief Determines number of basis functions in molecular basis.
+    /// @return The number of basis functions.
+    auto number_of_basis_functions() const -> size_t;
 
     /// @brief Determines number of basis functions with specific angular
     /// momentum in molecular basis.

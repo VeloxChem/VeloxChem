@@ -213,6 +213,22 @@ uplo_rm_index(const T irow,
     return icolumn + irow * nrows - irow * (irow + 1) / 2;
 }
 
+/// @brief Computes double factorial n!! of integer number.
+/// @param n The integer number to compute double factorial for.
+/// @return The double factorial of integer number, 1.0 for n < 2.
+inline auto
+double_factorial(const int n) -> double
+{
+    auto fact = 1.0;
+
+    for (int i = n; i > 1; i -= 2)
+    {
+        fact *= static_cast<double>(i);
+    }
+
+    return fact;
+}
+
 }  // namespace mathfunc
 
 #endif /* MathFunc_hpp */

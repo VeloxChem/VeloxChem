@@ -1,0 +1,15 @@
+# Guanine-2 (38 atoms), triplet, B3LYP, def2-SVPD: unrestricted SCF (RI-JK).
+@jobs
+task: scf
+@end
+
+@method settings
+xcfun: b3lyp
+basis: def2-svpd
+@end
+
+@molecule
+charge: 0
+multiplicity: 3
+xyzfile: guanine-2.xyz
+@end

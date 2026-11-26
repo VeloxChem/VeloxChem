@@ -106,8 +106,7 @@ export_orbdata(py::module &m)
         .def(py::pickle(
             [](const CBasisFunction &bf) { return py::make_tuple(bf.get_exponents(), bf.get_normalization_factors(), bf.get_angular_momentum()); },
             [](py::tuple t) { return CBasisFunction(t[0].cast<std::vector<double>>(), t[1].cast<std::vector<double>>(), t[2].cast<int>()); }))
-        .def("set_exponents", &CBasisFunction::set_exponents, "Sets exponents of basis function.")
-        .def("set_normalization_factors", &CBasisFunction::set_normalization_factors, "Gets name of chemical element.")
+        .def("set_primitives", &CBasisFunction::set_primitives, "Sets exponents and normalization factors of basis function.")
         .def("set_angular_momentum", &CBasisFunction::set_angular_momentum, "Sets angular momentum of basis function.")
         .def("add",
              &CBasisFunction::add,
@@ -118,6 +117,11 @@ export_orbdata(py::module &m)
         .def("get_normalization_factors", &CBasisFunction::get_normalization_factors, "Gets vector of normalization factors in basis function.")
         .def("get_angular_momentum", &CBasisFunction::get_angular_momentum, "Gets angular momentum of basis function.")
         .def("number_of_primitives", &CBasisFunction::number_of_primitive_functions, "Gets number of primitives in basis function.")
+        .def("largest_exponent", &CBasisFunction::largest_exponent, "Gets largest exponent in basis function.")
+        .def("smallest_exponent", &CBasisFunction::smallest_exponent, "Gets smallest exponent in basis function.")
+        .def("sum_of_absolute_norms",
+             &CBasisFunction::sum_of_absolute_norms,
+             "Gets sum of absolute values of normalization factors in basis function.")
         .def("__eq__", [](const CBasisFunction &self, const CBasisFunction &other) { return self == other; })
         .def("__copy__", [](const CBasisFunction &self) { return CBasisFunction(self); })
         .def("__deepcopy__", [](const CBasisFunction &self, py::dict) { return CBasisFunction(self); });
@@ -147,11 +151,17 @@ export_orbdata(py::module &m)
         .def("get_basis_functions",
              py::overload_cast<const int, const size_t>(&CAtomBasis::basis_functions, py::const_),
              "Gets GTOs with specific angular momentum and number of primitives.")
+        .def("get_basis_function",
+             &CAtomBasis::basis_function,
+             "Gets GTO with specific angular momentum and index.",
+             py::arg("angular_momentum"),
+             py::arg("index"))
         .def("get_identifier", &CAtomBasis::get_identifier, "Gets identifier of atom basis.")
         .def("get_name", &CAtomBasis::get_name, "Gets name of atom basis.")
         .def("get_ecp_potential", &CAtomBasis::get_ecp_potential, "Gets effective core potential of atom basis.")
         .def("has_ecp", &CAtomBasis::has_ecp, "Checks if atom basis contains effective core potential.")
         .def("max_angular_momentum", &CAtomBasis::max_angular_momentum, "Gets maximum angular momentum in atom basis.")
+        .def("number_of_basis_functions", py::overload_cast<>(&CAtomBasis::number_of_basis_functions, py::const_), "Gets number of GTOs.")
         .def("number_of_basis_functions",
              py::overload_cast<const int>(&CAtomBasis::number_of_basis_functions, py::const_),
              "Gets number of GTOs with specific angular momentum.")
@@ -162,6 +172,8 @@ export_orbdata(py::module &m)
         .def("number_of_primitive_basis_functions",
              &CAtomBasis::number_of_primitive_functions,
              "Gets number of primitive GTOs with specific angular momentum.")
+        .def("largest_exponent", &CAtomBasis::largest_exponent, "Gets largest exponent of GTOs with specific angular momentum.")
+        .def("smallest_exponent", &CAtomBasis::smallest_exponent, "Gets smallest exponent of GTOs with specific angular momentum.")
         .def("contraction_depths", &CAtomBasis::contraction_depths, "Gets contraction depths of GTOs with specific angular momentum.")
         .def("contraction_str", &CAtomBasis::contraction_string, "Gets contraction string of atom basis.")
         .def("primitives_str", &CAtomBasis::primitives_string, "Gets primitive GTOs string of atom basis.")
@@ -238,6 +250,7 @@ export_orbdata(py::module &m)
              "momentum and number of primitive GTOs from molecular basis for "
              "list of "
              "specific atoms.")
+        .def("number_of_basis_functions", py::overload_cast<>(&CMolecularBasis::number_of_basis_functions, py::const_), "Gets number of GTOs.")
         .def("number_of_basis_functions",
              py::overload_cast<const int>(&CMolecularBasis::number_of_basis_functions, py::const_),
              "Gets number of GTOs with specific angular momentum from molecular "

@@ -48,9 +48,12 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check,
+                           dft_and_ri_sanity_check,
                            nonlinear_response_environment_sanity_check)
 from .errorhandler import assert_msg_critical
+from .riresponse import lend_ri
+from .rijkresponse import initialize_ri_jk
+from .rijkresponse import ri_jk_general_factors
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
@@ -135,6 +138,16 @@ class CubicResponseDriver(NonlinearSolver):
             method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
+
+    def _get_nonlinear_fock_modes(self):
+        """
+        Gets the modes of the nonlinear Fock builds this driver makes.
+
+        :return:
+            A tuple of modes.
+        """
+
+        return ('crf', 'crf_ii')
 
     def compute(self, molecule, ao_basis, scf_results):
         """
@@ -221,11 +234,8 @@ class CubicResponseDriver(NonlinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute', 'nonlinear')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute', 'nonlinear')
 
         profiler = Profiler({
             'timing': False,
@@ -392,6 +402,19 @@ class CubicResponseDriver(NonlinearSolver):
             X = None
             self.comp = None
 
+        # NOTE: the B vectors are formed before the solvers this driver drives
+        # are made and lent to each of them (riresponse.lend_ri), rather than
+        # formed by each. The integral setup in compute_cubic_components
+        # uses them again. Not gated on _uses_ri_jk(), for the reason given
+        # in _init_eri.
+        # NOTE: before the RI-JK B vectors or the RI-J integrals are set up,
+        # which keep back from what they may hold the smallest batch of the
+        # nonlinear Fock builds.
+        self._set_ri_reserve_floor(molecule, ao_basis, scf_results)
+
+        if self.ri_jk and not self._ri_fallback:
+            initialize_ri_jk(self, molecule, ao_basis)
+
         # Computing the first-order response vectors (3 per frequency)
         N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
@@ -400,7 +423,8 @@ class CubicResponseDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug',
-            '_block_size_factor', 'ri_coulomb'
+            '_block_size_factor', 'ri_coulomb', 'ri_jk',
+            'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -411,7 +435,8 @@ class CubicResponseDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             N_drv.checkpoint_file = str(fpath) + '_crf_1.h5'
 
-        N_results = N_drv.compute(molecule, ao_basis, scf_results, ABCD)
+        with lend_ri(self, N_drv):
+            N_results = N_drv.compute(molecule, ao_basis, scf_results, ABCD)
 
         self._is_converged = N_drv.is_converged
 
@@ -432,6 +457,12 @@ class CubicResponseDriver(NonlinearSolver):
         self.ostream.flush()
 
         profiler.end(self.ostream)
+
+        # NOTE: the RI memory check of this driver's own Fock builds; the
+        # solvers it drives print their own.
+        self._print_ri_memory_check()
+
+        self._release_freed_memory()
 
         return cubic_dict
 
@@ -475,7 +506,7 @@ class CubicResponseDriver(NonlinearSolver):
 
         nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
-        eri_dict = self._init_eri(molecule, ao_basis)
+        eri_dict = self._init_eri(molecule, ao_basis, reuse_ri_jk=True)
 
         dft_dict = self._init_dft(molecule, scf_results)
 
@@ -485,10 +516,20 @@ class CubicResponseDriver(NonlinearSolver):
 
         profiler.check_memory_usage('1st densities')
 
+        fock_profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqtriples, density_list1,
                                        density_list2, density_list3, F0, mo,
-                                       molecule, ao_basis, eri_dict, dft_dict)
+                                       molecule, ao_basis, eri_dict, dft_dict,
+                                       fock_profiler)
+
+        fock_profiler.end(self.ostream)
 
         profiler.check_memory_usage('1st Focks')
 
@@ -507,10 +548,19 @@ class CubicResponseDriver(NonlinearSolver):
 
         profiler.check_memory_usage('2nd densities')
 
+        fock_profiler_two = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         fock_dict_two = self.get_fock_dict_II(freqtriples, density_list1_two,
                                               density_list2_two, F0, mo,
                                               molecule, ao_basis, eri_dict,
-                                              dft_dict)
+                                              dft_dict, fock_profiler_two)
+
+        fock_profiler_two.end(self.ostream)
 
         profiler.check_memory_usage('2nd Focks')
 
@@ -876,6 +926,21 @@ class CubicResponseDriver(NonlinearSolver):
         distributed_density_2 = None
         distributed_density_3 = None
 
+        # NOTE: the factors of the two orders which reach the Fock build, kept
+        # apart as lists of the occupied and the virtual right factor.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self._uses_ri_jk():
+            # NOTE: the shared halves are kept with the right factors rather than
+            # formed again where they are used, so the two cannot be built from
+            # different orbitals.
+            self._ri_jk_factors = {
+                'left_occ': mo[:, :nocc],
+                'left_vir': mo[:, nocc:],
+                'second': ([], []),
+                'third': ([], []),
+            }
+
         for (wb, wc, wd) in freqtriples:
 
             # convert response matrix to ao basis #
@@ -917,6 +982,23 @@ class CubicResponseDriver(NonlinearSolver):
 
                 Ddbc = self.commut(kd, Dbc)
                 Ddcb = self.commut(kd, Dcb)
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals. The two orders are collected apart because the
+                # array of each is cut with a stride of its own where there is a
+                # functional, and laid end to end where there is not, which is the
+                # order they are joined in at the call.
+                if self._ri_jk_factors is not None:
+                    for name, mat in (('second', Dbc + Dcb),
+                                      ('second', Dbd + Ddb),
+                                      ('second', Ddc + Dcd),
+                                      ('third', Dbcd + Dbdc + Dcbd + Dcdb +
+                                       Ddbc + Ddcb)):
+                        for part in (np.real, np.imag):
+                            ra, rb = ri_jk_general_factors(
+                                mo, nocc, part(mat))
+                            self._ri_jk_factors[name][0].append(ra)
+                            self._ri_jk_factors[name][1].append(rb)
 
                 # density transformation from MO to AO basis
 
@@ -1011,6 +1093,14 @@ class CubicResponseDriver(NonlinearSolver):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the densities of the second pass. They are one per
+        # frequency triple, real and imaginary, and go through the Fock build as
+        # two-time perturbed densities do.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self._uses_ri_jk():
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for (wb, wc, wd) in freqtriples:
 
             Nb = ComplexResponseSolver.get_full_solution_vector(Nx[('B', wb)])
@@ -1053,6 +1143,18 @@ class CubicResponseDriver(NonlinearSolver):
 
                 Dd_bc = self.commut(kd, Dbc)
                 Dbc_d = self.commut(kbc, Dd)
+
+                # NOTE: the factors, before the transformation to the atomic
+                # orbitals. The real and the imaginary part of the one density go
+                # to the Fock build in that order, and the factors follow it.
+                if self._ri_jk_factors is not None:
+                    total_mo = (Db_cd + Dcd_b + Dc_bd + Dbd_c + Dd_bc + Dbc_d)
+
+                    for part in (np.real, np.imag):
+                        ra, rb = ri_jk_general_factors(
+                            mo, nocc, part(total_mo))
+                        self._ri_jk_factors[1].append(ra)
+                        self._ri_jk_factors[3].append(rb)
 
                 # density transformation from MO to AO basis
 
@@ -1111,7 +1213,8 @@ class CubicResponseDriver(NonlinearSolver):
         return distributed_density_1, distributed_density_2
 
     def get_fock_dict(self, wi, density_list1, density_list2, density_list3, F0,
-                      mo, molecule, ao_basis, eri_dict, dft_dict):
+                      mo, molecule, ao_basis, eri_dict, dft_dict,
+                      profiler=None):
         """
         Computes the Fock matrices for a cubic response function
 
@@ -1131,6 +1234,8 @@ class CubicResponseDriver(NonlinearSolver):
             The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
+        :param profiler:
+            The profiler.
 
         :return:
             A dictonary of compounded first-order Fock-matrices
@@ -1174,21 +1279,48 @@ class CubicResponseDriver(NonlinearSolver):
         else:
             time_start_fock = time.time()
 
+            factors = self._ri_jk_factors
+
             if self._dft:
+                # NOTE: two arrays, each cut with a stride of its own, so the
+                # factors go as the two sets they were collected as.
+                split = None
+
+                if factors is not None:
+                    split = {
+                        'second': (factors['left_occ'], factors['second'][0],
+                                   factors['left_vir'], factors['second'][1]),
+                        'third': (factors['left_occ'], factors['third'][0],
+                                  factors['left_vir'], factors['third'][1]),
+                    }
+
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  dft_dict, density_list1,
                                                  density_list2, density_list3,
-                                                 'crf')
+                                                 'crf', profiler,
+                                                 dens_factors=split)
             else:
                 density_list_23 = DistributedArray(density_list2.data,
                                                    self.comm,
                                                    distribute=False)
                 density_list_23.append(density_list3, axis=1)
+
+                # NOTE: one array of the two orders laid end to end, cut with one
+                # stride, so the factors are one set joined in the same order.
+                joined = None
+
+                if factors is not None:
+                    joined = (factors['left_occ'],
+                              factors['second'][0] + factors['third'][0],
+                              factors['left_vir'],
+                              factors['second'][1] + factors['third'][1])
+
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  None, None, None,
-                                                 density_list_23, 'crf')
+                                                 density_list_23, 'crf', profiler,
+                                                 dens_factors=joined)
 
             self._print_fock_time(time.time() - time_start_fock)
 
@@ -1209,7 +1341,7 @@ class CubicResponseDriver(NonlinearSolver):
         return focks
 
     def get_fock_dict_II(self, wi, density_list1, density_list2, F0, mo,
-                         molecule, ao_basis, eri_dict, dft_dict):
+                         molecule, ao_basis, eri_dict, dft_dict, profiler=None):
         """
         Computes the Fock matrices for a cubic response function
 
@@ -1229,6 +1361,8 @@ class CubicResponseDriver(NonlinearSolver):
             The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
+        :param profiler:
+            The profiler.
 
         :return:
             A dictonary of compounded first-order Fock-matrices
@@ -1272,12 +1406,15 @@ class CubicResponseDriver(NonlinearSolver):
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  dft_dict, density_list1,
-                                                 density_list2, None, 'crf_ii')
+                                                 density_list2, None, 'crf_ii',
+                                                 profiler,
+                                                 dens_factors=self._ri_jk_factors)
             else:
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  None, None, density_list2,
-                                                 None, 'crf_ii')
+                                                 None, 'crf_ii', profiler,
+                                                 dens_factors=self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 
@@ -1545,7 +1682,8 @@ class CubicResponseDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug',
-            '_block_size_factor', 'ri_coulomb'
+            '_block_size_factor', 'ri_coulomb', 'ri_jk',
+            'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -1556,7 +1694,8 @@ class CubicResponseDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             Nxy_drv.checkpoint_file = str(fpath) + '_crf_2.h5'
 
-        Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_results, XY)
+        with lend_ri(self, Nxy_drv):
+            Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_results, XY)
 
         self._is_converged = (self._is_converged and Nxy_drv.is_converged)
 

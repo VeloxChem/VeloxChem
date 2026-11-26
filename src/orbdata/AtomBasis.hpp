@@ -118,11 +118,21 @@ class CAtomBasis
     /// @return The vector of basis functions.
     auto basis_functions() const -> std::vector<CBasisFunction>;
 
+    /// @brief Gets vector of basis functions.
+    /// @return The constant reference to vector of basis functions.
+    auto functions() const -> const std::vector<CBasisFunction> &;
+
     /// @brief Gets vector of basis functions with specific angular momentum.
     /// @param angular_momentum The angular momentum of requested basis
     /// functions.
     /// @return The vector of basis functions.
     auto basis_functions(const int angular_momentum) const -> std::vector<CBasisFunction>;
+
+    /// @brief Gets basis function with specific angular momentum and index.
+    /// @param angular_momentum The angular momentum of basis function.
+    /// @param index The index of basis function with given angular momentum.
+    /// @return The constant reference to basis function.
+    auto basis_function(const int angular_momentum, const size_t index) const -> const CBasisFunction &;
 
     /// @brief Gets vector of GTOs with specific angular momentum and number of
     /// primitive basis functions.
@@ -154,6 +164,10 @@ class CAtomBasis
     /// @return The maximum angular momentum.
     auto max_angular_momentum() const -> int;
 
+    /// @brief Gets number of basis functions in atom basis.
+    /// @return The number of basis functions.
+    auto number_of_basis_functions() const -> size_t;
+
     /// @brief Gets number of basis functions with specific angular momentum in
     /// atom basis.
     /// @param angular_momentum The requested angular momentum of basis
@@ -176,6 +190,26 @@ class CAtomBasis
     /// functiions.
     /// @return The number of primitive basis functions.
     auto number_of_primitive_functions(const int angular_momentum) const -> size_t;
+
+    /// @brief Gets largest exponent of primitive basis functions with requested
+    /// angular momentum.
+    /// @param angular_momentum The requested angular momentum of basis
+    /// functions.
+    /// @return The largest exponent, 0.0 if there are no such basis functions.
+    auto largest_exponent(const int angular_momentum) const -> double;
+
+    /// @brief Gets smallest exponent of primitive basis functions with requested
+    /// angular momentum.
+    /// @param angular_momentum The requested angular momentum of basis
+    /// functions.
+    /// @return The smallest exponent, 0.0 if there are no such basis functions.
+    auto smallest_exponent(const int angular_momentum) const -> double;
+
+    /// @brief Gets offsets of the first basis function of each angular momentum
+    /// in atom basis.
+    /// @return The vector of offsets, with the total number of basis functions
+    /// as last element. The vector holds a single zero for an empty atom basis.
+    auto basis_function_offsets() const -> std::vector<size_t>;
 
     /// @brief Get set of unique contraction numbers of basis functions with
     /// given angular momentum in atom basis.
@@ -204,6 +238,10 @@ class CAtomBasis
 
     /// @brief  identifier of chemical element.
     int _identifier;
+
+    /// @brief Sorts basis functions by ascending angular momentum, preserving
+    /// their relative order within each angular momentum.
+    auto _sort() -> void;
 };
 
 #endif /* AtomBasis_hpp */

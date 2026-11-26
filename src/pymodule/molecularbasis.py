@@ -78,6 +78,91 @@ def _known_aliases_for_basis_sets():
     }
 
 
+def _known_basis_set_categories():
+    """
+    Maps from basis set file name to the category of the orbital basis set.
+
+    :return:
+        A dictionary that maps from basis set file name to a tuple of the zeta
+        level of the valence functions (1 for a minimal basis set) and whether
+        the basis set has diffuse functions. Auxiliary (fitting) basis sets,
+        the effective core potentials and the basis sets of the starting guess
+        are not in it.
+    """
+
+    # NOTE: the zeta level is that of the valence split: 6-311G is counted as
+    # triple-zeta, pcseg-0 (without polarization functions) and the 6-31G sets
+    # with added polarization functions as double-zeta. pcX-n is counted as
+    # pcseg-n. Sadlej-pVTZ is counted as having diffuse functions.
+    groups = [
+        (1, False, [
+            'STO-3G', 'STO-3G-OLD', 'STO-6G', 'ANO-L-MB', 'ANO-RCC-MB',
+            'ANO-S-MB'
+        ]),
+        (2, False, [
+            '6-31G', '6-31G_D_', '6-31G_D,P_', '6-31G_2DF,P_',
+            '6-31G_3DF,3PD_', 'CC-PVDZ', 'CC-PCVDZ', 'DEF2-SVP', 'DEF2-SV_P_',
+            'PCSEG-0', 'PCSEG-1', 'PCX-1', 'ANO-L-VDZP', 'ANO-S-VDZP'
+        ]),
+        (2, True, [
+            '6-31+G', '6-31++G', '6-31+G_D_', '6-31++G_D_', '6-31+G_D,P_',
+            '6-31++G_D,P_', 'AUG-CC-PVDZ', 'AUG-CC-PCVDZ', 'DAUG-CC-PVDZ',
+            'DAUG-CC-PCVDZ', 'TAUG-CC-PVDZ', 'TAUG-CC-PCVDZ', 'DEF2-SVPD',
+            'AUG-PCSEG-0', 'AUG-PCSEG-1', 'AUG-PCX-1'
+        ]),
+        (3, False, [
+            '6-311G', '6-311G_D_', '6-311G_D,P_', '6-311G_2DF,2PD_', 'CC-PVTZ',
+            'CC-PCVTZ', 'DEF2-TZVP', 'DEF2-TZVPP', 'PCSEG-2', 'PCX-2',
+            'ANO-L-VTZP'
+        ]),
+        (3, True, [
+            '6-311+G', '6-311++G', '6-311+G_D_', '6-311++G_D_',
+            '6-311+G_D,P_', '6-311++G_D,P_', '6-311+G_2D,P_',
+            '6-311++G_2D,2P_', '6-311++G_3DF,3PD_', 'AUG-CC-PVTZ',
+            'AUG-CC-PCVTZ', 'DAUG-CC-PVTZ', 'DAUG-CC-PCVTZ', 'TAUG-CC-PVTZ',
+            'TAUG-CC-PCVTZ', 'DEF2-TZVPD', 'DEF2-TZVPPD', 'AUG-PCSEG-2',
+            'AUG-PCX-2', 'SADLEJ-PVTZ'
+        ]),
+        (4, False, [
+            'CC-PVQZ', 'CC-PCVQZ', 'DEF2-QZVP', 'DEF2-QZVPP', 'PCSEG-3',
+            'PCX-3', 'ANO-L-VQZP'
+        ]),
+        (4, True, [
+            'AUG-CC-PVQZ', 'AUG-CC-PCVQZ', 'DAUG-CC-PVQZ', 'DAUG-CC-PCVQZ',
+            'TAUG-CC-PVQZ', 'TAUG-CC-PCVQZ', 'DEF2-QZVPD', 'DEF2-QZVPPD',
+            'AUG-PCSEG-3', 'AUG-PCX-3'
+        ]),
+        (5, False, ['CC-PV5Z', 'CC-PCV5Z', 'PCSEG-4', 'PCX-4']),
+        (5, True, [
+            'AUG-CC-PV5Z', 'AUG-CC-PCV5Z', 'DAUG-CC-PV5Z', 'DAUG-CC-PCV5Z',
+            'TAUG-CC-PV5Z', 'TAUG-CC-PCV5Z', 'AUG-PCSEG-4', 'AUG-PCX-4'
+        ]),
+        (6, False, ['CC-PV6Z', 'CC-PV6Z-NO-OPT-GC']),
+        (6, True, ['AUG-CC-PV6Z', 'DAUG-CC-PV6Z', 'TAUG-CC-PV6Z']),
+    ]
+
+    return {
+        fname: (zeta, diffuse) for zeta, diffuse, fnames in groups
+        for fname in fnames
+    }
+
+
+def get_basis_set_category(name):
+    """
+    Gets the category of an orbital basis set.
+
+    :param name:
+        The name of the basis set, a common name or a file name, in any case.
+
+    :return:
+        A tuple of the zeta level of the valence functions (1 for a minimal
+        basis set) and whether the basis set has diffuse functions, or None for
+        a basis set not in _known_basis_set_categories.
+    """
+
+    return _known_basis_set_categories().get(_basis_name_to_file(name.upper()))
+
+
 def _basis_name_to_file(name):
     """
     Determines basis set file name from common name.
@@ -317,7 +402,10 @@ def _gen_basis_key(elem_name, basis_dict):
     return basis_key
 
 
-def _get_atom_bas_label(basis_name, atom_basis_labels, idx):
+def _get_atom_bas_label(basis_name,
+                        atom_basis_labels,
+                        idx,
+                        auxiliary_basis=False):
     """
     Gets atom basis label.
 
@@ -327,11 +415,20 @@ def _get_atom_bas_label(basis_name, atom_basis_labels, idx):
         The list of atom basis labels.
     :param idx:
         The index of the atom.
+    :param auxiliary_basis:
+        Whether the basis set is an auxiliary (fitting) basis set, which the
+        basis set labels of the atoms do not apply to.
     :return:
         The atom basis label.
     """
 
-    if basis_name.upper() in ['AO-START-GUESS', 'AO-START-GUESS-FOR-ECP']:
+    # NOTE: the basis set label given to an atom in the molecule names its
+    # orbital basis set. It does not apply to the basis set of the starting
+    # guess, nor to an auxiliary basis set, which would otherwise take that
+    # orbital basis set as its fitting functions.
+    if auxiliary_basis or basis_name.upper() in [
+            'AO-START-GUESS', 'AO-START-GUESS-FOR-ECP'
+    ]:
         atom_bas_label = basis_name.upper()
     else:
         atom_bas_label = atom_basis_labels[idx].upper()
@@ -346,7 +443,8 @@ def _MolecularBasis_read(molecule,
                          basis_name,
                          basis_path='.',
                          ostream=None,
-                         verbose=False):
+                         verbose=False,
+                         auxiliary_basis=False):
     """
     Reads AO basis set from file for given molecule.
 
@@ -358,6 +456,11 @@ def _MolecularBasis_read(molecule,
         Path to the basis set.
     :param ostream:
         The output stream.
+    :param auxiliary_basis:
+        Whether the basis set is an auxiliary (fitting) basis set, such as the
+        one of the resolution of the identity. Every atom is then given the
+        named basis set, and the basis set labels of the atoms in the molecule,
+        which name their orbital basis sets, are not applied.
 
     :return:
         The molecular basis set.
@@ -383,7 +486,8 @@ def _MolecularBasis_read(molecule,
     need_def2_ecp = False
     ecp_elem_id_mininum = 37
     for idx, elem_id in enumerate(molecule.get_identifiers()):
-        atom_bas_label = _get_atom_bas_label(basis_name, atom_basis_labels, idx)
+        atom_bas_label = _get_atom_bas_label(basis_name, atom_basis_labels, idx,
+                                             auxiliary_basis)
         if (elem_id >= ecp_elem_id_mininum) and (
                 atom_bas_label.startswith('DEF2-')):
             need_def2_ecp = True
@@ -391,7 +495,7 @@ def _MolecularBasis_read(molecule,
 
     # read atom basis sets defined in molecule
     for atom_bas_label in set(atom_basis_labels):
-        if atom_bas_label != '':
+        if atom_bas_label != '' and not auxiliary_basis:
             basis_dict[atom_bas_label.upper()] = _read_basis_file(
                 atom_bas_label, basis_path, ostream)
 
@@ -408,7 +512,8 @@ def _MolecularBasis_read(molecule,
     mol_basis = MolecularBasis()
 
     for idx, elem_id in enumerate(molecule.get_identifiers()):
-        atom_bas_label = _get_atom_bas_label(basis_name, atom_basis_labels, idx)
+        atom_bas_label = _get_atom_bas_label(basis_name, atom_basis_labels, idx,
+                                             auxiliary_basis)
 
         basis_key = _gen_basis_key(atom_basis_elements[idx],
                                    basis_dict[atom_bas_label])

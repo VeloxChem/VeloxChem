@@ -37,6 +37,8 @@ import time
 import sys
 
 from .oneeints import compute_electric_dipole_integrals
+from .riresponse import lend_ri
+from .rijkresponse import initialize_ri_jk
 from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -46,7 +48,7 @@ from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .firstorderprop import FirstOrderProperties
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check,
+                           dft_and_ri_sanity_check,
                            nonlinear_response_environment_sanity_check)
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -133,6 +135,17 @@ class ShgDriver(NonlinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
+    def _get_nonlinear_fock_modes(self):
+        """
+        Gets the modes of the nonlinear Fock builds this driver makes, which
+        shg_type chooses.
+
+        :return:
+            A tuple of modes.
+        """
+
+        return ('shg_red',) if self.shg_type == 'reduced' else ('shg',)
+
     def compute(self, molecule, ao_basis, scf_results):
         """
         Computes the isotropic quadratic response function for second-harmonic
@@ -167,11 +180,8 @@ class ShgDriver(NonlinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute', 'nonlinear')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute', 'nonlinear')
 
         profiler = Profiler({
             'timing': self.timing,
@@ -269,6 +279,19 @@ class ShgDriver(NonlinearSolver):
 
         # Computing the first-order response vectors (3 per frequency)
 
+        # NOTE: the B vectors are formed before the solvers this driver drives
+        # are made and lent to each of them (riresponse.lend_ri), rather than
+        # formed by each. The integral setup in compute_quad_components
+        # uses them again. Not gated on _uses_ri_jk(), for the reason given
+        # in _init_eri.
+        # NOTE: before the RI-JK B vectors or the RI-J integrals are set up,
+        # which keep back from what they may hold the smallest batch of the
+        # nonlinear Fock builds.
+        self._set_ri_reserve_floor(molecule, ao_basis, scf_results)
+
+        if self.ri_jk and not self._ri_fallback:
+            initialize_ri_jk(self, molecule, ao_basis)
+
         N_drv = ComplexResponseSolver(self.comm, self.ostream)
 
         cpp_keywords = [
@@ -276,7 +299,8 @@ class ShgDriver(NonlinearSolver):
             'conv_thresh', 'max_iter', 'eri_thresh', 'timing',
             'memory_profiling', 'batch_size', 'restart', 'xcfun', 'grid_level',
             'potfile', 'electric_field', 'program_end_time', '_debug',
-            '_block_size_factor', 'ri_coulomb'
+            '_block_size_factor', 'ri_coulomb', 'ri_jk',
+            'ri_auxiliary_basis'
         ]
 
         for key in cpp_keywords:
@@ -287,7 +311,8 @@ class ShgDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             N_drv.checkpoint_file = str(fpath) + '_shg.h5'
 
-        N_results = N_drv.compute(molecule, ao_basis, scf_results, AB)
+        with lend_ri(self, N_drv):
+            N_results = N_drv.compute(molecule, ao_basis, scf_results, AB)
 
         self._is_converged = N_drv.is_converged
 
@@ -303,6 +328,12 @@ class ShgDriver(NonlinearSolver):
                                             ao_basis, profiler)
 
         profiler.end(self.ostream)
+
+        # NOTE: the RI memory check of this driver's own Fock builds; the
+        # solvers it drives print their own.
+        self._print_ri_memory_check()
+
+        self._release_freed_memory()
 
         # Compute dipole vector
         scf_prop = FirstOrderProperties(self.comm, self.ostream)
@@ -431,7 +462,7 @@ class ShgDriver(NonlinearSolver):
 
         nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
-        eri_dict = self._init_eri(molecule, ao_basis)
+        eri_dict = self._init_eri(molecule, ao_basis, reuse_ri_jk=True)
 
         dft_dict = self._init_dft(molecule, scf_results)
 
@@ -441,10 +472,20 @@ class ShgDriver(NonlinearSolver):
 
         profiler.check_memory_usage('Densities')
 
+        fock_profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqpairs, first_order_dens,
                                        second_order_dens, F0, mo, molecule,
-                                       ao_basis, eri_dict, dft_dict, profiler)
+                                       ao_basis, eri_dict, dft_dict,
+                                       fock_profiler)
+
+        fock_profiler.end(self.ostream)
 
         profiler.check_memory_usage('Focks')
 
@@ -553,6 +594,15 @@ class ShgDriver(NonlinearSolver):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the sigma and lambda densities, collected beside
+        # them and carried on the driver. They are block diagonal in the orbitals,
+        # each of them a commutator of two first-order things, which is the shape
+        # the driver takes as four factors.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self._uses_ri_jk():
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         for (wb, wc) in freqpairs:
 
             nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', wb)])
@@ -590,6 +640,24 @@ class ShgDriver(NonlinearSolver):
                 D_lam_yz = self.commut(k_y, D_z) + self.commut(k_z, D_y)
 
                 # density transformation from MO to AO basis
+
+                # NOTE: the factors, before the transformation to the atomic
+                # orbitals throws the block structure away. The columns below are
+                # the real parts alone for the reduced way and the real and the
+                # imaginary part of each for the full one, so the factors are
+                # built from the same branch and cannot drift from them.
+                if self._ri_jk_factors is not None:
+                    mo_occ = mo[:, :nocc]
+                    mo_vir = mo[:, nocc:]
+                    parts = ((np.real,) if self.shg_type == 'reduced'
+                             else (np.real, np.imag))
+                    for dmat in (D_sig_x, D_sig_y, D_sig_z, D_lam_xy, D_lam_xz,
+                                 D_lam_yz):
+                        for part in parts:
+                            self._ri_jk_factors[1].append(
+                                np.matmul(mo_occ, part(dmat[:nocc, :nocc]).T))
+                            self._ri_jk_factors[3].append(
+                                np.matmul(mo_vir, part(dmat[nocc:, nocc:]).T))
 
                 D_x = np.linalg.multi_dot([mo, D_x, mo.T])
                 D_y = np.linalg.multi_dot([mo, D_y, mo.T])
@@ -692,6 +760,8 @@ class ShgDriver(NonlinearSolver):
             The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
+        :param profiler:
+            The profiler.
 
         :return:
             A dictonary of compounded first-order two-time Fock-matrices. For
@@ -744,13 +814,14 @@ class ShgDriver(NonlinearSolver):
                                                  eri_dict, dft_dict,
                                                  first_order_dens,
                                                  second_order_dens, None,
-                                                 'shg_red', profiler)
+                                                 'shg_red', profiler,
+                                                 self._ri_jk_factors)
             elif self.shg_type == 'full':
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real_and_imag', eri_dict,
                                                  dft_dict, first_order_dens,
                                                  second_order_dens, None, 'shg',
-                                                 profiler)
+                                                 profiler, self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 

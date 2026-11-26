@@ -38,6 +38,9 @@ import time
 import sys
 
 from .oneeints import compute_electric_dipole_integrals
+from .riresponse import lend_ri
+from .rijkresponse import initialize_ri_jk
+from .rijkresponse import ri_jk_general_factors
 from .veloxchemlib import mpi_master
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -46,7 +49,7 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check,
+                           dft_and_ri_sanity_check,
                            nonlinear_response_environment_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
@@ -96,8 +99,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         self.property = 'electric dipole moment'
 
-        # tpa transition settings
-
+        # excited state settings
         self.state = 1
         self.nstates = None
         self._initial_state = None
@@ -105,8 +107,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         # input keywords
         self._input_keywords['response'].update({
-            'initial_state': ('int', 'index state'),
-            'final_state': ('int', 'index of state'),
+            'state': ('int', 'index of the excited state'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -123,6 +124,16 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
+
+    def _get_nonlinear_fock_modes(self):
+        """
+        Gets the modes of the nonlinear Fock builds this driver makes.
+
+        :return:
+            A tuple of modes.
+        """
+
+        return ('qrf',)
 
     def compute(self, molecule, ao_basis, scf_results):
         """
@@ -173,11 +184,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute', 'nonlinear')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute', 'nonlinear')
 
         profiler = Profiler({
             'timing': False,
@@ -250,6 +258,19 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         self.nstates = max(self.state, min(3, max_nstates))
 
         # run RPA
+        # NOTE: the B vectors are formed before the solvers this driver drives
+        # are made and lent to each of them (riresponse.lend_ri), rather than
+        # formed by each. The integral setup in compute_quad_components
+        # uses them again. Not gated on _uses_ri_jk(), for the reason given
+        # in _init_eri.
+        # NOTE: before the RI-JK B vectors or the RI-J integrals are set up,
+        # which keep back from what they may hold the smallest batch of the
+        # nonlinear Fock builds.
+        self._set_ri_reserve_floor(molecule, ao_basis, scf_results)
+
+        if self.ri_jk and not self._ri_fallback:
+            initialize_ri_jk(self, molecule, ao_basis)
+
         rpa_drv = LinearResponseEigenSolver(self.comm, self.ostream)
         rpa_drv.nonlinear = True
 
@@ -258,7 +279,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug',
-            '_block_size_factor', 'ri_coulomb'
+            '_block_size_factor', 'ri_coulomb', 'ri_jk',
+            'ri_auxiliary_basis'
         ]
 
         for key in rpa_keywords:
@@ -269,7 +291,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             rpa_drv.checkpoint_file = str(fpath) + '_doublequadres_rpa.h5'
 
-        rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
+        with lend_ri(self, rpa_drv):
+            rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
         available_states = len(rpa_results['eigenvalues'])
         assert_msg_critical(
             available_states >= self.nstates,
@@ -317,7 +340,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug',
-            '_block_size_factor', 'ri_coulomb'
+            '_block_size_factor', 'ri_coulomb', 'ri_jk',
+            'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -328,7 +352,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             N_drv.checkpoint_file = str(fpath) + '_doublequadres_cpp.h5'
 
-        N_results = N_drv.compute(molecule, ao_basis, scf_results, B)
+        with lend_ri(self, N_drv):
+            N_results = N_drv.compute(molecule, ao_basis, scf_results, B)
 
         self._is_converged = N_drv.is_converged
         assert_msg_critical(
@@ -353,6 +378,12 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         self.ostream.flush()
 
         profiler.end(self.ostream)
+
+        # NOTE: the RI memory check of this driver's own Fock builds; the
+        # solvers it drives print their own.
+        self._print_ri_memory_check()
+
+        self._release_freed_memory()
 
         return ret_dict
 
@@ -395,7 +426,7 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
-        eri_dict = self._init_eri(molecule, ao_basis)
+        eri_dict = self._init_eri(molecule, ao_basis, reuse_ri_jk=True)
 
         dft_dict = self._init_dft(molecule, scf_results)
 
@@ -405,10 +436,20 @@ class ExcitedStateMomentDriver(NonlinearSolver):
 
         profiler.check_memory_usage('Densities')
 
+        fock_profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         # computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqs, first_order_dens,
                                        second_order_dens, F0, mo, molecule,
-                                       ao_basis, eri_dict, dft_dict, profiler)
+                                       ao_basis, eri_dict, dft_dict,
+                                       fock_profiler)
+
+        fock_profiler.end(self.ostream)
 
         profiler.check_memory_usage('Focks')
 
@@ -626,6 +667,14 @@ class ExcitedStateMomentDriver(NonlinearSolver):
         distributed_density_1 = None
         distributed_density_2 = None
 
+        # NOTE: the factors of the densities which reach the Fock build. Only the
+        # two-time perturbed one is built from here, and it is carried as a real
+        # and an imaginary column, so the factors go the same way.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self._uses_ri_jk():
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
+
         Nf = LinearResponseEigenSolver.get_full_solution_vector(
             Xf[self._initial_state - 1])
         Ng = LinearResponseEigenSolver.get_full_solution_vector(
@@ -644,6 +693,16 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             # create the first order two indexed densities #
 
             Dfg_ = self.commut(kg_, Df) + self.commut(kf, Dg_)
+
+            # NOTE: the factors, taken before the transformation to the atomic
+            # orbitals and in the order the columns are laid out below. The
+            # first-order densities beside them are there for the quadrature
+            # alone and no Fock matrix is asked of them.
+            if self._ri_jk_factors is not None:
+                for part in (np.real, np.imag):
+                    ra, rb = ri_jk_general_factors(mo, nocc, part(Dfg_))
+                    self._ri_jk_factors[1].append(ra)
+                    self._ri_jk_factors[3].append(rb)
 
             # Density transformation from MO to AO basis
 
@@ -717,6 +776,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
             The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
+        :param profiler:
+            The profiler.
 
         :return:
             A dictonary of compounded first-order Fock-matrices
@@ -760,7 +821,8 @@ class ExcitedStateMomentDriver(NonlinearSolver):
                                              'real_and_imag', eri_dict,
                                              dft_dict, first_order_dens,
                                              second_order_dens, None, 'qrf',
-                                             profiler)
+                                             profiler,
+                                             dens_factors=self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 

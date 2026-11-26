@@ -18,6 +18,7 @@ class TestUnrestrictedRPA:
     def run_rpa(self,
                 xcfun_label,
                 basis_label,
+                ri,
                 ref_exc_enes,
                 ref_osc_str,
                 tol,
@@ -35,9 +36,15 @@ class TestUnrestrictedRPA:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseUnrestrictedEigenSolver()
         lr_drv.ostream.mute()
@@ -52,44 +59,71 @@ class TestUnrestrictedRPA:
                 np.abs(ref_osc_str -
                        lr_results['oscillator_strengths'])) < 1.0e-4
 
-    def test_hf_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_svp(self, ri):
 
         # vlxtag: UHF, Absorption, TDHF
 
-        ref_exc_enes = np.array([
-            0.07000019, 0.09444351, 0.23795183, 0.53171161, 0.54518734,
-            0.55496039, 0.57527661, 0.58052563, 0.61929121, 0.63384529
-        ])
+        ref_exc_enes = {
+            False: np.array([
+                0.07000019, 0.09444351, 0.23795183, 0.53171161, 0.54518734,
+                0.55496039, 0.57527661, 0.58052563, 0.61929121, 0.63384529
+            ]),
+            True: np.array([
+                0.06999431, 0.09443923, 0.23797135, 0.53175322, 0.54517164,
+                0.55500281, 0.57529450, 0.58055751, 0.61932931, 0.63388218
+            ])
+        }[ri]
 
-        ref_osc_str = np.array([
-            0.1803, 0.0013, 0.0000, 0.2184, 0.0358, 0.0002, 0.0187, 0.0000,
-            0.0789, 0.0253
-        ])
+        ref_osc_str = {
+            False: np.array([
+                0.1803, 0.0013, 0.0000, 0.2184, 0.0358, 0.0002, 0.0187, 0.0000,
+                0.0789, 0.0253
+            ]),
+            True: np.array([
+                0.1803, 0.0013, 0.0000, 0.2184, 0.0357, 0.0002, 0.0188, 0.0000,
+                0.0790, 0.0252
+            ])
+        }[ri]
 
-        self.run_rpa('hf', 'def2-svp', ref_exc_enes, ref_osc_str, 1.0e-6)
+        self.run_rpa('hf', 'def2-svp', ri, ref_exc_enes, ref_osc_str, 1.0e-6)
 
-    def test_pbe0_svp(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_pbe0_svp(self, ri):
 
         # vlxtag: UKS, Absorption, TDDFT
 
-        ref_exc_enes = np.array([
-            0.08832630, 0.09472770, 0.22512802, 0.48348997, 0.48361504,
-            0.51691424, 0.52828051, 0.54298284, 0.56229157, 0.60539714
-        ])
+        ref_exc_enes = {
+            False: np.array([
+                0.08832630, 0.09472770, 0.22512802, 0.48348997, 0.48361504,
+                0.51691424, 0.52828051, 0.54298284, 0.56229157, 0.60539714
+            ]),
+            True: np.array([
+                0.08835786, 0.09472777, 0.22514196, 0.48349412, 0.48358975,
+                0.51694984, 0.52831078, 0.54290013, 0.56232383, 0.60538397
+            ])
+        }[ri]
 
-        ref_osc_str = np.array([
-            0.1596, 0.0012, 0.0000, 0.1985, 0.0338, 0.0072, 0.0000, 0.0308,
-            0.0600, 0.1210
-        ])
+        ref_osc_str = {
+            False: np.array([
+                0.1596, 0.0012, 0.0000, 0.1985, 0.0338, 0.0072, 0.0000, 0.0308,
+                0.0600, 0.1210
+            ]),
+            True: np.array([
+                0.1597, 0.0012, 0.0000, 0.1985, 0.0338, 0.0072, 0.0000, 0.0308,
+                0.0601, 0.1210
+            ])
+        }[ri]
 
         self.run_rpa('pbe0',
                      'def2-svp',
+                     ri,
                      ref_exc_enes,
                      ref_osc_str,
                      1.0e-5,
                      max_subspace_dim=120)
 
-    def run_rpa_with_ecp(self, ref_exc_enes, ref_osc_str, tol):
+    def run_rpa_with_ecp(self, ref_exc_enes, ref_osc_str, tol, ri):
 
         xyz_string = """2
         xyz
@@ -103,8 +137,14 @@ class TestUnrestrictedRPA:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseUnrestrictedEigenSolver()
         lr_drv.ostream.mute()
@@ -118,19 +158,28 @@ class TestUnrestrictedRPA:
                 np.abs(ref_osc_str -
                        lr_results['oscillator_strengths'])) < 1.0e-4
 
-    def test_hf_with_ecp(self):
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
+    def test_hf_with_ecp(self, ri):
 
         # vlxtag: UHF, Absorption, TDHF
 
-        ref_exc_enes = np.array(
-            [0.08148954, 0.08148954, 0.09916297, 0.09916297, 0.12983930])
+        ref_exc_enes = {
+            False: np.array(
+                [0.08148954, 0.08148954, 0.09916297, 0.09916297, 0.12983930]),
+            True: np.array(
+                [0.08148364, 0.08148364, 0.09915714, 0.09915714, 0.12983960])
+        }[ri]
         ref_osc_str = np.array([0.0000, 0.0000, 0.0001, 0.0001, 0.0119])
 
-        self.run_rpa_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6)
+        self.run_rpa_with_ecp(ref_exc_enes, ref_osc_str, 1.0e-6, ri)
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 4,
                         reason='limit MPI size for this test case')
-    def test_core_excitation_water_cation_sto3g(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_core_excitation_water_cation_sto3g(self, ri):
 
         xyz_string = """3
         xyz
@@ -144,8 +193,14 @@ class TestUnrestrictedRPA:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseUnrestrictedEigenSolver()
         lr_drv.ostream.mute()
@@ -155,8 +210,14 @@ class TestUnrestrictedRPA:
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
-            ref_exc_enes = np.array([19.686416638, 20.394042142, 20.435119894])
-            ref_osc_str = np.array([0.051629296, 0.002790081, 0.013572433])
+            ref_exc_enes = {
+                False: np.array([19.686416638, 20.394042142, 20.435119894]),
+                True: np.array([19.686629210, 20.394282949, 20.435366772])
+            }[ri]
+            ref_osc_str = {
+                False: np.array([0.051629296, 0.002790081, 0.013572433]),
+                True: np.array([0.051628277, 0.002788722, 0.013575975])
+            }[ri]
 
             assert np.max(np.abs(lr_results['eigenvalues'] -
                                  ref_exc_enes)) < 1.0e-7
@@ -164,7 +225,8 @@ class TestUnrestrictedRPA:
                 np.abs(lr_results['oscillator_strengths'] -
                        ref_osc_str)) < 1.0e-5
 
-    def test_nto_and_detach_attach_water_cation_sto3g(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_nto_and_detach_attach_water_cation_sto3g(self, ri):
 
         xyz_string = """3
         xyz
@@ -178,8 +240,14 @@ class TestUnrestrictedRPA:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseUnrestrictedEigenSolver()
         lr_drv.ostream.mute()
@@ -189,14 +257,21 @@ class TestUnrestrictedRPA:
         lr_results = lr_drv.compute(mol, bas, scf_results)
 
         if lr_drv.rank == mpi_master():
-            ref_nto_lambdas_a = np.array([
-                [7.92386e-05, 0.0],
-                [4.3593022e-03, 0.0],
-            ])
-            ref_nto_lambdas_b = np.array([
-                [1.0002985115, 0.0, 0.0],
-                [1.0029741042, 0.0, 0.0],
-            ])
+            ref_nto_lambdas_a = {
+                False: np.array([
+                    [7.92386e-05, 0.0],
+                    [4.3593022e-03, 0.0],
+                ]),
+                True: np.array([[7.935774e-05, 0.0], [4.3584009e-03, 0.0]])
+            }[ri]
+            ref_nto_lambdas_b = {
+                False: np.array([
+                    [1.0002985115, 0.0, 0.0],
+                    [1.0029741042, 0.0, 0.0],
+                ]),
+                True: np.array([[1.0002989376, 0.0000000000, 0.0000000000],
+                                [1.0029733215, 0.0000000000, 0.0000000000]])
+            }[ri]
 
             assert 'nto_lambdas_a' in lr_results
             assert 'nto_lambdas_b' in lr_results
@@ -214,7 +289,8 @@ class TestUnrestrictedRPA:
             assert len(lr_results['eigenvalues']) == 2
             assert np.all(np.isfinite(lr_results['eigenvalues']))
 
-    def test_checkpoint_and_restart(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_checkpoint_and_restart(self, tmp_path, ri):
 
         xyz_string = """3
         xyz
@@ -228,6 +304,7 @@ class TestUnrestrictedRPA:
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
 
         filename = str(tmp_path / "water_restart")
@@ -238,6 +315,11 @@ class TestUnrestrictedRPA:
         scf_drv.compute(mol, bas)
         scf_drv.restart = True
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_drv = LinearResponseUnrestrictedEigenSolver()
         lr_drv.filename = filename
@@ -264,7 +346,8 @@ class TestUnrestrictedRPA:
                     np.abs(lr_results_first[key] -
                            lr_results_second[key])) < tol
 
-    def test_restart_allows_missing_nstates(self, tmp_path):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_restart_allows_missing_nstates(self, tmp_path, ri):
 
         xyz_string = """3
         xyz
@@ -278,6 +361,7 @@ class TestUnrestrictedRPA:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
 
         filename = str(tmp_path / 'unrestricted_missing_nstates')
@@ -287,6 +371,11 @@ class TestUnrestrictedRPA:
         scf_drv.compute(mol, bas)
         scf_drv.restart = True
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
         scf_results['filename'] = filename
 
         reference_drv = LinearResponseUnrestrictedEigenSolver()
@@ -414,7 +503,8 @@ class TestUnrestrictedRPA:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='skip pytest.raises for multiple MPI processes')
-    def test_rejects_unsupported_modes(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_rejects_unsupported_modes(self, ri):
 
         xyz_string = """3
         xyz
@@ -428,8 +518,14 @@ class TestUnrestrictedRPA:
         bas = MolecularBasis.read(mol, 'sto-3g', ostream=None)
 
         scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         nonlinear_drv = LinearResponseUnrestrictedEigenSolver()
         nonlinear_drv.ostream.mute()
@@ -448,3 +544,69 @@ class TestUnrestrictedRPA:
         with pytest.raises(VeloxChemError,
                            match='restricted_subspace not implemented'):
             restricted_drv.compute(mol, bas, scf_results)
+
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_unstable_reference_is_flagged(self, ri):
+
+        # H2 at 1.5 Angstrom: the spin-symmetric UHF solution is a saddle point
+        # (unstable towards spin polarization); at 0.74 Angstrom it is stable
+
+        found = {}
+
+        for distance in [0.74, 1.5]:
+            mol = Molecule.read_xyz_string(
+                f'2\n\nH 0.0 0.0 0.0\nH 0.0 0.0 {distance}')
+            bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+            scf_drv = ScfUnrestrictedDriver()
+            scf_drv.ri = ri
+            scf_drv.ostream.mute()
+            scf_results = scf_drv.compute(mol, bas)
+
+            if scf_drv.rank == mpi_master():
+                if ri:
+                    assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                    assert not scf_results['ri_fallback']
+
+            lr_drv = LinearResponseUnrestrictedEigenSolver()
+            lr_drv.ostream.mute()
+            lr_drv.nstates = 1
+            lr_drv.compute(mol, bas, scf_results)
+
+            found[distance] = lr_drv._reference_instability
+
+        if MPI.COMM_WORLD.Get_rank() == mpi_master():
+            assert found[0.74] is None
+            assert len(found[1.5]) == 1
+            rotation, lowest = found[1.5][0]
+            assert rotation == 'real'
+            assert lowest < -0.1
+
+    @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
+                        reason='skip pytest.raises for multiple MPI processes')
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_no_new_trial_vectors_is_an_error(self, ri):
+
+        # H2 at 1.5 Angstrom in def2-SVP: the initial guess for three states
+        # spans the whole excitation space, and the spin-symmetric UHF solution
+        # is unstable, so the unconverged residuals lie inside the reduced space
+
+        mol = Molecule.read_xyz_string('2\n\nH 0.0 0.0 0.0\nH 0.0 0.0 1.5')
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_drv = ScfUnrestrictedDriver()
+        scf_drv.ri = ri
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, bas)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        lr_drv = LinearResponseUnrestrictedEigenSolver()
+        lr_drv.ostream.mute()
+        lr_drv.nstates = 3
+
+        with pytest.raises(VeloxChemError, match='No new trial vectors'):
+            lr_drv.compute(mol, bas, scf_results)

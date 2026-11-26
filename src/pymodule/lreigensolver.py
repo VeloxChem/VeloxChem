@@ -44,7 +44,7 @@ from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
+                           dft_and_ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check, gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
@@ -133,6 +133,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
+        self._reference_instability = None
+
         # check molecule
         molecule_sanity_check(molecule, 'restricted', type(self).__name__)
 
@@ -143,11 +145,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -281,14 +280,21 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                 igs = self._initial_excitations(self.nstates, orb_ene, nocc,
                                                 norb, checkpoint_nstates)
                 if igs:
-                    bger, bung = self._setup_trials(igs, None, self._dist_bger,
-                                                    self._dist_bung)
+                    # projected onto the complement of the subspace restored
+                    # from the checkpoint; nothing may be left when it already
+                    # contains the guesses
+                    bger, bung = self._setup_trials(igs,
+                                                    None,
+                                                    self._dist_bger,
+                                                    self._dist_bung,
+                                                    allow_empty=True)
 
-                    profiler.set_timing_key('Preparation')
+                    if self._get_num_trial_vectors(bger, bung) > 0:
+                        profiler.set_timing_key('Preparation')
 
-                    self._e2n_half_size(bger, bung, molecule, basis,
-                                        scf_results, eri_dict, dft_dict,
-                                        pe_dict, profiler)
+                        self._e2n_half_size(bger, bung, molecule, basis,
+                                            scf_results, eri_dict, dft_dict,
+                                            pe_dict, profiler)
 
         # generate initial guess from scratch
         else:
@@ -328,11 +334,15 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
             nroots = max(self.nstates, self._get_collapse_nvec())
 
             wn_all, c_ger_all, c_ung_all = self._solve_reduced_space(nroots)
-            wn = wn_all[:self.nstates].copy()
-            c_ger = c_ger_all[:, :self.nstates].copy()
-            c_ung = c_ung_all[:, :self.nstates].copy()
 
-            for k in range(self.nstates):
+            # roots above nstates are refined as well, see
+            # LinearSolver._get_num_refined_roots
+            nrefine = self._get_num_refined_roots_for(wn_all)
+            wn = wn_all[:nrefine].copy()
+            c_ger = c_ger_all[:, :nrefine].copy()
+            c_ung = c_ung_all[:, :nrefine].copy()
+
+            for k in range(nrefine):
                 w = wn[k]
 
                 x_ger = self._dist_bger.matmul_AB_no_gather(c_ger[:, k])
@@ -341,7 +351,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                 e2x_ger = self._dist_e2bger.matmul_AB_no_gather(c_ger[:, k])
                 e2x_ung = self._dist_e2bung.matmul_AB_no_gather(c_ung[:, k])
 
-                if self.nonlinear:
+                if self.nonlinear and k < self.nstates:
                     fock_realger = self._dist_fock_ger.matmul_AB_no_gather(
                         c_ger[:, k])
                     fock_realung = self._dist_fock_ung.matmul_AB_no_gather(
@@ -380,9 +390,19 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                 xn = np.sqrt(np.sum(x_norms_2))
 
                 if xn != 0:
-                    relative_residual_norm[k] = 2.0 * rn / xn
+                    rel_res = 2.0 * rn / xn
                 else:
-                    relative_residual_norm[k] = 2.0 * rn
+                    rel_res = 2.0 * rn
+
+                # a root above nstates receives a trial vector when its
+                # residual norm is at or above conv_thresh; it is not reported
+                # and not part of the convergence check
+                if k >= self.nstates:
+                    if rel_res >= self.conv_thresh:
+                        exc_residuals[k] = r
+                    continue
+
+                relative_residual_norm[k] = rel_res
 
                 if relative_residual_norm[k] < self.conv_thresh:
                     exc_energies[k] = w
@@ -416,7 +436,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
                 profiler.print_memory_tracing(self.ostream)
 
-                self._print_iteration(relative_residual_norm, wn)
+                self._print_iteration(relative_residual_norm, wn[:self.nstates])
 
                 self._print_gostshyp_neg_amp_info()
 
@@ -457,11 +477,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
             profiler.stop_timer('Orthonorm.')
 
-            if self.rank == mpi_master():
-                n_new_trials = new_trials_ger.shape(1) + new_trials_ung.shape(1)
-            else:
-                n_new_trials = None
-            n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
+            n_new_trials = self._get_num_trial_vectors(new_trials_ger,
+                                                       new_trials_ung)
 
             if iter_per_trial_in_hours is not None:
                 next_iter_in_hours = iter_per_trial_in_hours * n_new_trials
@@ -497,6 +514,7 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
         profiler.check_memory_usage('End of LR eigensolver')
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
 
         self._dist_bger = None
         self._dist_bung = None
@@ -505,6 +523,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
         self._dist_fock_ger = None
         self._dist_fock_ung = None
+
+        self._release_freed_memory()
 
         # calculate properties
         if self.is_converged:
@@ -537,6 +557,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                 }
 
             if self.rank == mpi_master():
+                solutions_write_time = 0.0
+
                 # final h5 file for response solutions
                 if self.filename is not None:
                     final_h5_fname = f'{self.filename}.h5'
@@ -691,8 +713,10 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
 
                     # write response solutions to h5 file
                     if (self.save_solutions and final_h5_fname is not None):
+                        write_t0 = tm.time()
                         write_rsp_full_solution_to_hdf5(
                             final_h5_fname, eigvec, s, self.nstates)
+                        solutions_write_time += tm.time() - write_t0
 
                     # save excitation details
                     excitation_details.append(
@@ -774,6 +798,18 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                         'num_virtual': orbital_details['num_virtual']
                     }
 
+                    # NOTE: the C-PCM settings of this response, which
+                    # TddftOrbitalResponse takes from these results
+                    # (rsp_results_solvation_sanity_check);
+                    # cpcm_optical_epsilon and non_equilibrium_solv are not
+                    # in the SCF results.
+                    if self._cpcm:
+                        ret_dict['solvation_model'] = self.solvation_model
+                        ret_dict['cpcm_optical_epsilon'] = (
+                            self.cpcm_optical_epsilon)
+                        ret_dict['non_equilibrium_solv'] = (
+                            self.non_equilibrium_solv)
+
                     if (self.save_solutions and
                             final_h5_fname is not None):
                         full_solutions_keys = [
@@ -807,7 +843,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
                     if (self.save_solutions and final_h5_fname is not None):
                         self.ostream.print_info(
                             'Response solution vectors written to file: ' +
-                            final_h5_fname)
+                            f'{final_h5_fname} ' +
+                            f'(took {solutions_write_time:.2f} sec).')
                         self.ostream.print_blank()
                         self.ostream.flush()
 
@@ -933,6 +970,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger, 2.0)
         e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung, 2.0)
         s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
+
+        self._check_reference_stability(e2gg, e2uu, 2.0)
 
         if self.rank == mpi_master():
 
@@ -1161,11 +1200,8 @@ class LinearResponseEigenSolver(LinearResponseEigenSolverBase):
         # check SCF results
         scf_results_sanity_check(self, scf_results)
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)

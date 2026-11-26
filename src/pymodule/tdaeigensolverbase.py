@@ -74,6 +74,17 @@ class TdaEigenSolverBase(LinearSolver):
         - cube_points: The number of cubic grid points in X, Y and Z directions.
     """
 
+    # The reference is reported as unstable when the lowest TDA excitation
+    # energy is below minus this value (in Hartree). Numerical errors in this
+    # energy are far smaller. For H2, twisted ethylene and the triplet of
+    # noradrenaline with B3LYP/def2-SVP, near a zero excitation energy,
+    # switching between RI-JK and four-center integrals or between grid levels
+    # 2 and 6 moved it by at most 2.1e-5, and tightening the SCF threshold from
+    # 1e-6 to 1e-10 did not move it. For C, O and B atoms and the OH radical,
+    # whose orbital Hessians have modes that are zero by symmetry, the lowest
+    # TDA excitation energy stayed at 6e-3 or above.
+    _reference_instability_thresh = 1.0e-3
+
     def __init__(self, comm=None, ostream=None):
         """
         Initializes TDA excited states computation drived to default setup.
@@ -93,6 +104,11 @@ class TdaEigenSolverBase(LinearSolver):
         # excited states information
         self.nstates = 3
 
+        # roots refined above nstates (see LinearSolver._get_num_refined_roots)
+        self.num_extra_roots = 2
+        self.extra_root_cluster_thresh = 1.0e-3
+        self.max_extra_cluster_roots = 2
+
         self.initial_guess_multiplier = 3
         self.guess_scaling_threshold = 10
         self.max_subspace_dim = None
@@ -103,6 +119,10 @@ class TdaEigenSolverBase(LinearSolver):
 
         # solver setup
         self.solver = None
+
+        # the lowest excitation energy found by _check_reference_stability,
+        # or None
+        self._reference_instability = None
 
         # NTO and detachment/attachment density
         self.nto = False
@@ -186,6 +206,39 @@ class TdaEigenSolverBase(LinearSolver):
 
         self._is_converged = self.comm.bcast(self._is_converged,
                                              root=mpi_master())
+
+    def _check_reference_stability(self):
+        """
+        Warns, once per calculation, when the lowest TDA excitation energy is
+        clearly negative, which means that the SCF reference is not a minimum
+        of the energy. Called on the master rank after the reduced-space
+        solution.
+
+        The TDA matrix A is the average of the electronic Hessians for real and
+        for imaginary orbital rotations, so a negative eigenvalue of A means
+        that one of them has a negative eigenvalue. The converse does not hold:
+        an unstable reference can have only positive TDA excitation energies.
+        The lowest Ritz value of the Davidson solver is an upper bound to the
+        lowest eigenvalue of A and does not increase over the iterations.
+        """
+
+        if self._reference_instability is not None:
+            return
+
+        eigvals, rnorms_not_used = self.solver.get_eigenvalues()
+        lowest = eigvals[0]
+
+        if lowest >= -self._reference_instability_thresh:
+            return
+
+        self._reference_instability = lowest
+
+        self.ostream.print_warning(
+            f'The lowest TDA excitation energy is at most {lowest:.2e} a.u.')
+        self.ostream.print_warning(
+            'Check whether the SCF solution is a true minimum.')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def _comp_onee_integrals(self, molecule, basis):
         """
@@ -306,6 +359,14 @@ class TdaEigenSolverBase(LinearSolver):
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
+                continue
+            # NOTE: the RI drivers and B vectors are not copied. The simd RI
+            # drivers have no copy in Python, and every calculation forms its
+            # own at its start (rijkresponse.initialize_ri_jk,
+            # rijresponse.initialize_ri_j). The copy keeps them unset as
+            # constructed, neither lent nor
+            # borrowing.
+            if key in self._ri_not_copied:
                 continue
             setattr(new_rsp_drv, key, deepcopy(val))
 

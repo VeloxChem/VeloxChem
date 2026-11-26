@@ -162,9 +162,17 @@ class CMolecule
     auto atom_basis_labels() const -> std::vector<std::pair<std::string, std::string>>;
 
     /// @brief Gets vector Cartesian coordinates of atoms in molecule.
+    /// @return The constant reference to vector of atom coordinates.
+    /// @note The coordinates are given in atomic units, which is how they are
+    /// stored, so that they are read without copying the molecule.
+    auto coordinates() const -> const std::vector<TPoint<double>> &;
+
+    /// @brief Gets vector Cartesian coordinates of atoms in molecule.
     /// @param unit The unit used to define coordinates of atoms.
     /// @return The vector of atom coordinates.
-    auto coordinates(const std::string &unit = std::string("au")) const -> std::vector<TPoint<double>>;
+    /// @note The unit is no longer defaulted, as the overload above returns the
+    /// stored coordinates without copying them.
+    auto coordinates(const std::string &unit) const -> std::vector<TPoint<double>>;
 
     /// @brief Gets charges of all atoms in molecule.
     /// @return The vector of atomic charges of molecule.

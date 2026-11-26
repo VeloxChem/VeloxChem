@@ -96,6 +96,14 @@ class CTimer
      @return the elapsed time as a string.
      */
     std::string getElapsedTime() const;
+
+    /**
+     Gets elapsed time accumulated over completed start/stop intervals, in
+     seconds.
+
+     @return the elapsed time in seconds.
+     */
+    double getElapsedSeconds() const;
 };
 
 #endif /* Timer_hpp */

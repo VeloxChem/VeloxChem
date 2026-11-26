@@ -1,0 +1,562 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+#ifndef SimdRIFockDriver_hpp
+#define SimdRIFockDriver_hpp
+
+#include <cstddef>
+#include <span>
+#include <utility>
+#include <vector>
+
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
+#include "PackedMatrix.hpp"
+#include "SparseTensor.hpp"
+
+/// @brief The memory of the B vectors of a calculation, and what forming and using
+/// them holds beside them, in bytes.
+struct CBqMemory
+{
+    /// @brief The values of the B vectors of every operator.
+    size_t held = 0;
+
+    /// @brief What forming the B vectors holds beside them at its peak: the
+    /// permuted metrics, the integrals of one batch, the descriptions of the blocks
+    /// of the integrals and of the pattern, and the buffers of the threads.
+    size_t forming = 0;
+
+    /// @brief The index of the auxiliary functions of the blocks, which the half
+    /// transformation of a Fock build forms over the B vectors.
+    size_t index = 0;
+
+    /// @brief The descriptions of the blocks the B vectors carry beside their
+    /// values, counted from what each block holds.
+    size_t pattern = 0;
+};
+
+/// @brief Class CSimdRIFockDriver computes the B vectors of the resolution of the
+/// identity approximation of the Coulomb interaction.
+///
+/// @note The B vectors are defined as B(q)_ij = sum over p of (ij|p) L(-1)_pq, where
+/// (ij|p) are the three-center electron repulsion integrals and L(-1) is the inverse
+/// of the two-center metric (p|q), which the caller supplies in the packed format.
+///
+/// @note The B vectors are screened on the atomic orbital pair, as the three-center
+/// integrals are, and are dense in q, as the inverse metric is dense. Their memory is
+/// therefore the surviving atomic orbital pairs times the auxiliary basis, which
+/// reaches hundreds of gigabytes for a large molecule. The auxiliary functions of q
+/// are what a calculation distributes over the MPI ranks, and the driver forms the
+/// ones of the given atoms alone, so that a rank holds its own share and no more.
+/// A single rank asks for all of them.
+///
+/// @note The sum over p runs over the whole auxiliary basis whatever share of q a
+/// rank holds, so the three-center integrals cannot be distributed the same way. They
+/// are formed in batches of the blocks of atomic orbital pairs instead, and each
+/// batch is contracted and dropped before the next is formed, so that the peak is the
+/// B vectors and one batch rather than the whole three-center tensor.
+class CSimdRIFockDriver
+{
+   public:
+    /// @brief The default constructor.
+    CSimdRIFockDriver() = default;
+
+    /// @brief Computes the B vectors of the resolution of the identity approximation.
+    /// @param molecule The molecule to compute the B vectors of.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param inverse_metric The inverse of the two-center metric, in the packed
+    /// format, as packlin::invert returns it.
+    /// @param threshold The screening threshold.
+    /// @param aux_atoms The atoms whose auxiliary functions the B vectors are formed
+    /// for, as their indices in the molecule and without repetition. The whole
+    /// molecule is a list of every atom, and an empty list is a share of no atoms,
+    /// which forms no B vectors.
+    /// @return The sparse tensor of the B vectors, whose blocks hold the auxiliary
+    /// functions of q in the place the three-center integrals hold those of p, or
+    /// an empty tensor for a share of no atoms.
+    auto compute_bq_vectors(const CMolecule        &molecule,
+                            const CMolecularBasis  &basis,
+                            const CMolecularBasis  &aux_basis,
+                            const CPackedMatrix    &inverse_metric,
+                            const double            threshold,
+                            const std::vector<int> &aux_atoms) const -> CSparseTensor;
+
+    /// @brief Computes the B vectors of the Coulomb operator and of the attenuated
+    /// one, for a hybrid range separated functional.
+    /// @param molecule The molecule to compute the B vectors of.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param inverse_metric The inverse of the two-center Coulomb metric.
+    /// @param inverse_metric_erf The inverse of the two-center attenuated metric,
+    /// which is the metric of the operator its B vectors are of. The exchange of
+    /// the long range is the attenuated integrals fitted in the attenuated metric,
+    /// and mixing the two metrics fits neither operator.
+    /// @param threshold The screening threshold.
+    /// @param omega The range separation parameter, which must be positive.
+    /// @param aux_atoms The atoms whose auxiliary functions the B vectors are formed
+    /// for, as for compute_bq_vectors. An empty list forms none.
+    /// @return The B vectors of the Coulomb operator and those of the attenuated
+    /// one, on one sparsity pattern.
+    /// @note The pattern is the Coulomb bound for both, as the attenuated operator
+    /// is bounded by the plain one everywhere: erf(omega r) / r is at most 1 / r, so
+    /// a pair the Coulomb bound keeps cannot be one the attenuated integrals need
+    /// more of, and a pair it drops carries nothing in either.
+    /// @note The two are formed together and not by two calls. They share the
+    /// pattern, the blocks, and the walk of the indices of the gather and of the
+    /// scatter; what is doubled is the integrals, the product with the metric and
+    /// the storage, which is the work itself and not the bookkeeping around it.
+    auto compute_bq_vectors_rs(const CMolecule        &molecule,
+                               const CMolecularBasis  &basis,
+                               const CMolecularBasis  &aux_basis,
+                               const CPackedMatrix    &inverse_metric,
+                               const CPackedMatrix    &inverse_metric_erf,
+                               const double            threshold,
+                               const double            omega,
+                               const std::vector<int> &aux_atoms) const
+        -> std::pair<CSparseTensor, CSparseTensor>;
+
+    /// @brief Contracts the B vectors with a density matrix.
+    /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param density The density matrix, in the packed format.
+    /// @return The Y vector, Y(q) = sum over i and j of B(q)_ij D_ij, indexed by the
+    /// dense index of the auxiliary basis function and zero where the B vectors carry
+    /// no auxiliary function of their own.
+    /// @note A symmetric density is the one of a self consistent field calculation
+    /// and a general density is the one of a response calculation. Which of the two
+    /// is contracted follows from the type of the matrix, so that the caller cannot
+    /// ask for the wrong one.
+    /// @note The B vectors hold each unordered pair of atoms once, and hold the
+    /// diagonal pairs of atoms with the basis functions of both sides. The elements
+    /// of a diagonal pair of atoms are therefore summed as they are, and those of an
+    /// off-diagonal pair are summed with the transposed element of the density, which
+    /// is twice the element itself when the density is symmetric.
+    auto compute_y_vector(const CSparseTensor    &bq_vectors,
+                          const CMolecularBasis  &basis,
+                          const CMolecularBasis  &aux_basis,
+                          const CPackedMatrix    &density) const -> std::vector<double>;
+
+    /// @brief Computes the Coulomb matrix of the resolution of the identity.
+    /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param y_vector The Y vector, as compute_y_vector returns it.
+    /// @return The Coulomb matrix, F_ij = sum over q of B(q)_ij Y(q), in the packed
+    /// format as a symmetric matrix.
+    /// @note This is the form which takes the Y vector, so that a calculation which
+    /// contracts many densities with one set of B vectors forms them once.
+    auto compute_fock_matrix(const CSparseTensor        &bq_vectors,
+                             const CMolecularBasis      &basis,
+                             const CMolecularBasis      &aux_basis,
+                             const std::vector<double>  &y_vector) const -> CPackedMatrix;
+
+    /// @brief Computes the Coulomb matrix of the resolution of the identity for a
+    /// density matrix.
+    /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param density The density matrix, in the packed format.
+    /// @return The Coulomb matrix, in the packed format as a symmetric matrix.
+    /// @note The Coulomb matrix is symmetric whether the density is symmetric or
+    /// general, so it is stored as a symmetric matrix in either case.
+    /// @note No factor of the occupancy or of the spin is applied. This is the
+    /// contraction as it is written, and a convention which carries such a factor
+    /// applies it to the density or to the matrix returned.
+    auto compute_fock_matrix(const CSparseTensor   &bq_vectors,
+                             const CMolecularBasis &basis,
+                             const CMolecularBasis &aux_basis,
+                             const CPackedMatrix   &density) const -> CPackedMatrix;
+
+    /// @brief Transforms one index of the B vectors into the molecular orbitals.
+    /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param coefficients The molecular orbital coefficients of the orbitals to
+    /// transform into, as a general matrix of one row per basis function and one
+    /// column per orbital.
+    /// @param qfirst The first auxiliary basis function to transform, as its dense
+    /// index in the auxiliary basis.
+    /// @param qlast The auxiliary basis function past the last one to transform.
+    /// @return The W matrices, W(q)_is = sum over r of B(q)_ir C_rs, one general
+    /// matrix of one row per basis function and one column per orbital for each
+    /// auxiliary basis function of the range.
+    /// @note The sum over r leaves nothing of the sparsity of the pairs of basis
+    /// functions: an atom on the auxiliary side is reached by every atom of the
+    /// molecule, as the pair of an atom with itself is at zero distance and
+    /// survives any threshold. The W matrices are therefore dense, and are the
+    /// dimensions of the basis times the orbitals times the auxiliary basis, which
+    /// grows as the cube of the size of the molecule with nothing to screen. They
+    /// are formed for a range of the auxiliary basis rather than for all of it, so
+    /// that the caller forms what it can hold, uses it and asks for the next range.
+    auto compute_w_vectors(const CSparseTensor   &bq_vectors,
+                           const CMolecularBasis &basis,
+                           const CMolecularBasis &aux_basis,
+                           const CPackedMatrix   &coefficients,
+                           const size_t           qfirst,
+                           const size_t           qlast) const -> std::vector<CPackedMatrix>;
+
+    /// @brief Transforms one index of the B vectors into the molecular orbitals,
+    /// into matrices the caller holds.
+    /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param coefficients The molecular orbital coefficients.
+    /// @param qfirst The first auxiliary basis function to transform.
+    /// @param qlast The auxiliary basis function past the last one to transform.
+    /// @param w_vectors The matrices to store the result in, one per auxiliary
+    /// basis function of the range, each of one row per basis function and one
+    /// column per orbital. They are set rather than added to.
+    /// @note This is the form which does not allocate, so that a calculation which
+    /// forms the W matrices of one range after another reuses one set of them
+    /// rather than allocating and freeing gigabytes on every range.
+    /// @param accumulate True to add to the matrices rather than to set them, for a
+    /// caller which forms them from the integrals of one batch of blocks of atom
+    /// pairs after another and needs the sum over all of them.
+    auto compute_w_vectors(const CSparseTensor         &bq_vectors,
+                           const CMolecularBasis       &basis,
+                           const CMolecularBasis       &aux_basis,
+                           const CPackedMatrix         &coefficients,
+                           const size_t                 qfirst,
+                           const size_t                 qlast,
+                           std::vector<CPackedMatrix>  &w_vectors,
+                           const bool                   accumulate = false) const -> void;
+
+    /// @brief Transforms one index of the B vectors into the molecular orbitals,
+    /// for the auxiliary basis functions named rather than for a range of them.
+    /// @param bq_vectors The B vectors, as compute_bq_vectors returns them.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param coefficients The molecular orbital coefficients.
+    /// @param functions The auxiliary basis functions to transform, as their dense
+    /// indices in the auxiliary basis. One matrix is filled for each, in the order
+    /// they are given.
+    /// @param w_vectors The matrices to store the result in, at least one per
+    /// function. A caller which reuses one set of them across ranges may pass
+    /// more; only the first functions.size() are written.
+    /// @param accumulate True to add to the matrices rather than to set them.
+    /// @note A rank of a communicator holds the B vectors of a share of the atoms
+    /// of the auxiliary basis, and the functions of an atom are not consecutive in
+    /// the dense index -- the index is ordered by angular momentum across the whole
+    /// molecule -- so the share it holds is not a range and cannot be asked for as
+    /// one. Asking for a range which covers it would have the rank form, zero and
+    /// multiply a matrix for every function it holds nothing of, which is the work
+    /// of every other rank done again as zeros.
+    auto compute_w_vectors(const CSparseTensor         &bq_vectors,
+                           const CMolecularBasis       &basis,
+                           const CMolecularBasis       &aux_basis,
+                           const CPackedMatrix         &coefficients,
+                           const std::vector<size_t>   &functions,
+                           std::vector<CPackedMatrix>  &w_vectors,
+                           const bool                   accumulate = false) const -> void;
+
+    /// @brief Sets the density of the B vectors at which the transformation into
+    /// the molecular orbitals expands them rather than walking their values.
+    /// @param threshold The density, between zero and one.
+    /// @note The transformation is the sum over r of B(q)_ir C_rs. Walking the
+    /// values of B does the least arithmetic, and expanding them into a square and
+    /// handing that to a matrix product does more of it on the matrix unit of the
+    /// machine, which a loop of the compiler cannot reach. Which of the two wins
+    /// follows from how dense the B vectors are, and the density at which they
+    /// change places is what this sets. A threshold above one takes the walk
+    /// always and one of zero takes the product always, which is how the two are
+    /// compared against one another.
+    auto set_dense_threshold(const double threshold) -> void;
+
+    /// @brief The fraction of the B vectors which is actually held.
+    /// @param bq_vectors The B vectors.
+    /// @param basis The molecular basis.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @return The number of values held over the number a dense tensor would hold.
+    /// @note This is the quantity the transformation compares against the threshold,
+    /// and it is the same walk, so what is reported is what would be decided on. It
+    /// is not free: it costs a pass over the combinations of every block.
+    /// @param held The auxiliary functions the tensor holds, which on more than one
+    /// rank is a share of the basis; zero takes the whole of it.
+    auto bq_density(const CSparseTensor   &bq_vectors,
+                    const CMolecularBasis &basis,
+                    const CMolecularBasis &aux_basis,
+                    const size_t           held = 0) const -> double;
+
+    /// @brief Gets the density of the B vectors at which the transformation
+    /// expands them.
+    /// @return The density.
+    auto get_dense_threshold() const -> double;
+
+    /// @brief Releases the squares the dense half transformation keeps.
+    /// @note They are formed again on the next transformation. A driver prepared
+    /// for another molecule has no use for the ones it holds.
+    auto release_squares() const -> void;
+
+    /// @brief Adds the exchange contribution of a range of the auxiliary basis to
+    /// a matrix.
+    /// @param w_vectors The W matrices of the range, as compute_w_vectors returns
+    /// them, or the first of the storage compute_w_vectors filled for a range
+    /// shorter than it.
+    /// @param matrix The symmetric matrix to add the contribution to, in the packed
+    /// format, which the Coulomb matrix of the same calculation has been formed in.
+    /// @param factor The factor the contribution is added with.
+    /// @note The contribution is factor times the sum over q of W(q) times W(q)
+    /// transposed, summed over the range the W matrices hold. The ranges of a
+    /// calculation are added one after another into the same matrix, as the W
+    /// matrices of the whole auxiliary basis do not fit in the memory of a large
+    /// molecule.
+    /// @note No sign is applied. The exchange enters a Fock matrix with a sign and
+    /// a factor which depend on the convention of the caller, which passes them as
+    /// the factor rather than having them built in here.
+    /// @note A view and not a vector, so that a caller which keeps storage for a
+    /// range of W matrices hands over a shorter range as the first of them rather
+    /// than as a vector of its own, which would have to be copied or moved out of
+    /// the storage and back.
+    auto compute_exchange_matrix(std::span<const CPackedMatrix> w_vectors,
+                                 CPackedMatrix                 &matrix,
+                                 const double                   factor = 1.0) const -> void;
+
+    /// @brief Gets the memory of the B vectors and what forming them reaches.
+    /// @param molecule The molecule to form the B vectors of.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param threshold The screening threshold.
+    /// @param aux_atoms The atoms whose auxiliary functions the B vectors are formed
+    /// for, as for compute_bq_vectors.
+    /// @param nops The number of operators, one for the Coulomb operator alone and
+    /// two for a hybrid range separated functional.
+    /// @return The memory in bytes, for the number of threads of the caller, which
+    /// is none of anything for a share of no atoms: nothing is formed for it.
+    /// @note The blocks and the batches are described as compute_bq_vectors
+    /// describes them, so this is what that call will hold rather than an estimate
+    /// of it. It costs the description of the sparsity pattern, which is a small
+    /// part of forming the B vectors.
+    auto bq_vectors_memory(const CMolecule        &molecule,
+                           const CMolecularBasis  &basis,
+                           const CMolecularBasis  &aux_basis,
+                           const double            threshold,
+                           const std::vector<int> &aux_atoms,
+                           const size_t            nops) const -> CBqMemory;
+
+    /// @brief Gets the memory a Fock build holds beside the B vectors and the W
+    /// matrices of a range.
+    /// @param nao The number of basis functions of the molecular basis.
+    /// @param naux The number of basis functions of the auxiliary basis.
+    /// @param norbitals The occupied orbitals the exchange is formed from.
+    /// @param nfunctions The auxiliary functions of a range of the W matrices.
+    /// @return The memory in bytes, for the number of threads of the caller: the
+    /// squares of the half transformation, the buffers of the Coulomb matrix, the
+    /// triangles and the staging of the exchange, the Fock matrices, the density
+    /// and orbitals the caller hands over, and an allowance for each thread.
+    auto build_memory(const size_t nao, const size_t naux, const size_t norbitals, const size_t nfunctions) const
+        -> size_t;
+
+    /// @brief Gets the memory forming the integrals of a sparsity pattern holds
+    /// beside the integrals themselves.
+    /// @param pattern The sparsity pattern the integrals are formed in.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @return The memory in bytes, for the number of threads of the caller: the
+    /// arena of the integral driver and an allowance for each thread.
+    auto integrals_memory(const CTripleSparsityPattern &pattern,
+                          const CMolecularBasis        &basis,
+                          const CMolecularBasis        &aux_basis) const -> size_t;
+
+    /// @brief Gets the memory a Coulomb build holds beside the integrals it reads
+    /// and the metric.
+    /// @param nao The number of basis functions of the molecular basis.
+    /// @param naux The number of basis functions of the auxiliary basis.
+    /// @return The memory in bytes, for the number of threads of the caller: the
+    /// buffers of the right hand side of the fitting and of the Coulomb matrix, the
+    /// density and the Coulomb matrix the caller hands over and expands, and an
+    /// allowance for each thread.
+    auto coulomb_build_memory(const size_t nao, const size_t naux) const -> size_t;
+
+    /// @brief Gets the most memory the three-center term of a gradient holds for
+    /// one atom of the auxiliary basis, of the atoms it sweeps.
+    /// @param molecule The molecule.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param threshold The screening threshold the pattern of an atom is described
+    /// with, which is the one the gradient describes it with.
+    /// @param aux_atoms The atoms of the auxiliary basis the term sweeps, one at a
+    /// time. An empty list sweeps none and holds nothing.
+    /// @param nops One for the Coulomb operator, and two for a hybrid range
+    /// separated functional, whose derivative is two tensors.
+    /// @param per_function What the caller holds for each auxiliary function of the
+    /// atom being swept while its derivative is contracted, in bytes: the exchange
+    /// back transformed into a square of the basis, for each operator.
+    /// @return The memory in bytes, for the number of threads of the caller: the
+    /// description of the pattern of the atom, its derivative tensors, the arena of
+    /// the derivative driver and an allowance for each thread, and what the caller
+    /// holds for its functions.
+    /// @note The patterns are described as the gradient describes them, one atom at a
+    /// time, so this is what the sweep will hold rather than an estimate of it. It
+    /// costs the description of every pattern of the sweep, which the gradient pays
+    /// again and which is a small part of computing the derivatives over them.
+    auto derivative_memory(const CMolecule        &molecule,
+                           const CMolecularBasis  &basis,
+                           const CMolecularBasis  &aux_basis,
+                           const double            threshold,
+                           const std::vector<int> &aux_atoms,
+                           const size_t            nops,
+                           const size_t            per_function) const -> size_t;
+
+    /// @brief Gets the memory the two-center term of a gradient holds beside the
+    /// two-index fitted density it is handed.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param natoms The atoms of the molecule, each of which a thread holds a row
+    /// of the gradient for.
+    /// @param nops One for the Coulomb operator and two for a hybrid range separated
+    /// functional.
+    /// @return The memory in bytes, for the number of threads of the caller: the
+    /// arena of the derivative driver, the rows of the gradient and an allowance for
+    /// each thread.
+    /// @note The arena is taken for the highest angular momentum of the auxiliary
+    /// basis on both sides and for the most atom pairs a block of the derivative
+    /// driver can take, which is a bound on what it holds rather than its value.
+    auto metric_derivative_memory(const CMolecularBasis &aux_basis, const size_t natoms, const size_t nops) const
+        -> size_t;
+
+   private:
+    /// @brief Computes the B vectors of one operator or of two.
+    /// @param molecule The molecule to compute the B vectors of.
+    /// @param basis The molecular basis on a and b sides.
+    /// @param aux_basis The auxiliary molecular basis.
+    /// @param inverse_metrics The inverted metric of each operator, in the order the
+    /// tensors come back in: one for the Coulomb operator alone, or the Coulomb one
+    /// and then the attenuated one.
+    /// @param threshold The screening threshold.
+    /// @param omega The range separation parameter, or zero for the Coulomb operator
+    /// alone. It must be positive exactly when there are two metrics.
+    /// @param aux_atoms The atoms whose auxiliary functions the B vectors are formed
+    /// for, as for compute_bq_vectors. An empty list forms none.
+    /// @return One tensor per operator, all on one sparsity pattern, or empty
+    /// tensors for a share of no atoms.
+    /// @note Both public entries are written in terms of this, so the one operator
+    /// case is the same code as the two operator one and not a copy of it which
+    /// drifts. It carries the pattern, the blocks and the indices once whatever the
+    /// number of operators, and repeats only the values.
+    auto _compute_bq_vectors(const CMolecule                          &molecule,
+                             const CMolecularBasis                    &basis,
+                             const CMolecularBasis                    &aux_basis,
+                             const std::vector<const CPackedMatrix *> &inverse_metrics,
+                             const double                              threshold,
+                             const double                              omega,
+                             const std::vector<int>                   &aux_atoms) const -> std::vector<CSparseTensor>;
+
+    /// @brief Gets the shape of the work of the exchange of a range.
+    /// @param nao The number of basis functions of the molecular basis.
+    /// @param nocc The occupied orbitals of the W matrices.
+    /// @param nfunctions The W matrices of the range.
+    /// @return The auxiliary functions one rank k update takes, and the triangles
+    /// the updates are summed into, one for each thread which takes a part.
+    auto _exchange_shape(const size_t nao, const size_t nocc, const size_t nfunctions) const
+        -> std::pair<size_t, size_t>;
+
+    /// @brief The density of the B vectors at which the transformation expands
+    /// them into a square rather than walking their values.
+    /// @note Zero, which is to say that the square is always formed. The product
+    /// was faster than the sum in every one of the eleven combinations of molecule
+    /// and basis it was measured on, by 1.6 times where the occupied orbitals are
+    /// few and the basis is large and by up to 4.9 times where they are many. The
+    /// density at which the two change places was never reached by a case which
+    /// fits in the memory of this machine, so it is not known, and a threshold
+    /// which named one would be a guess dressed as a measurement. A caller which
+    /// meets a sparse enough set of B vectors can raise it.
+    double _dense_threshold = 0.0;
+
+    /// @brief One square of the molecular basis for every thread, which the dense
+    /// half transformation scatters the values of one auxiliary function into.
+    /// @note It was allocated and zeroed inside the transformation, so every call
+    /// paid for it: a square is the basis by the basis, nine megabytes at eleven
+    /// hundred functions, and a thread holds one. At a hundred and twenty eight
+    /// threads that is 1.2 gigabytes an call and six calls a build, which is why
+    /// what the transformation spends beside its phases grew with the threads
+    /// rather than falling -- 0.018 seconds on fourteen against 0.081 on a hundred
+    /// and twenty eight. Kept here it is allocated once. The peak is what it always
+    /// was; what changes is that it is held between calls rather than returned.
+    /// @note It is mutable because the transformation is const, and it is safe
+    /// because every thread reaches only its own square and no caller enters the
+    /// transformation from inside a parallel region.
+    mutable std::vector<std::vector<double>> _squares;
+
+    /// @brief The memory one thread may stage the W matrices into before the rank
+    /// k update, which sets how many auxiliary functions go into one update.
+    /// @note The update of one auxiliary function alone reads the whole triangle of
+    /// the basis for a depth of the orbitals alone, so the triangle would be read
+    /// once for every function. Gathering several of them reads it once for the
+    /// chunk instead, and the arithmetic of an update grows with the depth while
+    /// what it reads does not. Measured on tagrisso with def2-svp, in gigaflops per
+    /// second: 274 for a depth of one function, 442 for sixteen and 526 for sixty
+    /// four. Against that stands the memory, which every thread holds one of, so
+    /// the count is taken from these bytes and falls as the basis and the orbitals
+    /// grow.
+    static constexpr size_t _syrk_staging = size_t{32} * 1024 * 1024;
+
+    /// @brief The memory the triangles of the exchange may hold together.
+    /// @note One triangle for each thread, so that the auxiliary functions divide
+    /// over them without the threads writing over one another. The bound is on the
+    /// basis rather than on the machine: a triangle is the square of the basis, so
+    /// two gigabytes stopped at fourteen hundred functions on a hundred and twenty
+    /// eight threads, and a cluster of three thousand two hundred was given twenty
+    /// six of them -- a fifth of the build running on a fifth of the cores. Sixteen
+    /// carries four thousand at that width, for ten gigabytes of buffers, which is
+    /// nothing beside the integrals of such a calculation.
+    static constexpr size_t _syrk_triangles = size_t{16} * 1024 * 1024 * 1024;
+
+    /// @brief The memory a batch of the three-center integrals is allowed to reach.
+    /// @note The batch is the blocks of atomic orbital pairs whose integrals are
+    /// formed at once. Making it larger costs memory and buys nothing beyond the
+    /// point where the threads are busy, as the contraction of a batch is what is
+    /// parallelized and not the batches.
+    static constexpr size_t _batch_budget = size_t{4} * 1024 * 1024 * 1024;
+
+    /// @brief The memory one thread may hold the columns of one contraction of the
+    /// B vectors in, which sets how many atom pairs go into one product.
+    /// @note The contraction gathers the integrals of every atom basis group into
+    /// one buffer and multiplies the metric by it. Both sides of that product are
+    /// the whole auxiliary basis deep, so a chunk of the atom pairs costs the pair
+    /// of buffers this many bytes and the count follows from it rather than from
+    /// the block, which has no bound of its own.
+    static constexpr size_t _bq_columns = size_t{32} * 1024 * 1024;
+
+    /// @brief The memory a thread holds beyond the buffers counted for it, which
+    /// is allowed for rather than counted.
+    /// @note It is the scratch of the integral kernels and of the linear algebra
+    /// library, and what the allocator of a thread keeps of it, none of which is
+    /// visible from here. It does not grow with the molecule or the basis, so a
+    /// fixed amount a thread, somewhat above what was observed, allows for it.
+    static constexpr size_t _thread_allowance = size_t{8} * 1024 * 1024;
+
+
+};
+
+#endif /* SimdRIFockDriver_hpp */

@@ -33,9 +33,20 @@
 #ifndef SerialDenseLinearAlgebra_hpp
 #define SerialDenseLinearAlgebra_hpp
 
+#include <cstddef>
+
 #include "DenseMatrix.hpp"
 #include "SubMatrix.hpp"
 
+/**
+ Serial dense linear algebra.
+
+ All routines in this namespace are serial: each call runs on the calling
+ thread only and never starts threads of its own. The implementation uses
+ Eigen. The routines are intended for the serial inner loops of code that is
+ parallelized at a higher level with OpenMP or MPI, so they must not be
+ replaced by, or internally route to, a threaded BLAS.
+ */
 namespace sdenblas {  // sdenblas namespace
 
 /**
@@ -90,6 +101,106 @@ auto serialInPlaceAddAB(CDenseMatrix& matrixA, const CDenseMatrix& matrixB, cons
  @return the solution vector x.
  */
 auto serialSolve(const CDenseMatrix& mat, const std::vector<double>& vec) -> std::vector<double>;
+
+/**
+ Computes matrix multiplication: C = alpha * A * B + beta * C, for row major
+ matrices with explicit leading dimensions.
+
+ @param nrows the number of rows of A and C.
+ @param ncols the number of columns of B and C.
+ @param nsums the number of columns of A and rows of B.
+ @param alpha the factor of the product.
+ @param matrixA the values of A, as a row major array with leading dimension lda.
+ @param lda the leading dimension of A.
+ @param matrixB the values of B, as a row major array with leading dimension ldb.
+ @param ldb the leading dimension of B.
+ @param beta the factor of C.
+ @param matrixC the values of C, as a row major array with leading dimension ldc.
+ @param ldc the leading dimension of C.
+ */
+auto serialMultAB(const size_t  nrows,
+                  const size_t  ncols,
+                  const size_t  nsums,
+                  const double  alpha,
+                  const double *matrixA,
+                  const size_t  lda,
+                  const double *matrixB,
+                  const size_t  ldb,
+                  const double  beta,
+                  double       *matrixC,
+                  const size_t  ldc) -> void;
+
+/**
+ Computes matrix multiplication: C = alpha * A * B^T + beta * C, for row major
+ matrices with explicit leading dimensions.
+
+ @param nrows the number of rows of A and C.
+ @param ncols the number of columns of B and C.
+ @param nsums the number of columns of A and B.
+ @param alpha the factor of the product.
+ @param matrixA the values of A, as a row major array with leading dimension lda.
+ @param lda the leading dimension of A.
+ @param matrixB the values of B, as a row major array with leading dimension ldb.
+ @param ldb the leading dimension of B.
+ @param beta the factor of C.
+ @param matrixC the values of C, as a row major array with leading dimension ldc.
+ @param ldc the leading dimension of C.
+ */
+auto serialMultABt(const size_t  nrows,
+                   const size_t  ncols,
+                   const size_t  nsums,
+                   const double  alpha,
+                   const double *matrixA,
+                   const size_t  lda,
+                   const double *matrixB,
+                   const size_t  ldb,
+                   const double  beta,
+                   double       *matrixC,
+                   const size_t  ldc) -> void;
+
+/**
+ Adds a symmetric rank k update: C += alpha * A * A^T, into the lower triangle of
+ the row major matrix C.
+
+ @param n the number of rows of A and of C.
+ @param k the number of columns of A.
+ @param alpha the factor of the update.
+ @param matrixA the values of A, as a row major array with leading dimension lda.
+ @param lda the leading dimension of A.
+ @param matrixC the values of C, as a row major array with leading dimension ldc.
+ @param ldc the leading dimension of C.
+ */
+auto serialRankUpdate(const size_t  n,
+                      const size_t  k,
+                      const double  alpha,
+                      const double *matrixA,
+                      const size_t  lda,
+                      double       *matrixC,
+                      const size_t  ldc) -> void;
+
+/**
+ Solves a triangular system with many right hand sides: factor * X = values, or
+ factor^T * X = values when the factor is transposed, for a row major lower
+ triangular factor and row major right hand sides. The solution is written over
+ the right hand sides in place.
+
+ @param nrows the number of rows and columns of the factor, and the rows of values.
+ @param ncols the number of columns of values.
+ @param factor the values of the lower triangular factor, as a row major array
+ with leading dimension ldf.
+ @param ldf the leading dimension of the factor.
+ @param values the values of the right hand sides, as a row major array with
+ leading dimension ldv, overwritten by the solution.
+ @param ldv the leading dimension of the values.
+ @param transposed whether to solve against the transpose of the factor.
+ */
+auto serialSolveTriangular(const size_t  nrows,
+                           const size_t  ncols,
+                           const double *factor,
+                           const size_t  ldf,
+                           double       *values,
+                           const size_t  ldv,
+                           const bool    transposed) -> void;
 
 /**
  Computes matrix multiplication: C += A * B.

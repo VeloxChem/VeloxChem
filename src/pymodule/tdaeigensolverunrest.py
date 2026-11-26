@@ -43,7 +43,7 @@ from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
+                           dft_and_ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check, gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
@@ -107,6 +107,8 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-2
 
+        self._reference_instability = None
+
         # check molecule
         molecule_sanity_check(molecule)
 
@@ -117,11 +119,8 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -215,11 +214,6 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         # GOSTSHYP information
         self._init_gostshyp(molecule, basis, scf_results)
 
-        # TODO: enable PE
-        assert_msg_critical(
-            not self._pe, f'{type(self).__name__}: ' +
-            'not yet implemented for polarizable embedding')
-
         # set up trial excitation vectors on master node
 
         diag_mat, trial_mat = self._gen_trial_vectors(molecule,
@@ -228,9 +222,14 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
 
         # block Davidson algorithm setup
 
-        self.solver = BlockDavidsonSolver(self.max_subspace_dim,
-                                          self.collapse_nvec,
-                                          self.lindep_thresh)
+        self.solver = BlockDavidsonSolver(
+            self.max_subspace_dim,
+            self.collapse_nvec,
+            self.lindep_thresh,
+            num_extra_roots=self.num_extra_roots,
+            extra_root_cluster_thresh=self.extra_root_cluster_thresh,
+            max_extra_cluster_roots=self.max_extra_cluster_roots,
+            conv_thresh=self.conv_thresh)
 
         # read initial guess from restart file
 
@@ -284,6 +283,8 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                 n_trials = self.comm.bcast(n_trials, root=mpi_master())
 
                 if n_trials > 0:
+                    profiler.set_timing_key('Preparation')
+
                     tdens_a = self._get_trans_densities(trial_mat,
                                                         scf_results,
                                                         molecule,
@@ -294,9 +295,11 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                                                         molecule,
                                                         basis,
                                                         spin='beta')
+                    tfactors = self._get_trans_density_factors(
+                        trial_mat, scf_results, molecule, basis)
                     fock = self._comp_lr_fock_unrestricted(
                         (tdens_a, tdens_b), molecule, basis, eri_dict, dft_dict,
-                        pe_dict, profiler)
+                        pe_dict, profiler, dens_factors=tfactors)
                     if self.rank == mpi_master():
                         sig_mat = self._get_sigmas(fock, scf_results, molecule,
                                                    basis, trial_mat)
@@ -305,6 +308,7 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
 
             if self.rank == mpi_master():
                 trial_mat = self.solver.compute(diag_mat)
+                self._check_reference_stability()
 
         profiler.check_memory_usage('Initial guess')
 
@@ -334,9 +338,12 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                                                 molecule,
                                                 basis,
                                                 spin='beta')
+            tfactors = self._get_trans_density_factors(trial_mat, scf_results,
+                                                       molecule, basis)
             fock = self._comp_lr_fock_unrestricted((tdens_a, tdens_b), molecule,
                                                    basis, eri_dict, dft_dict,
-                                                   pe_dict, profiler)
+                                                   pe_dict, profiler,
+                                                   dens_factors=tfactors)
 
             profiler.start_timer('ReducedSpace')
 
@@ -350,6 +357,8 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                 self.solver.add_iteration_data(sig_mat, trial_mat, self.nstates)
 
                 trial_mat = self.solver.compute(diag_mat)
+
+                self._check_reference_stability()
 
                 self._print_iter_data(i)
 
@@ -387,6 +396,8 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
         if self.rank == mpi_master():
             self._print_convergence('{:d} excited states'.format(self.nstates))
 
+            solutions_write_time = 0.0
+
             # final hdf5 file to save response results
             if self.filename is not None:
                 final_h5_fname = f'{self.filename}.h5'
@@ -401,6 +412,9 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
 
         profiler.check_memory_usage('End of TDA eigensolver')
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
+
+        self._release_freed_memory()
 
         # compute 1e dipole integrals
 
@@ -460,8 +474,10 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
                 # write eigenvectors to h5 file
                 if (self.save_solutions and final_h5_fname is not None):
                     eigvec_full = eigvecs[:, s].copy()
+                    write_t0 = tm.time()
                     write_rsp_full_solution_to_hdf5(
                         final_h5_fname, eigvec_full, s, self.nstates)
+                    solutions_write_time += tm.time() - write_t0
 
                 # save excitation details
                 excitation_details.append(
@@ -612,7 +628,8 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
             if (self.save_solutions and final_h5_fname is not None):
                 self.ostream.print_info(
                     'Response solution vectors written to file: ' +
-                    final_h5_fname)
+                    f'{final_h5_fname} ' +
+                    f'(took {solutions_write_time:.2f} sec).')
                 self.ostream.print_blank()
                 self.ostream.flush()
 
@@ -752,6 +769,60 @@ class TdaUnrestrictedEigenSolver(TdaEigenSolverBase):
             return diag_mat, trial_mat
 
         return None, None
+
+    def _get_trans_density_factors(self, trial_mat, scf_results, molecule, basis):
+        """
+        Computes the factors the transition densities of both spins are made of.
+
+        :param trial_mat:
+            The matrix containing the Z vectors as columns.
+        :param scf_results:
+            The dictionary of results from converged SCF wavefunction.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            A pair of factor sets, one for each spin, or None away from the master
+            rank or where the resolution of the identity will not use them.
+
+        .. note::
+            The left factor of a spin is that spin's occupied orbitals, so the two
+            spins carry a set each and share nothing. Each density has one term, as
+            in the restricted Tamm-Dancoff case: it is C(occupied) times the right
+            factor transposed.
+        """
+
+        if self.rank != mpi_master():
+            return None
+
+        # NOTE: the dense path does not take the factors, so they are formed only
+        # where the resolution of the identity will contract them.
+        if not self._uses_ri_jk():
+            return None
+
+        nocc_a = molecule.number_of_alpha_occupied_orbitals(basis)
+        nocc_b = molecule.number_of_beta_occupied_orbitals(basis)
+
+        (mo_occ_a, mo_occ_b), (mo_vir_a,
+                               mo_vir_b) = self._get_mo_occ_and_mo_vir_unrestricted(
+                                   scf_results, nocc_a, nocc_b)
+
+        n_ov_a = mo_occ_a.shape[1] * mo_vir_a.shape[1]
+
+        rights_a, rights_b = [], []
+
+        for k in range(trial_mat.shape[1]):
+            mat_a = trial_mat[:n_ov_a, k].reshape(mo_occ_a.shape[1],
+                                                  mo_vir_a.shape[1])
+            mat_b = trial_mat[n_ov_a:, k].reshape(mo_occ_b.shape[1],
+                                                  mo_vir_b.shape[1])
+
+            rights_a.append(np.matmul(mo_vir_a, mat_a.T))
+            rights_b.append(np.matmul(mo_vir_b, mat_b.T))
+
+        return ((mo_occ_a, rights_a), (mo_occ_b, rights_b))
 
     def _get_trans_densities(self,
                              trial_mat,

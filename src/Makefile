@@ -35,6 +35,25 @@ VLX_LIBS_DIR := general
 VLX_LIBS_DIR += math
 VLX_LIBS_DIR += moldata
 VLX_LIBS_DIR += orbdata
+VLX_LIBS_DIR += simd_func
+VLX_LIBS_DIR += simd_t2c_overlap
+VLX_LIBS_DIR += simd_transfer
+VLX_LIBS_DIR += simd_transform
+VLX_LIBS_DIR += simd_t2c_kinetic_energy
+
+VLX_LIBS_DIR += simd_t2c_nuclear_potential
+VLX_LIBS_DIR += simd_t2c_electron_repulsion
+VLX_LIBS_DIR += simd_t2c_electron_repulsion_rs
+VLX_LIBS_DIR += simd_t2c_electron_repulsion_geom_10_rs
+VLX_LIBS_DIR += simd_geometry
+VLX_LIBS_DIR += simd_t2c_electron_repulsion_grad
+VLX_LIBS_DIR += simd_t3c_electron_repulsion
+VLX_LIBS_DIR += simd_t3c_electron_repulsion_rs
+VLX_LIBS_DIR += simd_t3c_electron_repulsion_geom_100_rs
+VLX_LIBS_DIR += simd_t3c_electron_repulsion_geom_010_rs
+VLX_LIBS_DIR += simd_t3c_electron_repulsion_grad
+VLX_LIBS_DIR += simd_t3c_electron_repulsion_geom_100
+VLX_LIBS_DIR += simd_t3c_electron_repulsion_geom_010
 VLX_LIBS_DIR += python
 VLX_LIBS_DIR += t2c_func
 VLX_LIBS_DIR += t2c_geometrical_derivatives
@@ -50,7 +69,6 @@ VLX_LIBS_DIR += t4c_func
 VLX_LIBS_DIR += t4c_electron_repulsion
 VLX_LIBS_DIR += t4c_geometrical_derivatives
 VLX_LIBS_DIR += dft_func
-VLX_LIBS_DIR += t3c_overlap
 VLX_LIBS_DIR += t3c_electron_repulsion
 VLX_LIBS_DIR += t3c_func
 VLX_LIBS_DIR += t3c_electron_repulsion_geom_X00
@@ -58,6 +76,7 @@ VLX_LIBS_DIR += t3c_electron_repulsion_geom_0X0
 VLX_LIBS_DIR += visualization
 VLX_LIBS_DIR +=	onee_ints
 VLX_LIBS_DIR +=	pdft_func
+VLX_LIBS_DIR += fika
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))
@@ -75,6 +94,8 @@ debug: $(VLX_LIBS)
 	mkdir -p ../build/python/veloxchem
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
+	$(RM) -r $(CURDIR)/../build/python/veloxchem/mofbuilder
+	$(CP) -r pymodule/mofbuilder $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py
@@ -89,6 +110,8 @@ release: $(VLX_LIBS)
 	mkdir -p ../build/python/veloxchem
 	$(MV) $(VLX_TARGET) $(CURDIR)/../build/python/veloxchem
 	$(CP) $(VLX_MODULE) $(CURDIR)/../build/python/veloxchem
+	$(RM) -r $(CURDIR)/../build/python/veloxchem/mofbuilder
+	$(CP) -r pymodule/mofbuilder $(CURDIR)/../build/python/veloxchem
 	$(CP) -r $(VLX_BAS) $(CURDIR)/../build/python/veloxchem
 	$(CP) -r ../database $(CURDIR)/../build/python/veloxchem
 	@echo ""                               >> $(CURDIR)/../build/python/veloxchem/__init__.py

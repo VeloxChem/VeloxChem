@@ -40,15 +40,13 @@ from .veloxchemlib import mpi_master, boltzmann_in_hartreeperkelvin
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
-from .c2diis import CTwoDiis
-from .diis import Diis
 from .mathutils import solve_in_orthogonal_basis
 
 
 class ScfRestrictedDriver(ScfDriver):
     """
-    Implements spin restricted closed shell SCF method with C2-DIIS and
-    two-level C2-DIIS convergence accelerators.
+    Implements spin restricted closed shell SCF method with DIIS and
+    two-level DIIS convergence accelerators.
 
     :param comm:
         The MPI communicator.
@@ -91,7 +89,8 @@ class ScfRestrictedDriver(ScfDriver):
             The orthogonalization matrix.
 
         :return:
-            The electronic gradient.
+            The error matrix (only populated on the master rank), the
+            electronic gradient and the maximum gradient.
         """
 
         if self.rank == mpi_master():
@@ -107,13 +106,14 @@ class ScfRestrictedDriver(ScfDriver):
             e_grad = 2.0 * np.linalg.norm(e_mat)
             max_grad = np.max(np.abs(e_mat))
         else:
-            e_grad = 0.0
-            max_grad = 0.0
+            e_mat = None
+            e_grad = None
+            max_grad = None
 
         e_grad = self.comm.bcast(e_grad, root=mpi_master())
         max_grad = self.comm.bcast(max_grad, root=mpi_master())
 
-        return e_grad, max_grad
+        return e_mat, e_grad, max_grad
 
     def _comp_density_change(self, den_mat, old_den_mat):
         """
@@ -141,89 +141,6 @@ class ScfRestrictedDriver(ScfDriver):
         diff_den = self.comm.bcast(diff_den, root=mpi_master())
 
         return diff_den
-
-    def _store_diis_data(self, fock_mat, den_mat, ovl_mat, e_grad):
-        """
-        Stores spin restricted closed shell Fock/Kohn-Sham and density matrices
-        for current iteration. Overloaded base class method.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        :param den_mat:
-            The density matrix.
-        :param ovl_mat:
-            The overlap matrix (used in ROSCF).
-        :param e_grad:
-            The electronic gradient.
-        """
-
-        if self.rank == mpi_master() and e_grad < self.diis_thresh:
-
-            if len(self._fock_matrices_alpha) == self.max_err_vecs:
-                self._fock_matrices_alpha.popleft()
-                self._density_matrices_alpha.popleft()
-
-            self._fock_matrices_alpha.append(fock_mat[0].copy())
-            self._density_matrices_alpha.append(den_mat[0].copy())
-
-    def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
-        """
-        Computes effective spin restricted closed shell Fock/Kohn-Sham matrix
-        in the AO basis (by DIIS extrapolation of stored AO Fock/Kohn-Sham
-        matrices). Overloaded base class method.
-
-        :param fock_mat:
-            The Fock/Kohn-Sham matrix.
-        :param ovl_mat:
-            The overlap matrix.
-        :param oao_mat:
-            The orthogonalization matrix.
-
-        :return:
-            The effective Fock/Kohn-Sham matrix.
-        """
-
-        if self.rank == mpi_master():
-
-            if len(self._fock_matrices_alpha) == 1:
-                return (np.copy(self._fock_matrices_alpha[0]),)
-
-            if len(self._fock_matrices_alpha) > 1:
-
-                if self.acc_type.upper() in ['C2DIIS', 'L2_C2DIIS']:
-                    acc_diis = CTwoDiis()
-                elif self.acc_type.upper() in ['DIIS', 'L2_DIIS']:
-                    acc_diis = Diis()
-
-                acc_diis.compute_error_vectors_restricted(
-                    self._fock_matrices_alpha, self._density_matrices_alpha,
-                    ovl_mat, oao_mat)
-                weights = acc_diis.compute_weights()
-
-                return self._get_scaled_fock(weights)
-
-            return tuple(fock_mat)
-
-        return (None,)
-
-    def _get_scaled_fock(self, weights):
-        """
-        Computes effective spin restricted closed shell Fock/Kohn-Sham matrix
-        by summing Fock/Kohn-Sham matrices scalwd with weigths.
-
-        :param weights:
-            The weights of Fock/Kohn-Sham matrices.
-
-        :return:
-            The scaled Fock/Kohn-Sham matrix.
-        """
-
-        effmat = np.zeros(self._fock_matrices_alpha[0].shape)
-
-        for w, fmat in zip(weights, self._fock_matrices_alpha):
-            effmat = effmat + w * fmat
-
-        return (effmat,)
 
     def _gen_molecular_orbitals(self, molecule, ao_basis, eff_fock_mat,
                                 oao_mat):
@@ -293,7 +210,7 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.embedding is not None:
-            emb_type = ' with ' + self.embedding['settings']['embedding_method']
+            emb_type = ' with PE'
         else:
             emb_type = ''
 
@@ -317,6 +234,13 @@ class ScfRestrictedDriver(ScfDriver):
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
+                continue
+            # NOTE: the RI driver the SCF formed is not copied. The simd RI
+            # drivers have no copy in Python, and the copy forms its own when it
+            # runs the SCF. A gradient of a copy which has not run the SCF stops
+            # with an error before any work (ScfGradientDriver.compute,
+            # TddftGradientDriver.compute).
+            if key == '_ri_drv':
                 continue
             setattr(new_scf_drv, key, deepcopy(val))
 

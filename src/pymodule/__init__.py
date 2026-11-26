@@ -58,10 +58,17 @@ from .veloxchemlib import NuclearPotentialGeom101Driver
 from .veloxchemlib import NuclearPotentialErfGeom100Driver
 from .veloxchemlib import NuclearPotentialErfGeom010Driver
 from .veloxchemlib import ElectricDipoleMomentGeom100Driver
-from .veloxchemlib import ThreeCenterOverlapDriver
-from .veloxchemlib import ThreeCenterElectronRepulsionDriver
-from .veloxchemlib import ThreeCenterElectronRepulsionGeom100Driver
-from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver
+
+# deprecated non-SIMD three-center electron repulsion drivers, only built when
+# configured with -DVLX_USE_OLD_RI=YES
+try:
+    from .veloxchemlib import ThreeCenterElectronRepulsionDriver
+    from .veloxchemlib import ThreeCenterElectronRepulsionGeom100Driver
+    from .veloxchemlib import ThreeCenterElectronRepulsionGeom010Driver
+    from .rijkfockdriver import RIJKFockDriver
+except ImportError:
+    pass
+
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import TwoCenterElectronRepulsionGeom100Driver
 from .veloxchemlib import EcpDriver
@@ -70,7 +77,6 @@ from .veloxchemlib import FockGeom1000Driver
 from .veloxchemlib import FockGeom2000Driver
 from .veloxchemlib import FockGeom1100Driver
 from .veloxchemlib import FockGeom1010Driver
-from .veloxchemlib import RIFockGradDriver
 from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import XCMolecularGradient
@@ -116,12 +122,11 @@ from .inputparser import InputParser
 from .outputstream import OutputStream
 from .matrix import Matrix
 from .matrices import Matrices
+from .packedmatrix import PackedMatrix
 from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .aodensitymatrix import AODensityMatrix
 from .molecularorbitals import MolecularOrbitals
-from .rifockdriver import RIFockDriver
-from .rijkfockdriver import RIJKFockDriver
 from .fockdriver import FockDriver
 from .griddriver import GridDriver
 from .scfrestdriver import ScfRestrictedDriver
@@ -178,6 +183,9 @@ from .localizationdriver import LocalizationDriver
 from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .peforcefieldgenerator import PEForceFieldGenerator
+from .fikaforcefield import FikaForceFieldReader
+from .fikapdbreader import FikaPdbReader, FikaPdbResidue
+from .fikapotfilereader import FikaPotfileReader
 from .firstorderpropdriver import FirstOrderPropertyDriver
 from .firstorderprop import FirstOrderProperties
 from .excitedstatemomentdriver import ExcitedStateMomentDriver
@@ -226,10 +234,13 @@ from .reactionmatcher import ReactionMatcher
 from .smddriver import SmdDriver
 from .atombdedriver import AtomBdeDriver
 from .orbitallocalization import OrbitalLocalizationDriver
+from .embeddingparser import EmbeddingParser
+from .embeddingpotfilewriter import EmbeddingPotfileWriter
 from .ensembleparser import EnsembleParser
 from .ensembledriver import EnsembleDriver
 from .spectrumaverager import SpectrumAverager
 from .gostshypdriver import GostshypDriver
+from .tessellation import GostshypCavityDriver
 # for backward compatibility only
 from .cppsolver import ComplexResponseSolver as ComplexResponse
 from .tdacppsolver import ComplexResponseTdaSolver as ComplexResponseTDA

@@ -36,9 +36,15 @@ import time
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import _RIJKFockDriver
+
+try:
+    from .veloxchemlib import _RIJKFockDriver
+except ImportError:
+    _RIJKFockDriver = None
+
 from .veloxchemlib import TwoCenterElectronRepulsionDriver
 from .veloxchemlib import SubMatrix
+from .matrix import Matrix
 from .outputstream import OutputStream
 from .molecularbasis import MolecularBasis
 from .mathutils import screened_eigh
@@ -77,11 +83,20 @@ class RIJKFockDriver:
         self.metric = None
         self.metric_threshold = 1.0e-12
 
+        if _RIJKFockDriver is None:
+            raise ImportError('RIJKFockDriver requires the legacy (non-SIMD) '
+                              "driver '_RIJKFockDriver', which is not included "
+                              'in this build. It is only compiled when '
+                              'VeloxChem is configured with the CMake option '
+                              '-DVLX_USE_OLD_RI=YES; rebuild with that option '
+                              'to use this class.')
+
         self._ri_drv = _RIJKFockDriver()
 
     def compute_metric(self, molecule, basis, verbose=True):
         """
-        Computes Cholesky decomposed J metric for the RI-JK Fock driver.
+        Computes the inverse square root of the J metric for the RI-JK Fock
+        driver using an eigendecomposition.
 
         :param molecule:
             The molecule to compute J metric.
@@ -102,7 +117,9 @@ class RIJKFockDriver:
                 self.ostream.flush()
 
             if isinstance(basis, str):
-                basis_ri = MolecularBasis.read(molecule, basis)
+                basis_ri = MolecularBasis.read(molecule,
+                                               basis,
+                                               auxiliary_basis=True)
             else:
                 basis_ri = MolecularBasis(basis)
 
@@ -126,8 +143,7 @@ class RIJKFockDriver:
 
             ri_prep_t0 = time.time()
 
-            # compute J^{-1/2}
-            # for now, use hard-coded threshold
+            # compute J^{-1/2} with metric_threshold
             eigvals, eigvecs = screened_eigh(mat_j_np, self.metric_threshold)
             metric_np = eigvecs * (1.0 / np.sqrt(eigvals))
 
@@ -141,7 +157,7 @@ class RIJKFockDriver:
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-        # broadcast Cholesky decomposed J metric
+        # broadcast the inverse square root of the J metric
         self.metric = self.comm.bcast(self.metric)
 
     def compute_bq_vectors(self,
@@ -170,7 +186,9 @@ class RIJKFockDriver:
 
         if isinstance(auxiliary_basis, str):
             if self.rank == mpi_master():
-                basis_ri = MolecularBasis.read(molecule, auxiliary_basis)
+                basis_ri = MolecularBasis.read(molecule,
+                                               auxiliary_basis,
+                                               auxiliary_basis=True)
             else:
                 basis_ri = None
             basis_ri = self.comm.bcast(basis_ri, root=mpi_master())
@@ -224,7 +242,9 @@ class RIJKFockDriver:
 
         if isinstance(auxiliary_basis, str):
             if self.rank == mpi_master():
-                basis_ri = MolecularBasis.read(molecule, auxiliary_basis)
+                basis_ri = MolecularBasis.read(molecule,
+                                               auxiliary_basis,
+                                               auxiliary_basis=True)
             else:
                 basis_ri = None
             basis_ri = self.comm.bcast(basis_ri, root=mpi_master())
@@ -272,7 +292,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_j_fock(density, label)
 
-        # No reduction here. Reduction will be done in scfdriver.
+        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
 
         if verbose:
             self.ostream.print_info('Coulomb contribution done in ' +
@@ -280,7 +300,7 @@ class RIJKFockDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        return fmat
+        return gmat
 
     def compute_screened_j_fock(self, density, label, verbose=True):
         """
@@ -304,7 +324,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_screened_j_fock(density, label)
 
-        # No reduction here. Reduction will be done in scfdriver.
+        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
 
         if verbose:
             self.ostream.print_info('Coulomb contribution done in ' +
@@ -312,7 +332,7 @@ class RIJKFockDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        return fmat
+        return gmat
 
     @staticmethod
     def _get_density_factor(density):
@@ -408,7 +428,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_k_fock(density, occ_mos)
 
-        # No reduction here. Reduction will be done in scfdriver.
+        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
 
         if verbose:
             self.ostream.print_info('Exchange contribution done in ' +
@@ -416,7 +436,7 @@ class RIJKFockDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        return fmat
+        return gmat
 
     def compute_screened_k_fock(self,
                                 density,
@@ -454,7 +474,7 @@ class RIJKFockDriver:
 
         fmat = self._ri_drv.compute_screened_k_fock(density, occ_mos)
 
-        # No reduction here. Reduction will be done in scfdriver.
+        gmat = Matrix.reduce(fmat, self.comm, mpi_master())
 
         if verbose:
             self.ostream.print_info('Exchange contribution done in ' +
@@ -462,7 +482,7 @@ class RIJKFockDriver:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        return fmat
+        return gmat
 
     def compute_mo_bq_vectors(self, lambda_p, lambda_h, bstart, bend):
         """
@@ -480,3 +500,41 @@ class RIJKFockDriver:
 
         return self._ri_drv.compute_mo_bq_vectors(lambda_p, lambda_h, bstart,
                                                   bend)
+
+    def estimate_memory_for_bq_vectors(self,
+                                       screener,
+                                       molecule,
+                                       auxiliary_basis,
+                                       ithreshold):
+        """
+        Computes B^Q vectors (sreened, distributed) for the RI-JK Fock driver.
+
+        :param screener:
+            The two-electron ERI screener data.
+        :param molecule:
+            The molecule to compute three-center integrals.
+        :param auxiliary_basis:
+            The auxiliary basis to compute three-center integrals.
+        :param ithreshold:
+            The integer threshold of screening important integral pairs.
+        """
+
+        if isinstance(auxiliary_basis, str):
+            if self.rank == mpi_master():
+                basis_ri = MolecularBasis.read(molecule,
+                                               auxiliary_basis,
+                                               auxiliary_basis=True)
+            else:
+                basis_ri = None
+            basis_ri = self.comm.bcast(basis_ri, root=mpi_master())
+        else:
+            basis_ri = MolecularBasis(auxiliary_basis)
+
+        return self._ri_drv.estimate_memory_for_bq_vectors(screener, molecule, basis_ri, ithreshold, self.rank, self.nodes)
+
+    def get_indices_of_bq_vectors(self):
+        """
+        Returns the indices of local B^Q vectors.
+        """
+
+        return self._ri_drv.get_indices_of_bq_vectors()

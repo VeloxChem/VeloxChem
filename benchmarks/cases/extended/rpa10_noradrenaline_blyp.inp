@@ -1,0 +1,20 @@
+# Noradrenaline, BLYP, def2-TZVPD (552 basis functions): RPA, 10 states (RI-J).
+@jobs
+task: response
+@end
+
+@method settings
+xcfun: blyp
+basis: def2-tzvpd
+@end
+
+@response
+property: absorption
+nstates: 10
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: noradrenaline.xyz
+@end

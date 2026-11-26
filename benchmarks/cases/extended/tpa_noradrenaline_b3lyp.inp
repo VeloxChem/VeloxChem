@@ -1,0 +1,20 @@
+# Noradrenaline, B3LYP, def2-TZVPD (552 basis functions): two-photon absorption, 2 frequencies (RI-JK).
+@jobs
+task: response
+@end
+
+@method settings
+xcfun: b3lyp
+basis: def2-tzvpd
+@end
+
+@response
+property: tpa
+frequencies: 0.09-0.10 (0.01)
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: noradrenaline.xyz
+@end

@@ -1,0 +1,21 @@
+# Caffeine, B3LYP, def2-SVP: TDA, 5 states (RI-JK).
+@jobs
+task: response
+@end
+
+@method settings
+xcfun: b3lyp
+basis: def2-svp
+@end
+
+@response
+property: absorption
+nstates: 5
+tamm_dancoff: yes
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end

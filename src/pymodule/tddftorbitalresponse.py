@@ -41,7 +41,7 @@ from .distributedarray import DistributedArray
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
+                           dft_and_ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check,
                            rsp_results_solvation_sanity_check,
                            gostshyp_sanity_check,
@@ -148,6 +148,12 @@ class TddftOrbitalResponse(CphfSolver):
             The AO basis set.
         :param scf_tensors:
             The dictionary of tensors from the converged SCF calculation.
+        :param eri_dict:
+            The dictionary containing ERI information.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
         :param rsp_results:
             The results from a converged linear response calculation.
 
@@ -162,11 +168,8 @@ class TddftOrbitalResponse(CphfSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -189,17 +192,14 @@ class TddftOrbitalResponse(CphfSolver):
         self.tamm_dancoff = self.comm.bcast(self.tamm_dancoff,
                                             root=mpi_master())
 
-        # TODO: in the original implementation eri_dict, dft_dict, pe_dict
-        # are passed as arguments, but I am not sure why. Better to initialize
-        # here instead and remove from function arguments.
-        # ERI information
-        eri_dict = self._init_eri(molecule, basis)
-
-        # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
-
-        # PE information
-        pe_dict = self._init_pe(molecule, basis, silent=True)
+        # NOTE: eri_dict, dft_dict and pe_dict are the ones
+        # CphfSolver.compute_subspace_solver set up just before, which the
+        # solve uses as well; the RI-JK B vectors or the RI-J driver, or the
+        # fallback of either, were set up there. C-PCM and GOSTSHYP are set up
+        # here, after the checks above that switch them on (_cpcm, _gostshyp)
+        # and take the solvation settings of the response results;
+        # compute_subspace_solver calls _init_cpcm and _init_gostshyp before
+        # compute_rhs without running these checks.
 
         # CPCM information
         self._init_cpcm(molecule, basis)
@@ -311,6 +311,27 @@ class TddftOrbitalResponse(CphfSolver):
             # Make a list of unrel. DMs and excittion vectors:
             dm_ao_list = (list(unrel_dm_ao) + list(x_plus_y_ao) +
                           list(x_minus_y_ao))
+            xy_dm_ao = list(x_plus_y_ao) + list(x_minus_y_ao)
+
+            # Factors of the same densities for the resolution of the
+            # identity, where the solver is using RI-JK. The unrelaxed density
+            # is block diagonal in the orbitals, the transition densities are
+            # not, so the two are built in different shapes.
+            ri_jk_factors_1pdm = None
+            ri_jk_factors_xy = None
+
+            if self._uses_ri_jk():
+                ri_jk_factors_1pdm = (
+                    mo_occ,
+                    [np.matmul(mo_occ, dm_oo[i].T) for i in range(dof)],
+                    mo_vir,
+                    [np.matmul(mo_vir, dm_vv[i].T) for i in range(dof)],
+                )
+                ri_jk_factors_xy = (
+                    mo_occ,
+                    [np.matmul(mo_vir, x_plus_y[i].T) for i in range(dof)] +
+                    [np.matmul(mo_vir, x_minus_y[i].T) for i in range(dof)],
+                )
 
             # 2) Construct the right-hand side
 
@@ -338,6 +359,9 @@ class TddftOrbitalResponse(CphfSolver):
         else:
             dof = None
             dm_ao_list = None
+            xy_dm_ao = None
+            ri_jk_factors_1pdm = None
+            ri_jk_factors_xy = None
 
             if self._dft:
                 perturbed_dm_ao_list = None
@@ -361,8 +385,51 @@ class TddftOrbitalResponse(CphfSolver):
         molgrid = dft_dict['molgrid']
         gs_density = dft_dict['gs_density']
 
-        fock_ao_rhs = self._comp_lr_fock(dm_ao_list, molecule, basis, eri_dict,
-                                         dft_dict, pe_dict, profiler)
+        # NOTE: with C-PCM, the unrelaxed density takes the reaction field of
+        # the ground state, in equilibrium (the static dielectric constant),
+        # and the transition densities that of the response's kernel, which
+        # with non_equilibrium_solv is the optical dielectric constant.
+
+        if self._uses_ri_jk():
+            if self.rank == mpi_master():
+                unrel_dm_ao_list = list(unrel_dm_ao)
+            else:
+                unrel_dm_ao_list = None
+            fock_1pdm = self._comp_lr_fock(unrel_dm_ao_list,
+                                           molecule,
+                                           basis,
+                                           eri_dict,
+                                           dft_dict,
+                                           pe_dict,
+                                           profiler,
+                                           dens_factors=ri_jk_factors_1pdm,
+                                           cpcm_non_equilibrium=False)
+            fock_xy = self._comp_lr_fock(
+                xy_dm_ao,
+                molecule,
+                basis,
+                eri_dict,
+                dft_dict,
+                pe_dict,
+                profiler,
+                dens_factors=ri_jk_factors_xy,
+                cpcm_non_equilibrium=self.non_equilibrium_solv)
+            if self.rank == mpi_master():
+                fock_ao_rhs = fock_1pdm + fock_xy
+            else:
+                fock_ao_rhs = None
+        else:
+            # dm_ao_list: dof unrelaxed densities, then dof X+Y and dof X-Y
+            fock_ao_rhs = self._comp_lr_fock(
+                dm_ao_list,
+                molecule,
+                basis,
+                eri_dict,
+                dft_dict,
+                pe_dict,
+                profiler,
+                cpcm_non_equilibrium=([False] * dof +
+                                      [self.non_equilibrium_solv] * 2 * dof))
 
         profiler.start_timer('Kxc')
 
@@ -377,9 +444,11 @@ class TddftOrbitalResponse(CphfSolver):
         if self._dft:
             # Quadratic response routine for TDDFT E[3] term g^xc
             xc_drv = XCIntegrator()
-            # molgrid.partition_grid_points()
-            # molgrid.distribute_counts_and_displacements(self.rank,
-            #                                    self.nodes, self.comm)
+
+            if self.xc_screening_threshold is not None:
+                xc_drv.set_screening_threshold(
+                    self.xc_screening_threshold)
+
             xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
                                       perturbed_dm_ao_list, zero_dm_ao_list,
                                       gs_density, molgrid,
@@ -494,11 +563,8 @@ class TddftOrbitalResponse(CphfSolver):
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -529,8 +595,10 @@ class TddftOrbitalResponse(CphfSolver):
 
         profiler.start_timer('Prep')
 
-        # ERI information
-        eri_dict = self._init_eri(molecule, basis)
+        # ERI information. The RI-JK B vectors or the RI-J driver, or the
+        # fallback of either, are the ones compute set up: callers run compute
+        # first, with the same molecule and basis.
+        eri_dict = self._init_eri(molecule, basis, reuse_ri=True)
 
         # DFT information
         dft_dict = self._init_dft(molecule, scf_tensors, silent=True)
@@ -622,6 +690,7 @@ class TddftOrbitalResponse(CphfSolver):
         dist_cphf_ov = self.cphf_results['dist_cphf_ov']
 
         lambda_ao_list = []
+        lambda_rights = []
         for x in range(dof):
             cphf_ov_x = dist_cphf_ov[x].get_full_vector(0)
             if self.rank == mpi_master():
@@ -629,11 +698,30 @@ class TddftOrbitalResponse(CphfSolver):
                     np.linalg.multi_dot(
                         [mo_occ,
                          cphf_ov_x.reshape(nocc, nvir), mo_vir.T]))
+                if self._uses_ri_jk():
+                    lambda_rights.append(
+                        np.matmul(mo_vir, cphf_ov_x.reshape(nocc, nvir).T))
 
         profiler.stop_timer('lambda')
 
-        fock_lambda = self._comp_lr_fock(lambda_ao_list, molecule, basis,
-                                         eri_dict, dft_dict, pe_dict, profiler)
+        if self._uses_ri_jk():
+            lambda_factors = ((mo_occ, lambda_rights)
+                              if self.rank == mpi_master() else None)
+        else:
+            lambda_factors = None
+
+        # NOTE: the lambda multipliers are a ground-state orbital relaxation;
+        # with C-PCM their reaction field is in equilibrium (the static
+        # dielectric constant), whatever non_equilibrium_solv is.
+        fock_lambda = self._comp_lr_fock(lambda_ao_list,
+                                         molecule,
+                                         basis,
+                                         eri_dict,
+                                         dft_dict,
+                                         pe_dict,
+                                         profiler,
+                                         dens_factors=lambda_factors,
+                                         cpcm_non_equilibrium=False)
 
         profiler.start_timer('Other')
 
@@ -735,10 +823,6 @@ class TddftOrbitalResponse(CphfSolver):
         cur_str = 'Convergence Threshold           : {:.1e}'.format(
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
-
-        if self.ri_coulomb:
-            cur_str = 'Resolution of the Identity      : RI-J'
-            self.ostream.print_header(cur_str.ljust(str_width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '

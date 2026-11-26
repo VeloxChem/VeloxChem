@@ -34,6 +34,7 @@ from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import copy
+import time as tm
 import sys
 
 from .veloxchemlib import hartree_in_ev, mpi_master
@@ -182,13 +183,16 @@ class XPSDriver:
         if not fpath.is_file():
             return
 
+        write_t0 = tm.time()
+
         write_results_to_hdf5(str(fpath),
                               'xps',
                               results,
                               value_label='XPS result')
 
         self.ostream.print_blank()
-        self.ostream.print_info('XPS results written to file: ' + str(fpath))
+        self.ostream.print_info(f'XPS results written to file: {fpath} ' +
+                                f'(took {tm.time() - write_t0:.2f} sec).')
 
     @staticmethod
     def _get_xcfun_label(xcfun):

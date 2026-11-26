@@ -50,13 +50,18 @@ endmacro()
 # included cmake modules
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_default_build_paths.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_safeguards.cmake)
+# OpenMP must be found before the compiler flags are set up: the vector math
+# library probe in CXXFlags.cmake links its test program against the
+# OpenMP::OpenMP_CXX imported target.
+find_package(OpenMP 4.5 REQUIRED COMPONENTS CXX)
 include(${PROJECT_SOURCE_DIR}/cmake/compiler_flags/CXXFlags.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/eigen.cmake)
+include(${PROJECT_SOURCE_DIR}/cmake/custom/mathlib.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/boostmath.cmake)
 
 # find external dependencies
-# Python 3.10+
-find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development)
+# Python 3.11+
+find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development)
 # pybind11
 find_package(pybind11 2.6 CONFIG REQUIRED)
 # Libxc

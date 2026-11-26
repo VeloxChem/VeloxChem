@@ -39,6 +39,7 @@
 #include "BatchFunc.hpp"
 #include "ThreeCenterElectronRepulsionDriver.hpp"
 #include "SerialDenseLinearAlgebra.hpp"
+#include "ThreadedDenseLinearAlgebra.hpp"
 
 #include <iostream>
 
@@ -264,6 +265,34 @@ CRIJKFockDriver::local_compute_screened_bq_vectors(const CT4CScreener&        sc
 }
 
 auto
+CRIJKFockDriver::estimate_memory_for_bq_vectors(const CT4CScreener&     screener,
+                                                const CMolecule&        molecule,
+                                                const CMolecularBasis&  aux_basis,
+                                                const int               ithreshold,
+                                                const int               rank,
+                                                const int               nodes) const -> size_t
+{
+    // set up auxilary basis dimensions
+    
+    const auto naux = aux_basis.dimensions_of_basis();
+    
+    // set up active auxilary indices
+    
+    auto gindices = std::vector<size_t>(naux);
+    
+    std::iota(gindices.begin(), gindices.end(), 0);
+    
+    auto lindices = omp::partition_tasks(gindices, rank, nodes);
+    
+    // allocate B^Q vectors
+    
+    const auto bra_indices = omp::partition_flat_buffer(screener.gto_pair_blocks(), ithreshold);
+    
+    return lindices.size() * (bra_indices.back()[2] + bra_indices.back()[3]) * sizeof(double);
+}
+
+
+auto
 CRIJKFockDriver::compute_j_fock(const CMatrix     &density,
                                 const std::string &label) const -> CMatrix
 {
@@ -344,9 +373,9 @@ CRIJKFockDriver::compute_k_fock(const CMatrix &density, const CSubMatrix &molorb
         
         bqmo.zero();
         
-        sdenblas::serialMultAtB(bqmo, molorbs, bqao);
+        tdenblas::threadedMultAtB(bqmo, molorbs, bqao);
         
-        sdenblas::serialMultAtB(kmat, bqmo, bqmo);
+        tdenblas::threadedMultAtB(kmat, bqmo, bqmo);
     }
     
     fmat.assign_values(kmat);
@@ -449,7 +478,8 @@ CRIJKFockDriver::compute_mo_bq_vectors(const CSubMatrix& lambda_p, const CSubMat
         
         // set up AOs, MOs indices
            
-        const auto nmos = lambda_p.number_of_columns();
+        const auto nmos_p = lambda_p.number_of_columns();
+        const auto nmos_h = lambda_h.number_of_columns();
                
         const auto naos = lambda_p.number_of_rows();
         
@@ -472,11 +502,11 @@ CRIJKFockDriver::compute_mo_bq_vectors(const CSubMatrix& lambda_p, const CSubMat
             
             ptr_bq_vectors->reduced_unpack_data(bqao, *ptr_bq_mask, i);
             
-            auto tmat = CSubMatrix({0, 0, naos, nmos}, 0.0);
+            auto tmat = CSubMatrix({0, 0, naos, nmos_h}, 0.0);
             
             sdenblas::serialMultAB(tmat, bqao, *ptr_math);
             
-            auto lmat = CSubMatrix({0, 0, nmos, nmos}, 0.0);
+            auto lmat = CSubMatrix({0, 0, nmos_p, nmos_h}, 0.0);
             
             sdenblas::serialMultAtB(lmat, *ptr_matp, tmat);
             
@@ -583,4 +613,10 @@ CRIJKFockDriver::_comp_j_vector(const std::vector<double>& mvector) const -> std
     }
     
     return jvec;
+}
+
+auto
+CRIJKFockDriver::get_indices_of_bq_vectors() const -> std::vector<size_t>
+{
+    return _bq_vectors.indices();
 }

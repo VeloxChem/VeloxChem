@@ -33,7 +33,7 @@
 default:
   tags:
     - vlx-docker
-  image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-2074132
+  image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-0e81798
   interruptible: true
 
 workflow:
@@ -48,9 +48,15 @@ stages:
   - build
   - test
 
-.monkey:conf:
+.conf:
   variables:
-    VLX_NUM_BUILD_JOBS: "6"
+    VLX_NUM_BUILD_JOBS: "12"
+    # cpus reserved for a CI job; OpenMP threads are derived from this in the jobs
+    VLX_CI_THREADS: "12"
+    # MPI ranks used by the distributed test runs
+    VLX_CI_MPI_RANKS: "2"
+    OMPI_ALLOW_RUN_AS_ROOT: "1"
+    OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
   before_script:
     - uname -a
     - free -m
@@ -61,12 +67,16 @@ stages:
     - python -V
     - gcc --version
     - g++ --version
+    - echo "=== OpenMPI ==="
+    - which mpicc mpiexec mpicc.openmpi mpiexec.openmpi
+    - mpicc.openmpi --showme:version
+    - mpiexec.openmpi --version | head -2
 
-.monkey:setup:
+.setup:
   extends:
-    - .monkey:conf
+    - .conf
   before_script:
-    - !reference [ .monkey:conf, before_script]
+    - !reference [ .conf, before_script]
     - python -m venv --clear venv
     - source venv/bin/activate
     - python -m pip install --upgrade
@@ -74,48 +84,27 @@ stages:
         setuptools
         wheel
 
-monkey:cmake_build:
-  extends:
-    - .monkey:setup
+pip_install:
+  extends: .setup
   stage: build
   script:
-    - python -m pip install
-        numpy
-        pybind11[global]
-    - CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
-    - git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
-    - git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math
+    - CC=gcc MPICC=mpicc.openmpi python -m pip install --no-cache-dir mpi4py --no-binary=mpi4py
+    - mpiexec.openmpi --bind-to none -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
+    - python -m pip install MDAnalysis dftd4 openmm rdkit pymbar
+    # retry with backoff, cloning into a fresh directory each attempt and renaming on success
+    - for i in 1 2 3 4 5; do
+        git clone --depth 1 -b 3.4.0 https://gitlab.com/libeigen/eigen.git eigen-$i && mv eigen-$i eigen && break;
+        sleep $((i * 30));
+      done
+    - for i in 1 2 3 4 5; do
+        git clone --depth 1 -b boost-1.90.0 https://github.com/boostorg/math.git boost-math-$i && mv boost-math-$i boost-math && break;
+        sleep $((i * 30));
+      done
     - cd eigen && test "$(git rev-parse HEAD)" = "3147391d946bb4b6c68edd901f2add6ac1f31f8c" && cd ..
     - cd boost-math && test "$(git rev-parse HEAD)" = "e0fcd19f7227d81391770ea46015acc3c80af810" && cd ..
     - export EIGEN_INCLUDE_DIR=$(pwd)/eigen
     - export BOOST_INCLUDE_DIR=$(pwd)/boost-math/include
-    - cmake
-        -S.
-        -Bbuild
-        -GNinja
-        -DCMAKE_CXX_COMPILER=g++
-    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -d stats
-  timeout: 2h
-  artifacts:
-    paths:
-      - build
-    expire_in: 2 days
-
-monkey:pip_install:
-  extends: .monkey:setup
-  stage: build
-  script:
-    - CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
-    - CC=gcc CXX=g++ python -m pip install
-        MDAnalysis
-        "networkx<3.7"
-    - git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
-    - git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math
-    - cd eigen && test "$(git rev-parse HEAD)" = "3147391d946bb4b6c68edd901f2add6ac1f31f8c" && cd ..
-    - cd boost-math && test "$(git rev-parse HEAD)" = "e0fcd19f7227d81391770ea46015acc3c80af810" && cd ..
-    - export EIGEN_INCLUDE_DIR=$(pwd)/eigen
-    - export BOOST_INCLUDE_DIR=$(pwd)/boost-math/include
-    - SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=g++"
+    - SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=g++ -DVLX_USE_MATHLIB=ON -DVLX_MATH_LIBRARY=/usr/lib/x86_64-linux-gnu/openblas-openmp/libopenblas.so"
         python -m pip install -v .[test,qmmm]
   timeout: 2h
   artifacts:
@@ -123,20 +112,26 @@ monkey:pip_install:
       - venv
     expire_in: 2 days
 
-monkey:python_tests:
-  extends: .monkey:conf
+python_tests:
+  extends: .conf
   stage: test
-  needs: ["monkey:pip_install"]
-  variables:
-    OMP_NUM_THREADS: "6"
-    OMP_PLACES: "cores"
+  needs: ["pip_install"]
   script:
     - source venv/bin/activate
     - python -c "import veloxchem; print(veloxchem.__version__)"
-    - mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO
-        -m "solvers" --durations=10
+    # serial steps use the whole allocation, MPI steps share it across the ranks
+    - export OMP_NUM_THREADS="${VLX_CI_THREADS}"
+    - export VLX_MPI_THREADS="$((VLX_CI_THREADS / VLX_CI_MPI_RANKS))"
+    - test "$VLX_MPI_THREADS" -ge 1
+        || { echo "VLX_CI_THREADS ($VLX_CI_THREADS) < VLX_CI_MPI_RANKS ($VLX_CI_MPI_RANKS)"; exit 1; }
+    - OMP_NUM_THREADS="$VLX_MPI_THREADS" mpiexec.openmpi --bind-to none
+        -n "$VLX_CI_MPI_RANKS" python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
+    - OMP_NUM_THREADS="$VLX_MPI_THREADS" mpiexec.openmpi --bind-to none
+        -n "$VLX_CI_MPI_RANKS" python -m pytest --capture=no --log-cli-level=INFO
+        -m "solvers" --durations=100
+    # local runner: run the full suite, including tests marked as timeconsuming
     - python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO
-        -m "not timeconsuming" --durations=10
+        --durations=100
     - git clone https://github.com/VeloxChem/vlx-extra-tests.git
     - python -m pytest --capture=no --log-cli-level=INFO vlx-extra-tests/tests
   timeout: 2h

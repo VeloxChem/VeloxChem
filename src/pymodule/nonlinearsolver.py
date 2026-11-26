@@ -36,23 +36,89 @@ import time as tm
 import math
 
 from .veloxchemlib import XCIntegrator, MolecularGrid
+from .veloxchemlib import release_free_memory
 from .veloxchemlib import T4CScreener
 from .veloxchemlib import mpi_master
 from .veloxchemlib import make_matrix, mat_t
 from .matrix import Matrix
 from .aodensitymatrix import AODensityMatrix
 from .griddriver import GridDriver
-from .rifockdriver import RIFockDriver
 from .fockdriver import FockDriver
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
-from .sanitychecks import dft_sanity_check, ri_sanity_check
+from .sanitychecks import dft_and_ri_sanity_check
 from .sanitychecks import nonlinear_response_environment_sanity_check
 from .errorhandler import assert_msg_critical
+from .riresponse import print_ri_memory_check
+from .rijkresponse import initialize_ri_jk
+from .rijkresponse import ri_jk_fock_matrices
+from .rijkresponse import ri_jk_slice_factors
+from .rijresponse import initialize_ri_j
+from .rijresponse import ri_j_coulomb_matrices
 from .inputparser import parse_input, print_keywords, print_attributes
-from .dftutils import get_default_grid_level
-from .batchsize import get_batch_size
+from .dftutils import get_default_grid_level, get_optimal_grid_box_size
+from .dftutils import get_response_fock_xc_density_memory
+from .dftutils import get_response_fock_xc_call_memory
+from .batchsize import get_four_center_batch_size
+from .batchsize import get_ri_batch_size
+from .batchsize import get_ri_density_memory
 from .batchsize import get_number_of_batches
+
+
+# NOTE: the matrices of n_ao by n_ao which _comp_two_el_int holds on the master
+# for each density it builds the Fock matrix of: the density (in dts2 or dts3),
+# the Fock matrix the build returns, and its column of fock_mo. A cubic mode
+# with a functional also copies fock_mo into fock_mo_2 and fock_mo_3. The
+# first-order densities a functional needs are counted by _ri_density_memory.
+_RI_BATCH_MATRICES = 3
+_RI_BATCH_MATRICES_CUBIC_DFT = 4
+
+# NOTE: the modes of _comp_two_el_int whose Fock matrices are three-time
+# transformed; the other modes are two-time transformed.
+_CUBIC_MODES = ('crf', 'tpa', '3pa', 'thg', 'thgred')
+
+
+def _factor_sizes(dens_factors):
+    """
+    Gets the sizes of a set of RI-JK factors: the memory of the left factors
+    the densities share, and the columns of the right factors of one density.
+
+    :param dens_factors:
+        The factors, as _comp_two_el_int takes them (a tuple of left factors
+        and lists of right factors, or a dictionary of such tuples), or None.
+
+    :return:
+        The memory of the left factors in bytes, an array which the sets of a
+        dictionary share counted once, as a broadcast pickles it once; and the
+        most columns the right factors of one density have together, each of
+        them n_ao rows. Zero and zero for None.
+    """
+
+    if dens_factors is None:
+        return 0, 0
+
+    sets = (list(dens_factors.values())
+            if isinstance(dens_factors, dict) else [dens_factors])
+
+    seen = set()
+    left_memory = 0
+    columns = 0
+
+    for factors in sets:
+        if factors is None:
+            continue
+
+        lists = [item for item in factors if isinstance(item, list)]
+
+        for item in factors:
+            if not isinstance(item, list) and id(item) not in seen:
+                seen.add(id(item))
+                left_memory += int(item.nbytes)
+
+        for i in range(len(lists[0]) if lists else 0):
+            columns = max(columns, sum(rights[i].shape[1] for rights in lists))
+
+    return left_memory, columns
 
 
 class NonlinearSolver:
@@ -70,6 +136,8 @@ class NonlinearSolver:
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
+        - xc_screening_threshold: The value a basis function must reach over a
+          grid box to be kept for it.
         - electric_field: The static electric field.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
@@ -102,16 +170,63 @@ class NonlinearSolver:
         self.batch_size = None
 
         # RI-J
+        self.ri = True
         self.ri_coulomb = False
         self.ri_jk = False
-        self.ri_auxiliary_basis = 'def2-universal-jfit'
+        # NOTE: None takes the auxiliary basis set of the RI kind used
+        # (sanitychecks.get_ri_auxiliary_basis).
+        self.ri_auxiliary_basis = None
+        self._ri_jk_drv = None
+        self._ri_jk_response_drv = None
+        self._ri_jk_aux_basis = None
         self.ri_metric_threshold = 1.0e-12
         self._ri_drv = None
+
+        # NOTE: whether the SCF this response is formed on fell back from RI to
+        # the four-center integrals, for want of memory or, with RI-JK, for the
+        # number of atoms. It is read from the SCF results, and ri, ri_coulomb
+        # and ri_jk are left as they were set.
+        self._ri_fallback = False
+
+        # NOTE: whether the SCF this response is formed on was asked to use RI
+        # whatever memory it needs (ScfDriver.force_ri). It is read from the
+        # SCF results, and the response then uses RI whatever memory it is
+        # predicted to need as well.
+        self._force_ri = False
+
+        # NOTE: the memory the simd RI driver of a rank may hold, in GB, taken as
+        # it is; None takes what is free less the reserves. An attribute and not
+        # an input keyword, as for the gradient's budget. The SCF's
+        # ri_memory_budget is not handed on to response.
+        self.ri_memory_budget = None
+
+        # NOTE: the memory each rank keeps back from the RI-JK B vectors or
+        # the RI-J integrals for the smallest batch of this driver's nonlinear
+        # Fock builds, in bytes, set by _set_ri_reserve_floor before either is
+        # set up and read by riresponse.get_ri_memory_budget.
+        self._ri_reserve_floor = 0
+
+        # NOTE: whether this response fell back from RI to the four-center
+        # integrals for want of memory of its own, and what the build was
+        # checked with. RI-JK's is decided with the B vectors at the start of
+        # each calculation and lent with them (riresponse.lend_ri); RI-J's is
+        # decided again whenever the integrals are.
+        self._ri_jk_fallback = False
+        self._ri_jk_memory = None
+        self._ri_j_fallback = False
+        self._ri_j_memory = None
+
+        # NOTE: whether this solver's RI-JK B vectors are lent to a solver it
+        # drives, and whether the ones it holds are borrowed from the driver
+        # that drives it, for the duration of one compute (riresponse.lend_ri).
+        self._ri_jk_lent = False
+        self._ri_jk_borrowing = False
 
         # dft
         self._dft = False
         self.xcfun = None
         self.grid_level = None
+        self.xc_screening_threshold = None
 
         # polarizable embedding
         self.potfile = None
@@ -164,6 +279,9 @@ class NonlinearSolver:
         self._input_keywords = {
             'response': {
                 'eri_thresh': ('float', 'ERI screening threshold'),
+                'xc_screening_threshold':
+                    ('float', 'value a basis function must reach over a grid '
+                     'box to be kept for it'),
                 'batch_size': ('int', 'batch size for Fock build'),
                 'max_iter': ('int', 'maximum number of iterations'),
                 'conv_thresh': ('float', 'convergence threshold'),
@@ -178,11 +296,12 @@ class NonlinearSolver:
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 '_debug': ('bool', 'print debug info'),
                 '_block_size_factor': ('int', 'block size factor for ERI'),
-                '_xcfun_ldstaging': ('int', 'max batch size for DFT grid'),
             },
             'method_settings': {
+                'ri': ('bool', 'use RI approximation'),
                 'ri_coulomb': ('bool', 'use RI-J approximation'),
-                'ri_auxiliary_basis': ('str', 'RI-J auxiliary basis set'),
+                'ri_jk': ('bool', 'use RI-JK approximation'),
+                'ri_auxiliary_basis': ('str', 'RI auxiliary basis set'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
                 'electric_field': ('seq_fixed', 'static electric field'),
@@ -284,13 +403,11 @@ class NonlinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
-        ri_sanity_check(self)
-
-        dft_sanity_check(self, 'update_settings', 'nonlinear')
+        dft_and_ri_sanity_check(self, 'update_settings', 'nonlinear')
 
         nonlinear_response_environment_sanity_check(self)
 
-    def _init_eri(self, molecule, basis):
+    def _init_eri(self, molecule, basis, reuse_ri_jk=False):
         """
         Initializes ERI.
 
@@ -298,15 +415,15 @@ class NonlinearSolver:
             The molecule.
         :param basis:
             The AO basis set.
+        :param reuse_ri_jk:
+            True where the RI-JK B vectors were formed earlier in the same
+            calculation and are used again (see rijkresponse.initialize_ri_jk).
 
         :return:
             The dictionary of ERI information.
         """
 
-        # TODO: enable RI-JK
-        assert_msg_critical(
-            not self.ri_jk,
-            f'{type(self).__name__}.compute: RI-JK is not yet supported')
+        # NOTE: only the simd driver has a response path.
 
         if self.rank == mpi_master():
             screening = T4CScreener()
@@ -315,16 +432,77 @@ class NonlinearSolver:
             screening = None
         screening = self.comm.bcast(screening, root=mpi_master())
 
-        if self.ri_coulomb:
-            self._ri_drv = RIFockDriver(self.comm, self.ostream)
-            self._ri_drv.prepare_buffers(molecule,
-                                         basis,
-                                         self.ri_auxiliary_basis,
-                                         verbose=False)
+        asks_ri_coulomb = (self.ri_coulomb and self._dft and
+                           self.xcfun is not None and
+                           not self.xcfun.is_hybrid())
+        asks_ri_jk = self.ri_jk and not asks_ri_coulomb
+
+        self._print_ri_fallback_info(asks_ri_coulomb, asks_ri_jk)
+
+        if asks_ri_coulomb and not self._ri_fallback:
+            initialize_ri_j(self, molecule, basis)
+
+        # NOTE: not gated on _uses_ri_jk(), which reads this response's own
+        # fallback: that is decided again by rijkresponse.initialize_ri_jk at
+        # the start of each calculation, and one left from an earlier
+        # calculation would otherwise keep it from being decided again.
+        if asks_ri_jk and not self._ri_fallback:
+            initialize_ri_jk(self, molecule, basis, reuse_ri_jk)
 
         return {
             'screening': screening,
         }
+
+    def _uses_ri_jk(self):
+        """
+        Checks whether the Fock matrices are formed with the SIMD RI-JK driver,
+        which is what ri_jk asks for unless the SCF fell back to the
+        four-center integrals, for want of memory or for the number of atoms,
+        or this response did, for want of memory.
+
+        :return:
+            True if the SIMD RI-JK driver forms the Fock matrices.
+        """
+
+        return (self.ri_jk and not self._ri_fallback and
+                not self._ri_jk_fallback)
+
+    def _uses_ri_coulomb(self):
+        """
+        Checks whether the Coulomb matrices are formed with the SIMD RI-J
+        driver, which is what ri_coulomb asks for unless the SCF or this
+        response fell back to the four-center integrals for want of memory.
+
+        :return:
+            True if the SIMD RI-J driver forms the Coulomb matrices.
+        """
+
+        return (self.ri_coulomb and not self._ri_fallback and
+                not self._ri_j_fallback)
+
+    def _print_ri_fallback_info(self, asks_ri_coulomb, asks_ri_jk):
+        """
+        Prints that response follows the SCF to the four-center integrals,
+        where RI was asked for and the SCF fell back.
+
+        :param asks_ri_coulomb:
+            Whether the settings ask for RI-J.
+        :param asks_ri_jk:
+            Whether the settings ask for RI-JK.
+        """
+
+        if not self._ri_fallback or not (asks_ri_coulomb or asks_ri_jk):
+            return
+
+        # NOTE: response follows the ground state it is handed. RI on top of a
+        # four-center SCF would be the response of a different energy. The SCF
+        # has already warned, so this is an info line.
+        label = 'RI-J' if asks_ri_coulomb else 'RI-JK'
+        self.ostream.print_info(
+            f'The SCF formed its Fock matrices without {label}, so the ' +
+            'response Fock matrices are formed from the four-center integrals.')
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def _init_dft(self, molecule, scf_results):
         """
@@ -344,6 +522,15 @@ class NonlinearSolver:
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
+
+            if self.rank == mpi_master():
+                nbf = scf_results['C_alpha'].shape[0]
+            else:
+                nbf = None
+            nbf = self.comm.bcast(nbf, root=mpi_master())
+            self._xcfun_ldstaging = get_optimal_grid_box_size(nbf)
+            # update leading dimension (max batch size for DFT grid)
+            self.xcfun._set_leading_dimension(self._xcfun_ldstaging)
 
             molgrid = grid_drv.generate(molecule, self._xcfun_ldstaging)
 
@@ -394,7 +581,8 @@ class NonlinearSolver:
                        second_order_dens,
                        third_oder_dens,
                        mode,
-                       profiler=None):
+                       profiler=None,
+                       dens_factors=None):
         """
         Computes and returns a list of Fock matrices.
 
@@ -428,7 +616,7 @@ class NonlinearSolver:
         f_total = self._comp_two_el_int(mo, molecule, ao_basis, eri_dict,
                                         dft_dict, first_order_dens,
                                         second_order_dens, third_oder_dens,
-                                        mode, profiler)
+                                        mode, profiler, dens_factors)
         nrows = f_total.data.shape[0]
         half_ncols = f_total.data.shape[1] // 2
         ff_data = np.zeros((nrows, half_ncols), dtype='complex128')
@@ -442,6 +630,407 @@ class NonlinearSolver:
         else:
             return None
 
+    def _note_ri_batch_memory(self, density_memory, ndens, left_memory=0):
+        """
+        Records, for memory profiling, the most the solver held on the master
+        rank for the densities of one batch of an RI build.
+
+        :param density_memory:
+            The memory of one density, as get_ri_batch_size took it; None away
+            from the master rank, where nothing is recorded.
+        :param ndens:
+            The densities of the batch.
+        :param left_memory:
+            The memory of the left RI-JK factors the densities of the batch
+            share (_factor_sizes).
+        """
+
+        if density_memory is not None:
+            self._ri_batch_memory = max(getattr(self, '_ri_batch_memory', 0),
+                                        density_memory * ndens + left_memory)
+
+    def _release_freed_memory(self):
+        """
+        Returns the memory the allocator holds free to the system. Each
+        nonlinear driver calls this once at the end of its calculation, not
+        after every iteration; the solvers it drives call their own at the end
+        of each solve.
+        """
+
+        # NOTE: the memory a calculation frees is partly in pieces the
+        # allocator keeps rather than returns. Kept, it stays resident, and
+        # what runs next reads it as memory in use and takes a smaller batch or
+        # RI budget.
+        release_free_memory()
+
+    def _print_ri_memory_check(self):
+        """
+        Prints, with memory profiling, the most the simd RI driver was
+        predicted to reach and the solver held for a batch, against the growth
+        of each rank's peak after the driver was set up. Every rank must call
+        this.
+        """
+
+        print_ri_memory_check(self)
+
+    def _ri_density_memory(self, molecule, ao_basis, dft_dict, n_ao, mode,
+                           mode_is_cubic, n_factor_columns=0):
+        """
+        Gets the memory _comp_two_el_int holds on the master rank for each
+        density it builds the Fock matrix of, as get_ri_batch_size takes it.
+        Called on the master only.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param dft_dict:
+            The dictionary of DFT information.
+        :param n_ao:
+            The number of atomic orbitals.
+        :param mode:
+            The mode for densities in quadratic/cubic response.
+        :param mode_is_cubic:
+            True for a cubic mode.
+        :param n_factor_columns:
+            The columns of n_ao rows of the right RI-JK factors of one
+            density (_factor_sizes).
+
+        :return:
+            The memory in bytes.
+        """
+
+        n_matrices = _RI_BATCH_MATRICES
+        n_sliced = 0
+
+        if self._dft:
+            # NOTE: with a functional a batch is made of groups. Each group
+            # holds its first-order densities beside the densities whose Fock
+            # matrices are built (the second-order ones of a quadratic mode,
+            # the second- and third-order ones of a cubic mode), and the
+            # exchange-correlation integration slices all of them.
+            size_1, size_2, size_3 = self._get_dft_group_sizes(mode)
+
+            n_fock = size_2 + (size_3 if mode_is_cubic else 0)
+
+            if mode_is_cubic:
+                n_matrices = _RI_BATCH_MATRICES_CUBIC_DFT
+
+            n_matrices += size_1 / n_fock
+            n_sliced = (size_1 + n_fock) / n_fock
+
+        xc_density_memory = get_response_fock_xc_density_memory(
+            molecule, ao_basis, dft_dict, self.xcfun if self._dft else None,
+            self.xc_screening_threshold)
+
+        return get_ri_density_memory(n_ao, n_matrices, n_factor_columns,
+                                     n_sliced, xc_density_memory)
+
+    def _slice_batch_factors(self, dens_factors, batch_ind, batch_start,
+                             batch_end, batch_size_second_order,
+                             second_order_dens):
+        """
+        Cuts the RI-JK factors of one batch from the factors of every density
+        of a build, in the shape they were given in. Called on the master
+        only.
+
+        :param dens_factors:
+            The factors of the whole set: a tuple, or for a cubic mode with a
+            functional a dictionary of the 'second' and 'third' sets.
+        :param batch_ind:
+            The index of the batch.
+        :param batch_start:
+            The first density of the batch.
+        :param batch_end:
+            The density past the last of the batch.
+        :param batch_size_second_order:
+            The second-order densities of a batch of a cubic mode with a
+            functional, or None.
+        :param second_order_dens:
+            The second-order densities, whose columns the 'second' set
+            follows.
+
+        :return:
+            The factors of the batch.
+        """
+
+        # NOTE: two shapes of factors are taken. A two-time perturbed
+        # calculation hands the factors of its densities directly, as a tuple,
+        # and so does a three-time one without a functional, which joins its
+        # two-time and three-time densities into one array cut with one stride.
+        # A three-time one with a functional hands a dictionary of two sets,
+        # because its batch holds the two-time densities followed by the
+        # three-time ones, cut from two arrays with strides of their own and
+        # carrying two different block structures between them.
+        if not isinstance(dens_factors, dict):
+            return ri_jk_slice_factors(dens_factors, batch_start,
+                                              batch_end)
+
+        batch_factors = {
+            'third':
+                ri_jk_slice_factors(dens_factors['third'], batch_start,
+                                           batch_end)
+        }
+
+        second = dens_factors.get('second')
+
+        if second is not None:
+            # NOTE: the two-time densities are in the batch of a three-time
+            # calculation only when there is a functional to integrate, and the
+            # stride they are cut with is formed only there. Factors for them
+            # without it is a caller which has got the two cases the wrong way
+            # round, and is said so rather than left to fail inside the
+            # arithmetic.
+            assert_msg_critical(
+                batch_size_second_order is not None,
+                f'{type(self).__name__}: factors for the two-time ' +
+                'densities were given where the batch holds none')
+
+            # NOTE: the stride of the two-time array, formed the same way the
+            # densities were cut from it.
+            first_two = batch_size_second_order * batch_ind
+            last_two = min(first_two + batch_size_second_order,
+                           second_order_dens.shape(1))
+
+            batch_factors['second'] = ri_jk_slice_factors(
+                second, first_two, last_two)
+
+        return batch_factors
+
+    def _get_nonlinear_fock_modes(self):
+        """
+        Gets the modes of the nonlinear Fock builds (_comp_nlr_fock) this
+        driver makes. A driver which forms RI-JK B vectors returns its own.
+
+        :return:
+            A tuple of modes, empty here.
+        """
+
+        return ()
+
+    def _set_ri_reserve_floor(self, molecule, basis, scf_results):
+        """
+        Sets the memory each rank keeps back from the RI-JK B vectors or the
+        RI-J integrals for the smallest batch of this driver's nonlinear Fock
+        builds, in bytes (_ri_reserve_floor). Every rank must call this,
+        before either is set up.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_results:
+            The dictionary of results from the converged SCF.
+
+        .. note::
+            With a functional a batch is one group of densities at least
+            (_get_dft_group_sizes), whatever the memory, as the
+            exchange-correlation integration takes a group at once; without
+            one it is one density. The memory is what _comp_two_el_int is
+            charged for those densities: the master's matrices of each
+            density (_ri_density_memory) and the exchange-correlation memory
+            of a call. With RI-JK each density also has right factors of the
+            general shape, max(norb, 2 nocc) columns, and a call the left
+            factors (n_ao by norb); RI-J builds take no factors. The largest
+            over the driver's modes is kept.
+        """
+
+        self._ri_reserve_floor = 0
+
+        modes = self._get_nonlinear_fock_modes()
+
+        # NOTE: the same conditions as the setups in _init_eri.
+        asks_ri_coulomb = (self.ri_coulomb and self._dft and
+                           self.xcfun is not None and
+                           not self.xcfun.is_hybrid())
+        asks_ri_jk = self.ri_jk and not asks_ri_coulomb
+
+        if not ((asks_ri_coulomb or asks_ri_jk) and not self._ri_fallback and
+                modes):
+            return
+
+        # NOTE: a grid made for this and let go; the one the builds integrate
+        # on is made later by the driver. The largest boxes of the grid set
+        # the exchange-correlation memory.
+        dft_dict = self._init_dft(molecule, scf_results)
+
+        floor = None
+
+        if self.rank == mpi_master():
+            n_ao, n_orb = scf_results['C_alpha'].shape
+            nocc = molecule.number_of_alpha_electrons()
+
+            if asks_ri_jk:
+                columns = max(n_orb, 2 * nocc)
+                left_memory = 8 * n_ao * n_orb
+            else:
+                columns = 0
+                left_memory = 0
+
+            call_memory = get_response_fock_xc_call_memory(
+                molecule, basis, dft_dict, self.xcfun if self._dft else None,
+                False, self.xc_screening_threshold)
+
+            floor = 0
+
+            for mode in modes:
+                mode_is_cubic = mode in _CUBIC_MODES
+
+                if self._dft:
+                    _, size_2, size_3 = self._get_dft_group_sizes(mode)
+                    n_fock = size_2 + (size_3 if mode_is_cubic else 0)
+                else:
+                    n_fock = 1
+
+                density_memory = self._ri_density_memory(
+                    molecule, basis, dft_dict, n_ao, mode, mode_is_cubic,
+                    columns)
+
+                floor = max(
+                    floor,
+                    int(n_fock * density_memory) + call_memory + left_memory)
+
+        self._ri_reserve_floor = self.comm.bcast(floor, root=mpi_master())
+
+    def _get_dft_group_sizes(self, mode):
+        """
+        Gets the sizes of a group of densities a nonlinear Fock build with a
+        functional takes together, which its batches are made of.
+
+        :param mode:
+            The mode for densities in quadratic/cubic response.
+
+        :return:
+            The first-order, second-order and third-order densities of a group;
+            None for the third-order ones of a quadratic mode.
+        """
+
+        size_3 = None
+
+        if mode.lower() == 'crf':
+            # 6 first-order densities per frequency triple
+            # 6 second-order densities per frequency triple
+            # 2 third-order densities per frequency triple
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities in cubicresponsedriver
+            size_1, size_2, size_3 = 6, 6, 2
+
+        elif mode.lower() == 'tpa':
+            # 12 first-order densities per frequency
+            # 24 second-order densities per frequency
+            # 6 third-order densities per frequency
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities in tpafulldriver
+            size_1, size_2, size_3 = 12, 24, 6
+
+        elif mode.lower() == 'thg':
+            # 6 first-order densities per frequency
+            # 12 second-order densities per frequency
+            # 6 third-order densities per frequency
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities in thgdriver
+            size_1, size_2, size_3 = 6, 12, 6
+
+        elif mode.lower() == 'thgred':
+            # 3 first-order densities per frequency
+            # 6 second-order densities per frequency
+            # 3 third-order densities per frequency
+            # see get_densities in thgreddriver
+            size_1, size_2, size_3 = 3, 6, 3
+
+        elif mode.lower() == '3pa':
+            # 4 first-order densities per frequency
+            # 9 second-order densities per frequency
+            # 6 third-order densities per frequency
+            # see get_densities in threepatransitiondriver
+            size_1, size_2, size_3 = 4, 9, 6
+
+        elif mode.lower() == 'crf_ii':
+            # 12 first-order densities per frequency triple
+            # 2 second-order densities per frequency triple
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities_II in cubicresponsedriver
+            size_1, size_2 = 12, 2
+
+        elif mode.lower() == '3pa_ii':
+            # 13 first-order densities per frequency
+            # 6 second-order densities per frequency
+            # see get_densities_II in threepatransitiondriver
+            size_1, size_2 = 13, 6
+
+        elif mode.lower() == 'tpa_ii':
+            # 36 first-order densities per frequency
+            # 6 second-order densities per frequency
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities_II in tpafulldriver
+            size_1, size_2 = 36, 6
+
+        elif mode.lower() == 'thg_ii':
+            # 18 first-order densities per frequency
+            # 6 second-order densities per frequency
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities_II in thgdriver
+            size_1, size_2 = 18, 6
+
+        elif mode.lower() == 'thgred_ii':
+            # 9 first-order densities per frequency
+            # 3 second-order densities per frequency
+            # see get_densities_II in thgreddriver
+            size_1, size_2 = 9, 3
+
+        elif mode.lower() == 'redtpa_i':
+            # 6 first-order densities per frequency
+            # 6 second-order densities per frequency
+            # the real and the imaginary parts of each complex first-order
+            # density count as two, and the second-order densities are real;
+            # see get_densities in tpareddriver
+            size_1, size_2 = 6, 6
+
+        elif mode.lower() == 'redtpa_ii':
+            # 18 first-order densities per frequency
+            # 6 second-order densities per frequency
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities_II in tpareddriver
+            size_1, size_2 = 18, 6
+
+        elif mode.lower() == 'qrf':
+            # 4 first-order densities per frequency pair, or per frequency
+            # in excitedstatemomentdriver
+            # 2 second-order densities per frequency pair, or per frequency
+            # in excitedstatemomentdriver
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities in quadraticresponsedriver
+            # and in excitedstatemomentdriver
+            size_1, size_2 = 4, 2
+
+        elif mode.lower() == 'shg':
+            # 6 first-order densities per frequency
+            # 12 second-order densities per frequency
+            # the real and the imaginary parts of each complex density count
+            # as two; see get_densities in shgdriver
+            size_1, size_2 = 6, 12
+
+        elif mode.lower() == 'shg_red':
+            # 6 first-order densities per frequency
+            # 6 second-order densities per frequency
+            # the real and the imaginary parts of each complex first-order
+            # density count as two, and the second-order densities are real;
+            # see get_densities in shgdriver
+            size_1, size_2 = 6, 6
+
+        elif mode.lower() == 'tpa_quad':
+            # 5 first-order densities per frequency
+            # 4 second-order densities per frequency
+            # see get_densities in tpatransitiondriver
+            size_1, size_2 = 5, 4
+
+        else:
+            assert_msg_critical(
+                False, 'NonlinearSolver: Cannot get sizes for mode ' +
+                mode.lower())
+
+        return size_1, size_2, size_3
+
     def _comp_two_el_int(self,
                          mo,
                          molecule,
@@ -452,7 +1041,8 @@ class NonlinearSolver:
                          second_order_dens,
                          third_order_dens,
                          mode,
-                         profiler=None):
+                         profiler=None,
+                         dens_factors=None):
         """
         Computes the two-electron (HF) and Vxc part of the two and three-time
         perturbed Fock matrices.
@@ -500,7 +1090,7 @@ class NonlinearSolver:
         assert_msg_critical(mode_is_valid,
                             'NonlinearSolver: Invalid mode ' + mode.lower())
 
-        mode_is_cubic = mode.lower() in ['crf', 'tpa', '3pa', 'thg', 'thgred']
+        mode_is_cubic = mode.lower() in _CUBIC_MODES
         mode_is_quadratic = mode.lower() in [
             'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf', 'shg',
             'shg_red', 'tpa_quad', '3pa_ii', 'thg_ii', 'thgred_ii'
@@ -522,7 +1112,63 @@ class NonlinearSolver:
         elif mode_is_quadratic:
             n_total = second_order_dens.shape(1)
 
-        batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
+        density_memory = None
+
+        # NOTE: set below only for a cubic mode with a functional, whose
+        # second-order densities are cut with a stride of their own.
+        batch_size_second_order = None
+
+        # NOTE: without factors from the caller, use_ri_jk below is false and
+        # the build takes the four-center integrals, and
+        # get_four_center_batch_size as the four-center builds of the linear
+        # and CPHF solvers. The factors are handed on the master rank alone,
+        # so the master decides.
+        ri_build = None
+
+        if self.rank == mpi_master():
+            ri_build = (self._uses_ri_coulomb() or
+                        (self._uses_ri_jk() and dens_factors is not None))
+
+        ri_build = self.comm.bcast(ri_build, root=mpi_master())
+
+        # NOTE: the exchange-correlation integration holds this once for each
+        # build, whatever the number of its densities; both kinds of build
+        # take it off the room. The nonlinear exchange-correlation
+        # integrations are closed-shell only (see
+        # XCIntegrator.integrateKxcFock).
+        call_memory = None
+
+        # NOTE: the factors the caller hands over are those of every density
+        # of the build, held on the master. Every rank is sent the factors of
+        # one batch at a time below: the right factors of its densities, which
+        # are counted with each density, and the left factors they share,
+        # which are taken off the room with the exchange-correlation memory.
+        # The master's whole set is resident when the room is read. The
+        # pickled copy a broadcast holds while it runs is not counted.
+        left_memory = 0
+        factor_columns = 0
+
+        if self.rank == mpi_master():
+            left_memory, factor_columns = _factor_sizes(dens_factors)
+
+            call_memory = get_response_fock_xc_call_memory(
+                molecule, ao_basis, dft_dict,
+                self.xcfun if self._dft else None, False,
+                self.xc_screening_threshold) + left_memory
+
+        if ri_build:
+            if self.rank == mpi_master():
+                density_memory = self._ri_density_memory(
+                    molecule, ao_basis, dft_dict, n_ao, mode, mode_is_cubic,
+                    factor_columns)
+
+            batch_size = get_ri_batch_size(self.batch_size, n_total, n_ao,
+                                           density_memory, self.comm,
+                                           call_memory)
+        else:
+            batch_size = get_four_center_batch_size(self.batch_size, n_total,
+                                                    n_ao, self.comm,
+                                                    call_memory)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         # double-check batch size for DFT
@@ -531,99 +1177,7 @@ class NonlinearSolver:
 
             if self.rank == mpi_master():
 
-                if mode.lower() == 'crf':
-                    # 6 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    # 2 third-order densities per frequency
-                    size_1, size_2, size_3 = 6, 6, 2
-
-                elif mode.lower() == 'tpa':
-                    # 12 first-order densities per frequency
-                    # 24 second-order densities per frequency
-                    # 6 third-order densities per frequency
-                    size_1, size_2, size_3 = 12, 24, 6
-
-                elif mode.lower() == 'thg':
-                    # 12 first-order densities per frequency
-                    # 24 second-order densities per frequency
-                    # 6 third-order densities per frequency
-                    size_1, size_2, size_3 = 6, 12, 6
-
-                elif mode.lower() == 'thgred':
-                    # 12 first-order densities per frequency
-                    # 24 second-order densities per frequency
-                    # 6 third-order densities per frequency
-                    size_1, size_2, size_3 = 3, 6, 3
-
-                elif mode.lower() == '3pa':
-                    # 4 first-order densities per frequency
-                    # 9 second-order densities per frequency
-                    # 6 third-order densities per frequency
-                    size_1, size_2, size_3 = 4, 9, 6
-
-                elif mode.lower() == 'crf_ii':
-                    # 12 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 12, 2
-
-                elif mode.lower() == '3pa_ii':
-                    # 13 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 13, 6
-
-                elif mode.lower() == 'tpa_ii':
-                    # 36 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 36, 6
-
-                elif mode.lower() == 'thg_ii':
-                    # 36 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 18, 6
-
-                elif mode.lower() == 'thgred_ii':
-                    # 36 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 9, 3
-
-                elif mode.lower() == 'redtpa_i':
-                    # 6 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 6, 6
-
-                elif mode.lower() == 'redtpa_ii':
-                    # 18 first-order densities per frequency
-                    # 6 second-order densities per frequency
-                    size_1, size_2 = 18, 6
-
-                elif mode.lower() == 'qrf':
-                    # 4 first-order densities per frequency
-                    # 2 second-order densities per frequency
-                    # see get_densities in quadraticresponsedriver
-                    size_1, size_2 = 4, 2
-
-                elif mode.lower() == 'shg':
-                    # 6 first-order densities per frequency
-                    # 12 second-order densities per frequency
-                    # see get_densities in shgdriver
-                    size_1, size_2 = 6, 12
-
-                elif mode.lower() == 'shg_red':
-                    # 6 first-order densities
-                    # 6 second-order densities
-                    # see get_densities in shgdriver
-                    size_1, size_2 = 6, 6
-
-                elif mode.lower() == 'tpa_quad':
-                    # 5 first-order densities
-                    # 4 second-order densities
-                    # see get_densities in shgdriver
-                    size_1, size_2 = 5, 4
-
-                else:
-                    assert_msg_critical(
-                        False, 'NonlinearSolver: Cannot get sizes for mode ' +
-                        mode.lower())
+                size_1, size_2, size_3 = self._get_dft_group_sizes(mode)
 
                 if mode_is_cubic:
                     batch_size = max((batch_size // (size_2 + size_3)) * size_3,
@@ -669,6 +1223,30 @@ class NonlinearSolver:
             if mode_is_cubic:
                 batch_size_second_order = self.comm.bcast(
                     batch_size_second_order, root=mpi_master())
+
+        # NOTE: the densities whose Fock matrices a batch builds, once a batch
+        # with a functional is rounded to whole groups: the second- and
+        # third-order ones of a cubic mode, the others of a quadratic mode.
+        if density_memory is not None:
+            if self._dft and mode_is_cubic:
+                fock_densities = batch_size + batch_size_second_order
+            else:
+                fock_densities = batch_size
+            self._note_ri_batch_memory(density_memory,
+                                       min(fock_densities, n_total),
+                                       left_memory)
+
+        # NOTE: **the factors are broadcast as the densities are.** They are built
+        # on the master rank alone, and the response driver sweeps only the share
+        # of the auxiliary basis each rank holds, so every rank has to take the
+        # fitted path for the shares to add up. A rank which found none would take
+        # `use_ri_jk` to be false and build its share of the densities the four
+        # centre way instead, and the reduction below would add that four centre
+        # share to the fitted shares of the other ranks. What came back would be a
+        # Fock matrix of neither method. Whether there are factors is broadcast
+        # here, and the factors of each batch with its densities below.
+        factors_given = self.comm.bcast(dens_factors is not None,
+                                        root=mpi_master())
 
         # go through batches
 
@@ -830,6 +1408,19 @@ class NonlinearSolver:
             for idx in range(num_dts3):
                 dts3[idx] = self.comm.bcast(dts3[idx], root=mpi_master())
 
+            # NOTE: the factors of this batch and not of the whole set, cut from
+            # the same columns as the densities above.
+            batch_factors = None
+
+            if factors_given:
+                if self.rank == mpi_master():
+                    batch_factors = self._slice_batch_factors(
+                        dens_factors, batch_ind, batch_start, batch_end,
+                        batch_size_second_order, second_order_dens)
+
+                batch_factors = self.comm.bcast(batch_factors,
+                                                root=mpi_master())
+
             if self._dft:
                 if mode_is_quadratic:
                     dts_for_fock = dts2
@@ -871,26 +1462,74 @@ class NonlinearSolver:
 
             fock_arrays = []
 
-            for idx in range(len(dts_for_fock)):
+            # NOTE: the resolution of the identity takes the whole batch at once,
+            # as the shared factor is transformed once for all of it, so it
+            # replaces the loop rather than sitting inside it.
+            # NOTE: the factors are a tuple or a dictionary of two sets (see
+            # _slice_batch_factors).
+            factors_are_split = isinstance(batch_factors, dict)
+
+            # NOTE: the simd Coulomb only driver takes the whole batch too: every
+            # density is fitted against the same integrals, and the right hand sides
+            # of the fittings are gathered and reduced in one collective rather than
+            # one for each density.
+            use_ri_coulomb = (self._uses_ri_coulomb() and fock_type == 'j')
+
+            use_ri_jk = (self._uses_ri_jk() and fock_type != 'j' and
+                         batch_factors is not None and
+                         (mode_is_quadratic or mode_is_cubic))
+
+            # NOTE: a hybrid range-separated functional has its attenuated
+            # exchange subtracted inside the same call, in the same pass over the
+            # auxiliary basis. The four-centre correction further down is not
+            # reached for this path at all: it sits inside the loop over the
+            # densities, and that loop runs zero times here. The coefficient is
+            # passed to every one of the calls below, as a batch which took it in
+            # one group and not another would be missing the long-range term of
+            # half its densities and say nothing about it.
+            erf_k_factor = erf_k_coef if need_omega else 0.0
+
+            if use_ri_coulomb:
+                fock_arrays = ri_j_coulomb_matrices(
+                    self, dts_for_fock, self.comm)
+
+            elif use_ri_jk:
+                if not factors_are_split:
+                    fock_arrays = ri_jk_fock_matrices(
+                        self, ao_basis, batch_factors, fock_k_factor,
+                        erf_k_factor)
+                else:
+                    # NOTE: the two groups in the order dts_for_fock puts them,
+                    # the two-time densities first. They are built apart because
+                    # they are block diagonal where the three-time ones live
+                    # between the occupied orbitals and the virtual ones, and a
+                    # Fock matrix does not depend on the densities beside it, so
+                    # two batches laid end to end are the batch.
+                    fock_arrays = []
+
+                    second = batch_factors.get('second')
+
+                    if second is not None:
+                        fock_arrays += ri_jk_fock_matrices(
+                            self, ao_basis, second, fock_k_factor,
+                            erf_k_factor)
+
+                    fock_arrays += ri_jk_fock_matrices(
+                        self, ao_basis, batch_factors['third'],
+                        fock_k_factor, erf_k_factor)
+
+            for idx in range(0 if (use_ri_jk or use_ri_coulomb) else len(dts_for_fock)):
                 if self.ri_coulomb:
                     assert_msg_critical(
                         fock_type == 'j',
                         'NonlinearSolver: RI is only applicable to pure DFT functional'
                     )
 
-                if self.ri_coulomb and fock_type == 'j':
-                    # symmetrize density for RI-J
-                    den_mat_for_ri_j = make_matrix(ao_basis, mat_t.symmetric)
-                    den_mat_for_ri_j.set_values(
-                        0.5 * (dts_for_fock[idx] + dts_for_fock[idx].T))
+                den_mat = make_matrix(ao_basis, mat_t.general)
+                den_mat.set_values(dts_for_fock[idx])
 
-                    fock_mat = self._ri_drv.compute(den_mat_for_ri_j, 'j')
-                else:
-                    den_mat = make_matrix(ao_basis, mat_t.general)
-                    den_mat.set_values(dts_for_fock[idx])
-
-                    fock_mat = fock_drv.compute(screening, den_mat, fock_type,
-                                                fock_k_factor, 0.0, thresh_int)
+                fock_mat = fock_drv.compute(screening, den_mat, fock_type,
+                                            fock_k_factor, 0.0, thresh_int)
 
                 fock_np = fock_mat.to_numpy()
                 fock_mat = Matrix()
@@ -916,6 +1555,11 @@ class NonlinearSolver:
                 t0 = tm.time()
 
                 xc_drv = XCIntegrator()
+
+                if self.xc_screening_threshold is not None:
+                    xc_drv.set_screening_threshold(
+                        self.xc_screening_threshold)
+
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 
@@ -1084,10 +1728,6 @@ class NonlinearSolver:
         cur_str = 'Damping Parameter               : {:.6e}'.format(
             self.damping)
         self.ostream.print_header(cur_str.ljust(width))
-
-        if self.ri_coulomb:
-            cur_str = 'Resolution of the Identity      : RI-J'
-            self.ostream.print_header(cur_str.ljust(width))
 
         if self._dft:
             cur_str = 'Exchange-Correlation Functional : '

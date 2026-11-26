@@ -34,8 +34,11 @@
 
 #include <omp.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <functional>
+#include <utility>
 #include <vector>
 
 #include "DenseMatrix.hpp"
@@ -52,7 +55,7 @@
 
 CXCIntegrator::CXCIntegrator()
 
-    : _screeningThresholdForGTOValues(1.0e-12)
+    : _screeningThresholdForGTOValues(1.0e-10)
 {
 }
 
@@ -361,6 +364,101 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&                  aoFockMatrix
 
         errors::assertMsgCritical(false, errxcfuntype);
     }
+}
+
+auto
+CXCIntegrator::getLargestBoxAOCountsForResponseFockXC(const CMolecule&       molecule,
+                                                      const CMolecularBasis& basis,
+                                                      const CMolecularGrid&  molecularGrid,
+                                                      const CXCFunctional&   fvxc,
+                                                      const int              count) const -> std::vector<int>
+{
+    const auto boxes = getLargestBoxesForResponseFockXC(molecule, basis, molecularGrid, fvxc, count);
+
+    std::vector<int> aocounts;
+
+    aocounts.reserve(boxes.size());
+
+    for (const auto& [aocount, npoints] : boxes)
+    {
+        aocounts.push_back(aocount);
+    }
+
+    return aocounts;
+}
+
+auto
+CXCIntegrator::getLargestBoxesForResponseFockXC(const CMolecule&       molecule,
+                                                const CMolecularBasis& basis,
+                                                const CMolecularGrid&  molecularGrid,
+                                                const CXCFunctional&   fvxc,
+                                                const int              count) const -> std::vector<std::pair<int, int>>
+{
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    // NOTE: integrateFxcFock, integrateKxcFock and integrateKxcLxcFock call
+    // prescr::preScreenGtoBlock with gtoDeriv 0 for LDA and 1 for GGA and
+    // meta-GGA, and gtoThreshold _screeningThresholdForGTOValues. This function
+    // passes the same, so that it counts the functions they keep. If one of them
+    // passes another gtoDeriv, this function has to pass the same, or its counts
+    // are not what that integration holds.
+    int gto_deriv = 0;
+
+    if (xcfuntype == xcfun::lda)
+    {
+        gto_deriv = 0;
+    }
+    else if (xcfuntype == xcfun::gga)
+    {
+        gto_deriv = 1;
+    }
+    else if (xcfuntype == xcfun::mgga)
+    {
+        gto_deriv = 1;
+    }
+    else
+    {
+        errors::assertMsgCritical(false, std::string("XCIntegrator.getLargestBoxesForResponseFockXC: Only implemented for LDA/GGA/meta-GGA"));
+    }
+
+    const auto gto_blocks = gtofunc::make_gto_blocks(basis, molecule);
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+    auto ycoords = molecularGrid.getCoordinatesY();
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    const auto n_boxes = static_cast<int>(counts.size());
+
+    std::vector<std::pair<int, int>> boxes(n_boxes, {0, 0});
+
+#pragma omp parallel for schedule(dynamic)
+    for (int box_id = 0; box_id < n_boxes; box_id++)
+    {
+        auto boxdim = prescr::getGridBoxDimension(displacements[box_id], counts[box_id], xcoords, ycoords, zcoords);
+
+        int aocount = 0;
+
+        for (const auto& gto_block : gto_blocks)
+        {
+            auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(gto_block, gto_deriv, _screeningThresholdForGTOValues, boxdim);
+
+            aocount += static_cast<int>(pre_ao_inds.size());
+        }
+
+        boxes[box_id] = {aocount, counts[box_id]};
+    }
+
+    const auto n_largest = std::min(std::max(count, 0), n_boxes);
+
+    std::partial_sort(boxes.begin(), boxes.begin() + n_largest, boxes.end(), std::greater<std::pair<int, int>>());
+
+    boxes.resize(n_largest);
+
+    return boxes;
 }
 
 auto

@@ -4,6 +4,9 @@ from pathlib import Path
 
 from veloxchem.molecule import Molecule
 from veloxchem.evbdriver import EvbDriver
+from veloxchem.reactionmatcher import ReactionMatcher
+from veloxchem.outputstream import OutputStream
+from veloxchem.errorhandler import VeloxChemError
 
 try:
     import openmm
@@ -215,3 +218,30 @@ class TestReactionMatcher:
         # Input is one-indexed, but inner representation is zero-indexed
         assert breaking_bonds == {(1, 99)}
         assert forming_bonds == {(42, 99), (36, 101)}
+
+    def test_hydrogen_reduction(self):
+        # SN2 on decyl chloride, large enough for the hydrogens to be reduced into their parent atoms
+        rea = Molecule.read_smiles('CCCCCCCCCCCl.[OH-]')
+        pro = Molecule.read_smiles('CCCCCCCCCCO.[Cl-]')
+
+        rm = ReactionMatcher(ostream=OutputStream(None))
+        rm.force_hydrogen_inclusion = False
+        mapping, breaking_bonds, forming_bonds = rm.get_mapping(rea, pro)
+
+        n_atoms = rea.number_of_atoms()
+        assert len(mapping) == n_atoms
+        assert sorted(mapping.values()) == list(range(n_atoms))
+        rea_elems = rea.get_element_ids()
+        pro_elems = pro.get_element_ids()
+        assert all(rea_elems[i] == pro_elems[j] for i, j in mapping.items())
+        assert breaking_bonds == {(9, 10)}
+        assert forming_bonds == {(9, 32)}
+
+    def test_time_limit(self):
+        rea = Molecule.read_smiles('CCCCCCCCCCCl.[OH-]')
+        pro = Molecule.read_smiles('CCCCCCCCCCO.[Cl-]')
+
+        rm = ReactionMatcher(ostream=OutputStream(None))
+        rm.max_time = 0
+        with pytest.raises(VeloxChemError, match='time limit'):
+            rm.get_mapping(rea, pro)

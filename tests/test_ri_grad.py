@@ -20,9 +20,9 @@ class TestScfGradientDriverWithRI:
         bas = MolecularBasis.read(mol, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = True
         scf_drv.ostream.mute()
         scf_drv.xcfun = xcfun_label
-        scf_drv.ri_coulomb = True
         scf_results = scf_drv.compute(mol, bas)
 
         scf_grad_drv = ScfGradientDriver(scf_drv)
@@ -33,6 +33,7 @@ class TestScfGradientDriverWithRI:
             assert abs(ref_scf_energy - scf_results['scf_energy']) < tol_energy
             assert np.max(np.abs(ref_scf_grad - grad)) < tol_grad
 
+    @pytest.mark.timeconsuming
     def test_ri_blyp(self):
 
         mol_xyz = """24

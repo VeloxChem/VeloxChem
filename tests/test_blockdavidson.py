@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from veloxchem.blockdavidson import BlockDavidsonSolver
+from veloxchem.linearsolver import LinearSolver
 
 
 @pytest.mark.solvers
@@ -173,3 +174,81 @@ class TestBlockDavidsonSolver:
         assert solver.reduced_space_size() == 2
         assert new_trials.shape[0] == trial_mat.shape[0]
         assert np.all(np.isfinite(new_trials))
+
+    def test_num_refined_roots(self):
+
+        get_nroots = LinearSolver._get_num_refined_roots
+
+        ritz = np.array([0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70])
+
+        # no near-degeneracy above the last extra root
+        assert get_nroots(ritz, 2, 2, 1.0e-3, 2) == 4
+        assert get_nroots(ritz, 2, 0, 1.0e-3, 2) == 2
+
+        # fewer Ritz values than requested plus extra roots
+        assert get_nroots(ritz[:3], 2, 2, 1.0e-3, 2) == 3
+
+        # near-degenerate roots above the last extra root
+        ritz = np.array([0.10, 0.20, 0.30, 0.40, 0.4005, 0.4009, 0.4012])
+        assert get_nroots(ritz, 2, 2, 1.0e-3, 2) == 6
+        assert get_nroots(ritz, 2, 2, 1.0e-3, 1) == 5
+        assert get_nroots(ritz, 2, 2, 1.0e-4, 2) == 4
+
+    def test_extra_roots_refined_but_not_reported(self):
+
+        amat_not_used, diag_mat, trial_mat, sigma_mat = (
+            self.build_diagonal_problem())
+
+        solver = BlockDavidsonSolver(num_extra_roots=1)
+        solver.add_iteration_data(sigma_mat, trial_mat, 2)
+        solver.comp_residual_vectors()
+
+        reference = BlockDavidsonSolver()
+        reference.add_iteration_data(sigma_mat, trial_mat, 2)
+        reference.comp_residual_vectors()
+
+        assert solver.residual_matrices.shape[1] == 3
+        assert solver.ritz_vectors.shape[1] == 2
+        assert solver.residual_eigs.shape[0] == 2
+        assert solver.residual_norms.shape[0] == 2
+        assert np.allclose(solver.residual_eigs, reference.residual_eigs)
+        assert np.allclose(solver.residual_norms, reference.residual_norms)
+        assert solver._get_collapse_nvec() == 4
+
+        new_trials = solver.comp_trial_vectors(diag_mat)
+        assert new_trials.shape[1] == 3
+
+    def test_converged_roots_receive_no_trial_vectors(self):
+
+        amat = np.diag(np.array([1.0, 2.0, 4.0, 5.0, 7.0, 8.0]))
+        diag_mat = np.diag(amat)
+
+        # the first trial vector is the eigenvector of the lowest root, which
+        # therefore has a zero residual
+        trial_mat = np.zeros((6, 2))
+        trial_mat[0, 0] = 1.0
+        trial_mat[1, 1] = 1.0 / np.sqrt(2.0)
+        trial_mat[3, 1] = 1.0 / np.sqrt(2.0)
+        sigma_mat = np.matmul(amat, trial_mat)
+
+        solver = BlockDavidsonSolver(conv_thresh=1.0e-8)
+        solver.add_iteration_data(sigma_mat, trial_mat, 2)
+        solver.comp_residual_vectors()
+
+        assert np.allclose(solver.residual_eigs, [1.0, 3.5])
+        assert solver.residual_norms[0] < 1.0e-14
+        assert not solver.check_convergence(1.0e-8)
+
+        new_trials = solver.comp_trial_vectors(diag_mat)
+
+        # only the second root receives a trial vector
+        assert new_trials.shape[1] == 1
+        ref_trial = solver.residual_matrices[:, 1] / (3.5 - diag_mat)
+        ref_trial /= np.linalg.norm(ref_trial)
+        assert np.allclose(new_trials[:, 0], ref_trial)
+
+        # with all roots converged, no trial vector is left
+        solver.conv_thresh = 10.0
+        assert solver.comp_trial_vectors(diag_mat).shape[1] == 0
+        assert solver.project_trial_vectors(
+            solver.comp_trial_vectors(diag_mat)).shape[1] == 0

@@ -9,6 +9,19 @@ CXX := clang++
 CXX_REL_FLG := -std=c++20 -O3 -Xpreprocessor -fopenmp -march=native -Wall
 CXX_DEB_FLG := -std=c++20 -O3 -Xpreprocessor -fopenmp -march=native -Wall -g 
 
+# Vector math library, so that the vectorizer replaces the scalar math calls of
+# the integral kernels, the exponential above all, with their vector
+# counterparts. Apple systems carry them in libsystem_m, glibc in libmvec.
+
+ifeq ($(shell uname -s),Darwin)
+VECLIB_FLG := -fveclib=Darwin_libsystem_m
+else
+VECLIB_FLG := -fveclib=libmvec
+endif
+
+CXX_REL_FLG += $(VECLIB_FLG)
+CXX_DEB_FLG += $(VECLIB_FLG)
+
 # Generic preprocessor flags
 
 CPP_REL_FLG := 
@@ -30,34 +43,55 @@ CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 
 # OpenMP interface
 
-OPENMP_INC := -I /opt/homebrew/Cellar/libomp/21.1.6/include 
-OPENMP_LD  := -L /opt/homebrew/Cellar/libomp/21.1.6/lib -lomp
+OPENMP_INC := -I /opt/homebrew/opt/libomp/include
+OPENMP_LD  := -L /opt/homebrew/opt/libomp/lib -lomp
 
 CXX_REL_FLG += $(OPENMP_INC)
 CXX_DEB_FLG += $(OPENMP_INC)
 
 # LibXC interface
 
-LIBXC_INC := -I /opt/libxc/include
-LIBXC_LD  := -L /opt/libxc/lib -lxc
+LIBXC_INC := -I /Users/rinkevic/Development/Libraries/libxc/include
+LIBXC_LD  := -L /Users/rinkevic/Development/Libraries/libxc/lib -lxc -Wl,-rpath,/Users/rinkevic/Development/Libraries/libxc/lib
 
 CXX_REL_FLG += $(LIBXC_INC)
 CXX_DEB_FLG += $(LIBXC_INC)
 
 # Boost interface
 
-LIBBST_INC := -I /opt/homebrew/Cellar/boost/1.90.0_1/include
-LIBBST_LD  := -L /opt/homebrew/Cellar/boost/1.90.0_1/lib -lboost_math_c99
+LIBBST_INC := -I /opt/homebrew/opt/boost/include
+LIBBST_LD  := -L /opt/homebrew/opt/boost/lib -lboost_math_c99
 
 CXX_REL_FLG += $(LIBBST_INC)
 CXX_DEB_FLG += $(LIBBST_INC)
 
 # Eigen interface
 
-EIGEN_INC := -I /Users/rinkevic/Development/Libraries/Eigen
+EIGEN_INC := -I /opt/homebrew/opt/eigen/include/eigen3
 
 CXX_REL_FLG += $(EIGEN_INC)
 CXX_DEB_FLG += $(EIGEN_INC)
+
+# Math library interface
+#
+# The hardware specific math library provides the dense linear algebra, such as
+# the Cholesky factorization used to invert the packed matrices. It is selected
+# per platform below: Accelerate on macOS, and MKL or OpenBLAS elsewhere, whose
+# link line is set by the person building the code.
+#
+# Defining VLX_USE_MATHLIB is what selects it. When no math library is set the
+# define is absent and the Eigen implementation is compiled in its place, so a
+# machine without one needs no further change.
+
+UNAME_S := $(shell uname -s)
+
+ifeq ($(UNAME_S),Darwin)
+  MATH_LD  := -framework Accelerate
+  MATH_FLG := -DVLX_USE_MATHLIB -DACCELERATE_NEW_LAPACK
+endif
+
+CXX_REL_FLG += $(MATH_FLG)
+CXX_DEB_FLG += $(MATH_FLG)
 
 # Native shell commands
 

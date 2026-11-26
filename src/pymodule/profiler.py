@@ -50,10 +50,14 @@ class Profiler:
         - memory_profiling: The flag for printing memory usage.
         - memory_tracing: The flag for tracing memory allocation using
         - start_time: The starting time.
-        - start_avail_mem: The starting available memory.
         - timing_dict: The dictionary containing information about timing.
         - timing_key: The key for the timing dictionary.
-        - memory_usage: The list containing information about memory usage.
+        - timer_starts: The start times of the running timers, by timing key
+          and label.
+        - memory_usage: The list of tuples with the elapsed time, the
+          resident memory of the current process, the peak resident memory
+          of the current process so far, the total system memory usage, and
+          the remark at each checkpoint.
         - pr: The Profile object.
     """
 
@@ -71,10 +75,10 @@ class Profiler:
         self.memory_tracing = False
 
         self.start_time = None
-        self.start_avail_mem = None
 
         self.timing_dict = None
         self.timing_key = None
+        self.timer_starts = None
 
         self.memory_usage = None
         self.pr = None
@@ -100,10 +104,17 @@ class Profiler:
             self.memory_tracing = settings['memory_tracing']
 
         self.start_time = tm.time()
-        self.start_avail_mem = psutil.virtual_memory().available
 
         self.timing_dict = {}
+        self.timer_starts = {}
         self.memory_usage = []
+
+        if self.memory_profiling:
+            vm = psutil.virtual_memory()
+            proc_mem = psutil.Process().memory_info().rss
+            self.memory_usage.append(
+                (0.0, proc_mem, self.get_peak_memory(),
+                 vm.total - vm.available, 'Profiler starts'))
 
         if self.profiling:
             import cProfile
@@ -114,19 +125,25 @@ class Profiler:
             import tracemalloc
             tracemalloc.start()
 
-    def end(self, ostream, scf_flag=False):
+    def end(self, ostream, comm=None):
         """
         Stops the profiler and print the output.
 
         :param ostream:
             The output stream.
-        :param scf_flag:
-            The flag for SCF.
+        :param comm:
+            The communicator whose ranks the peak memory is gathered over, or
+            None for the rank that prints alone. Every rank of it must call
+            this.
         """
 
-        self.print_timing(ostream, scf_flag)
+        if self.memory_profiling:
+            self.check_memory_usage('Profiler stops')
+
+        self.print_timing(ostream)
         self.print_profiling_summary(ostream)
-        self.print_memory_usage(ostream, scf_flag)
+        self.print_memory_usage(ostream)
+        self.print_peak_memory_over_ranks(ostream, comm)
         self.print_memory_tracing(ostream)
 
     def print_profiling_summary(self, ostream):
@@ -201,7 +218,8 @@ class Profiler:
 
     def start_timer(self, label):
         """
-        Starts the timer for a label.
+        Starts the timer for a label. The times between the starts and stops
+        of a label under one timing key add up.
 
         :param label:
             The label.
@@ -210,7 +228,12 @@ class Profiler:
         key = self.timing_key
 
         if self.timing and (key is not None) and (key in self.timing_dict):
-            self.timing_dict[key][label] = tm.time()
+            # NOTE: the entry is made at the start, as the columns of the
+            # timing table follow the order in which labels enter timing_dict,
+            # and a label such as 'total' is started first and stopped last.
+            if label not in self.timing_dict[key]:
+                self.timing_dict[key][label] = 0.0
+            self.timer_starts[(key, label)] = tm.time()
 
     def stop_timer(self, label):
         """
@@ -223,8 +246,8 @@ class Profiler:
         key = self.timing_key
 
         if self.timing and (key is not None) and (key in self.timing_dict):
-            t0 = self.timing_dict[key][label]
-            self.timing_dict[key][label] = tm.time() - t0
+            t0 = self.timer_starts.pop((key, label))
+            self.timing_dict[key][label] += tm.time() - t0
 
     def add_timing_info(self, label, dt):
         """
@@ -243,14 +266,15 @@ class Profiler:
                 self.timing_dict[key][label] = 0.0
             self.timing_dict[key][label] += dt
 
-    def print_timing(self, ostream, scf_flag=False, rank_name=None):
+    def print_timing(self, ostream, rank_name=None):
         """
         Prints timing.
 
         :param ostream:
             The output stream.
-        :param scf:
-            The flag for SCF.
+        :param rank_name:
+            The name of the rank the timing is of, printed in the title, or
+            None.
         """
 
         if self.timing:
@@ -280,8 +304,6 @@ class Profiler:
             ostream.print_header(valstr.ljust(width))
 
             for key, val in self.timing_dict.items():
-                if scf_flag and key.lower() == 'iteration 0':
-                    continue
                 valstr = f'{key:<18s}'
                 for label in labels:
                     if label in val:
@@ -303,42 +325,145 @@ class Profiler:
         """
 
         if self.memory_profiling:
-            avail_mem = psutil.virtual_memory().available
-            used_mem = max(0, self.start_avail_mem - avail_mem)
+            vm = psutil.virtual_memory()
+            proc_mem = psutil.Process().memory_info().rss
+            total_used_mem = vm.total - vm.available
             self.memory_usage.append(
-                (tm.time() - self.start_time, used_mem, remark))
+                (tm.time() - self.start_time, proc_mem,
+                 self.get_peak_memory(), total_used_mem, remark))
 
-    def print_memory_usage(self, ostream, scf_flag=False):
+    @staticmethod
+    def get_peak_memory():
+        """
+        Gets the peak resident memory of the current process so far.
+
+        :return:
+            The peak resident memory in bytes, or the current resident memory
+            where the peak cannot be read.
+        """
+
+        # NOTE: the peak and not only the memory at the moment of a checkpoint.
+        # What a call allocates and frees between two checkpoints shows in no
+        # checkpoint, and that is where the peak of a calculation usually is.
+        current = psutil.Process().memory_info().rss
+
+        try:
+            import resource
+            peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        except (ImportError, OSError):
+            return current
+
+        # ru_maxrss is in kilobytes on Linux and in bytes on macOS
+        peak = peak if sys.platform == 'darwin' else peak * 1024
+
+        # NOTE: the kernel updates the peak lazily, so it can trail the memory
+        # held at the moment by a little.
+        return max(peak, current)
+
+    @staticmethod
+    def reset_peak_memory():
+        """
+        Resets the peak resident memory of the current process to the memory it
+        holds now, so that get_peak_memory reads the peak of what follows.
+
+        :return:
+            True if the peak was reset, and False where it cannot be, as on a
+            system other than Linux.
+        """
+
+        # NOTE: writing 5 to clear_refs resets the high-water mark of the
+        # resident memory the kernel keeps for the process, which ru_maxrss
+        # reads as well. A calculation which follows another, as a gradient
+        # follows its SCF, would otherwise read the earlier calculation's peak as
+        # its own.
+        try:
+            with open('/proc/self/clear_refs', 'w') as f:
+                f.write('5')
+        except OSError:
+            return False
+
+        return True
+
+    def print_memory_usage(self, ostream):
         """
         Prints memory usage.
 
+        The values are sampled at each checkpoint by the rank that prints
+        the table. The 'Process Memory' column is the resident set size
+        (RSS) of that single rank, and the 'Peak Memory' column the largest it
+        has been since the process started, or since reset_peak_memory last
+        reset it, including between checkpoints.
+        The 'System Used' column is the
+        system-wide memory usage of the node on which that rank runs,
+        calculated as total memory minus available memory; it includes all
+        processes on the node (including other MPI ranks) but is not summed
+        across nodes. The first and last rows are recorded when the profiler
+        starts and stops.
+
         :param ostream:
             The output stream.
-        :param scf_flag:
-            The flag for SCF.
         """
 
         if self.memory_profiling:
-            mem_str = 'Estimated memory usage'
+            mem_str = 'Memory usage (sampled on single rank)'
             ostream.print_header(mem_str.ljust(92))
             ostream.print_header(('-' * len(mem_str)).ljust(92))
 
-            mem_str = '{:20s}'.format('Elapsed Time')
-            mem_str += ' {:20s}'.format('Memory Usage')
+            mem_str = '{:14s}'.format('Elapsed Time')
+            mem_str += ' {:16s}'.format('Process Memory')
+            mem_str += ' {:16s}'.format('Peak Memory')
+            mem_str += ' {:16s}'.format('System Used')
             mem_str += ' {:s}'.format('Remark')
             ostream.print_header(mem_str.ljust(92))
 
-            for dt, mem, remark in self.memory_usage:
-                if scf_flag and remark.lower() == 'iteration 0':
-                    continue
-                mem_str = '{:.2f} sec'.format(dt).ljust(20)
-                mem_str += ' {:20s}'.format(self.memory_to_string(mem))
+            for dt, proc_mem, peak_mem, sys_mem, remark in self.memory_usage:
+                mem_str = '{:.2f} sec'.format(dt).ljust(14)
+                mem_str += ' {:16s}'.format(self.memory_to_string(proc_mem))
+                mem_str += ' {:16s}'.format(self.memory_to_string(peak_mem))
+                mem_str += ' {:16s}'.format(self.memory_to_string(sys_mem))
                 mem_str += ' {:s}'.format(remark)
                 ostream.print_header(mem_str.ljust(92))
 
             ostream.print_blank()
             ostream.print_blank()
             ostream.flush()
+
+    def print_peak_memory_over_ranks(self, ostream, comm):
+        """
+        Prints the largest and the smallest peak memory over the ranks of a
+        communicator, as the table above is of one rank alone.
+
+        :param ostream:
+            The output stream.
+        :param comm:
+            The communicator, or None to print nothing. Every rank of it must
+            call this.
+        """
+
+        if (not self.memory_profiling) or (comm is None):
+            return
+
+        # one rank has nothing to add to the table it printed
+        if comm.Get_size() == 1:
+            return
+
+        import platform
+
+        peaks = comm.allgather(
+            (self.get_peak_memory(), comm.Get_rank(), platform.node()))
+
+        largest, smallest = max(peaks), min(peaks)
+
+        ostream.print_header(
+            f'Peak memory over {len(peaks):d} MPI processes'.ljust(92))
+        ostream.print_header(
+            (f'Largest : {self.memory_to_string(largest[0])} on rank ' +
+             f'{largest[1]:d} ({largest[2]})').ljust(92))
+        ostream.print_header(
+            (f'Smallest: {self.memory_to_string(smallest[0])} on rank ' +
+             f'{smallest[1]:d} ({smallest[2]})').ljust(92))
+        ostream.print_blank()
+        ostream.flush()
 
     def comp_memory_object(self, obj, counted_ids=None):
         """
@@ -452,14 +577,20 @@ class Profiler:
             The amount of available memory as text string.
         """
 
-        return self.memory_to_string(psutil.virtual_memory().available)
+        # NOTE: the memory this process may still take: the node's free
+        # memory, or less where a control group the process is in (a Slurm
+        # allocation on a shared node) leaves less of its limit free.
+        from .environment import get_available_memory
 
-    def memory_to_string(self, memsize):
+        return self.memory_to_string(get_available_memory())
+
+    @staticmethod
+    def memory_to_string(memsize):
         """
-        Gets memory size as text string.
+        Gets memory size as text string, in decimal units (1 GB = 10^9 bytes).
 
         :param memsize:
-            The memory size.
+            The memory size in bytes.
         :return:
             The text string for memory size.
         """

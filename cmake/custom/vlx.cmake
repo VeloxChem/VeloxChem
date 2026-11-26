@@ -2,7 +2,15 @@
 # This is useful for static analysis tools and linters
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-find_package(OpenMP 4.5 REQUIRED COMPONENTS CXX)
+# OpenMP is found in the top-level CMakeLists.txt, before the compiler flags
+# module, because the vector math library probe links against
+# OpenMP::OpenMP_CXX.
+
+# The non-SIMD three-center electron repulsion drivers (and the momentum
+# transfer relations they are built on) are superseded by the SIMD
+# implementation and are not used anywhere outside the Python bindings.
+# They are therefore not compiled unless explicitly requested.
+option_with_print(VLX_USE_OLD_RI "Build the deprecated non-SIMD three-center RI integral drivers" OFF)
 
 message(STATUS "Configuring a ${CMAKE_BUILD_TYPE} build")
 string(TOUPPER ${CMAKE_BUILD_TYPE} _cmake_build_type_upper)

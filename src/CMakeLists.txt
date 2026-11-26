@@ -18,6 +18,7 @@ target_compile_options(vlxobjs
     "${VLX_CXX_FLAGS}"
   PUBLIC
     "${ARCH_FLAG}"
+    "${VECLIB_FLAG}"
   )
 
 # flags to append
@@ -39,16 +40,43 @@ target_link_libraries(vlxobjs
   PUBLIC
     OpenMP::OpenMP_CXX
     Math::LA
+    Math::Mathlib
     Libxc::xc
     Boost::headers
   )
 
+if(VLX_USE_OLD_RI)
+  target_compile_definitions(vlxobjs
+    PUBLIC
+      VLX_USE_OLD_RI
+    )
+endif()
+
 add_subdirectory(dft_func)
+add_subdirectory(fika)
 add_subdirectory(general)
 add_subdirectory(math)
 add_subdirectory(moldata)
 add_subdirectory(onee_ints)
 add_subdirectory(orbdata)
+add_subdirectory(simd_func)
+add_subdirectory(simd_t2c_overlap)
+add_subdirectory(simd_transfer)
+add_subdirectory(simd_transform)
+add_subdirectory(simd_t2c_kinetic_energy)
+add_subdirectory(simd_t2c_nuclear_potential)
+add_subdirectory(simd_t2c_electron_repulsion)
+add_subdirectory(simd_t2c_electron_repulsion_rs)
+add_subdirectory(simd_t2c_electron_repulsion_geom_10_rs)
+add_subdirectory(simd_geometry)
+add_subdirectory(simd_t2c_electron_repulsion_grad)
+add_subdirectory(simd_t3c_electron_repulsion)
+add_subdirectory(simd_t3c_electron_repulsion_rs)
+add_subdirectory(simd_t3c_electron_repulsion_geom_100_rs)
+add_subdirectory(simd_t3c_electron_repulsion_geom_010_rs)
+add_subdirectory(simd_t3c_electron_repulsion_grad)
+add_subdirectory(simd_t3c_electron_repulsion_geom_100)
+add_subdirectory(simd_t3c_electron_repulsion_geom_010)
 add_subdirectory(pdft_func)
 add_subdirectory(pymodule)
 add_subdirectory(python)
@@ -83,7 +111,6 @@ add_subdirectory(t3c_electron_repulsion)
 add_subdirectory(t3c_electron_repulsion_geom_0X0)
 add_subdirectory(t3c_electron_repulsion_geom_X00)
 add_subdirectory(t3c_func)
-add_subdirectory(t3c_overlap)
 add_subdirectory(t4c_electron_repulsion)
 add_subdirectory(t4c_electron_repulsion_geom_X000)
 add_subdirectory(t4c_electron_repulsion_geom_XY00)

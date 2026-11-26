@@ -7,6 +7,13 @@ else:
     matplotlib.use('Agg')
 
 
+def pytest_make_parametrize_id(config, val, argname):
+    if argname == 'ri' and isinstance(val, bool):
+        return 'RI' if val else '4C'
+
+    return None
+
+
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",
@@ -14,5 +21,5 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
-        "timeconsuming: time-consuming tests that are not included in CI",
+        "timeconsuming: tests taking >= 3 s with 16 threads; excluded from CI",
     )

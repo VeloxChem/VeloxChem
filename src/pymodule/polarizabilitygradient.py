@@ -55,7 +55,7 @@ from .profiler import Profiler
 from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, polgrad_sanity_check_1, polgrad_sanity_check_2)
+                           dft_and_ri_sanity_check, polgrad_sanity_check_1, polgrad_sanity_check_2)
 
 
 class PolarizabilityGradient:
@@ -71,6 +71,8 @@ class PolarizabilityGradient:
         - do_four_point: Four-point numerical differentiation
         - frequencies: The frequencies
         - vector_components: Cartesian components of the tensor
+        - xc_screening_threshold: The value a basis function must reach over a
+          grid box to be kept for it.
     """
 
     def __init__(self, scf_drv, comm=None, ostream=None):
@@ -122,7 +124,8 @@ class PolarizabilityGradient:
         self._dft = False
         self.grid_level = None
         self.xcfun = None
-        self._xcfun_ldstaging = 1024
+        self.xc_screening_threshold = scf_drv.xc_screening_threshold
+        self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
 
         self.flag = 'Polarizability Gradient Driver'
         self.frequencies = (0,)
@@ -181,7 +184,7 @@ class PolarizabilityGradient:
 
         parse_input(self, method_keywords, method_dict)
 
-        dft_sanity_check(self, 'update_settings')
+        dft_and_ri_sanity_check(self, 'update_settings')
 
         self.frequencies = list(self.frequencies)
 
@@ -213,7 +216,7 @@ class PolarizabilityGradient:
         # sanity checks
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self._scf_drv.scf_tensors)
-        dft_sanity_check(self, 'compute')
+        dft_and_ri_sanity_check(self, 'compute')
 
         start_time = tm.time()
 
@@ -233,6 +236,13 @@ class PolarizabilityGradient:
 
             # sanity check input frequencies
             polgrad_sanity_check_1(self)
+
+            if (self._scf_drv._uses_ri_jk() or
+                    self._scf_drv._uses_ri_coulomb()):
+                self.ostream.print_info(
+                    'The derivative integrals are computed without the '
+                    'resolution of the identity.')
+                self.ostream.print_blank()
 
             # compute
             self.polgradient = self.compute_analytical(molecule, basis,
@@ -690,6 +700,9 @@ class PolarizabilityGradient:
         # ERI threshold
         thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
 
+        # NOTE: four-center also where the SCF and the orbital response use
+        # the resolution of the identity: the polarizability gradient is not
+        # the derivative of an RI polarizability.
         # Fock gradient driver
         fock_grad_drv = FockGeom1000Driver()
 
@@ -883,6 +896,9 @@ class PolarizabilityGradient:
         # ERI threshold
         thresh_int = int(-math.log10(self._scf_drv.eri_thresh))
 
+        # NOTE: four-center also where the SCF and the orbital response use
+        # the resolution of the identity: the polarizability gradient is not
+        # the derivative of an RI polarizability.
         # Fock gradient driver
         fock_grad_drv = FockGeom1000Driver()
 
@@ -1497,16 +1513,23 @@ class PolarizabilityGradient:
         # set linear response driver
         lr_drv = self.set_lr_driver()
 
-        # mute the outputstreams
-        scf_drv.ostream.mute()
-        lr_drv.ostream.mute()
+        # NOTE: the SCF at every displaced geometry, and the response formed on
+        # it, takes the choice between RI and the four-center integrals that
+        # the SCF made at the reference geometry; see
+        # ScfDriver._ri_kept_for_displacements.
+        with scf_drv._ri_kept_for_displacements():
 
-        # construct polarizability gradient
-        num_polgradient = self.construct_numerical_gradient(molecule, ao_basis, scf_drv, lr_drv)
+            # mute the outputstreams
+            scf_drv.ostream.mute()
+            lr_drv.ostream.mute()
 
-        # unmute the output streams
-        scf_drv.ostream.unmute()
-        lr_drv.ostream.unmute()
+            # construct polarizability gradient
+            num_polgradient = self.construct_numerical_gradient(
+                molecule, ao_basis, scf_drv, lr_drv)
+
+            # unmute the output streams
+            scf_drv.ostream.unmute()
+            lr_drv.ostream.unmute()
 
         return num_polgradient
 
@@ -1662,6 +1685,10 @@ class PolarizabilityGradient:
 
             xcgrad_drv = XCMolecularGradient()
 
+            if self.xc_screening_threshold is not None:
+                xcgrad_drv.set_screening_threshold(
+                    self.xc_screening_threshold)
+
             polgrad_xcgrad = xcgrad_drv.integrate_vxc_gradient(
                 molecule, ao_basis, [rhow_dm_sym], [gs_dm], mol_grid, xcfun_label)
 
@@ -1772,6 +1799,10 @@ class PolarizabilityGradient:
                                                         root=mpi_master())
 
             xcgrad_drv = XCMolecularGradient()
+
+            if self.xc_screening_threshold is not None:
+                xcgrad_drv.set_screening_threshold(
+                    self.xc_screening_threshold)
 
             # real contribution
             polgrad_xcgrad_real = xcgrad_drv.integrate_vxc_gradient(  # Re DM

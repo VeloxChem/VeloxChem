@@ -113,7 +113,6 @@ class CRIJKFockDriver
                                      const int               rank,
                                      const int               nodes) -> void;
     
-    
     /// @brief Computes B^Q vectors in screened, distributed form.
     /// @param screener The ERIs screener.
     /// @param molecule The molecule.
@@ -127,7 +126,22 @@ class CRIJKFockDriver
                                            const CSubMatrix&          metric,
                                            const int                  ithreshold,
                                            const std::vector<size_t>& indices) -> void;
-    
+
+    /// @brief Estimates memory required to store B^Q vectors in screened, distributed form.
+    /// @param screener The ERIs screener.
+    /// @param molecule The molecule.
+    /// @param aux_basis The auxilary molecular  basis.
+    /// @param ithreshold The integer threshold of significant pairs screening.
+    /// @param rank The rank of MPI process to store batch of B^Q vectors.
+    /// @param nodes The number of MPI nodes in communicator.
+    /// @return The estimated memory requirements for screened B^Q vectors.
+    auto estimate_memory_for_bq_vectors(const CT4CScreener&     screener,
+                                        const CMolecule&        molecule,
+                                        const CMolecularBasis&  aux_basis,
+                                        const int               ithreshold,
+                                        const int               rank,
+                                        const int               nodes) const -> size_t;
+
     /// @brief Computes Coulomb Fock matrix for given density.
     /// @param density The density matrix to construct Fock matrix.
     /// @param label The label of Fock matrix type.
@@ -162,6 +176,10 @@ class CRIJKFockDriver
     /// @return The batch of transformed B^Q vectors.
     auto compute_mo_bq_vectors(const CSubMatrix& lambda_p, const CSubMatrix& lambda_h, const size_t bstart, const size_t bend) const -> std::vector<CSubMatrix>;
     
+    /// @brief Returns the indices of local B^Q vectors.
+    /// @return The indices of local B^Q vectors.
+    auto get_indices_of_bq_vectors() const -> std::vector<size_t>;
+
     private:
     
     /// The reduced indices mask for screened B^Q vectors.

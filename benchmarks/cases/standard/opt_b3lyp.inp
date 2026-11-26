@@ -1,0 +1,15 @@
+# Caffeine, B3LYP, def2-SVP: geometry optimization (RI-JK).
+@jobs
+task: optimize
+@end
+
+@method settings
+xcfun: b3lyp
+basis: def2-svp
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end

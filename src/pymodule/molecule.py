@@ -1948,6 +1948,63 @@ def _Molecule_partition_atoms(self, comm):
     return list(list_atoms[rank::nnodes])
 
 
+def _Molecule_partition_atoms_by_weight(self, comm, weights):
+    """
+    Partitions atoms over an MPI communicator by the work each of them carries
+    rather than by their number.
+
+    :param comm:
+        The MPI communicator.
+    :param weights:
+        The work of each atom, of one value per atom of the molecule. Any unit
+        will do, as only the ratios between them are used.
+
+    :return:
+        The list of atom indices for the current MPI rank.
+    """
+
+    # NOTE: dealing the atoms round robin balances how many each rank is given,
+    # which is not what costs. An atom in the middle of a molecule survives
+    # screening against far more of it than one at the edge, so equal counts of
+    # atoms are unequal counts of values. The atoms are handed out heaviest first,
+    # each to the rank carrying least so far, which is the longest processing time
+    # rule: it is one pass, and no rank ends more than a third above the lightest
+    # possible.
+
+    nnodes = comm.Get_size()
+
+    assert_msg_critical(
+        len(weights) == self.number_of_atoms(),
+        'Molecule.partition_atoms_by_weight: expecting one weight per atom')
+
+    if comm.Get_rank() == mpi_master():
+        order = sorted(range(len(weights)),
+                       key=lambda atom: (-weights[atom], atom))
+
+        loads = [0.0] * nnodes
+        shares = [[] for _ in range(nnodes)]
+
+        for atom in order:
+            if weights[atom] <= 0.0:
+                continue
+            lightest = min(range(nnodes), key=lambda rank: (loads[rank], rank))
+            shares[lightest].append(atom)
+            loads[lightest] += weights[atom]
+
+        # NOTE: the atoms of a rank are given back in the order of the molecule.
+        # Which rank holds an atom is what the weights decide; the order within a
+        # rank is not theirs to decide, and the dense index of the auxiliary basis
+        # is walked in ascending order everywhere else.
+
+        shares = [sorted(share) for share in shares]
+    else:
+        shares = None
+
+    shares = comm.bcast(shares, root=mpi_master())
+
+    return shares[comm.Get_rank()]
+
+
 def _Molecule_is_water_molecule(self):
     """
     Checks if a molecule is a water molecule.
@@ -2014,7 +2071,7 @@ def _Molecule_contains_water_molecule(self):
 
 
 @staticmethod
-def _Molecule_read_name(mol_name, verbose=False):
+def _Molecule_read_name(mol_name, verbose=False, timeout=10):
     """
     Reads molecule from its name as a string using PubChem data.
 
@@ -2022,19 +2079,23 @@ def _Molecule_read_name(mol_name, verbose=False):
         The molecule name string.
     :param verbose:
         The information printout level.
+    :param timeout:
+        Timeout in seconds for the PubChem request.
 
     :return:
         The molecule.
     """
 
-    smiles_str = Molecule.name_to_smiles(mol_name, verbose=verbose)
+    smiles_str = Molecule.name_to_smiles(mol_name,
+                                         verbose=verbose,
+                                         timeout=timeout)
     mol = Molecule.read_smiles(smiles_str)
 
     return mol
 
 
 @staticmethod
-def _Molecule_name_to_smiles(mol_name, verbose=False):
+def _Molecule_name_to_smiles(mol_name, verbose=False, timeout=10):
     """
     Returns SMILES-string for a given molecule name using PubChem data.
 
@@ -2042,53 +2103,62 @@ def _Molecule_name_to_smiles(mol_name, verbose=False):
         The molecule name string.
     :param verbose:
         The information printout level.
+    :param timeout:
+        Timeout in seconds for the PubChem request.
 
     :return smiles_str:
         The SMILES-string of the molecule
     """
 
-    smiles_str, title, cid = get_data_from_name(mol_name, verbose=verbose)
+    smiles_str, title, cid = get_data_from_name(mol_name,
+                                                verbose=verbose,
+                                                timeout=timeout)
 
     return smiles_str
 
 
 @staticmethod
-def _Molecule_name_to_xyz(mol_name):
+def _Molecule_name_to_xyz(mol_name, timeout=30):
     """
     Returns xyz-string for the first conformer
     of a given molecule name using Pubchem data.
 
     :param mol_name:
         The molecule name string.
+    :param timeout:
+        Timeout in seconds for the PubChem request.
 
     :return xyz:
         xyz-string of molecule
     """
 
-    conformerID_list = get_all_conformer_IDs(mol_name)
+    conformerID_list = get_all_conformer_IDs(mol_name, timeout=timeout)
     conformer_ID = conformerID_list[0]
-    xyz = get_conformer_data(conformer_ID)
+    xyz = get_conformer_data(conformer_ID, timeout=timeout)
 
     return xyz
 
 
 @staticmethod
-def _Molecule_get_all_conformer_data(mol_name):
+def _Molecule_get_all_conformer_data(mol_name, timeout=30):
     """
     Gets coordinates for all the conformers of a given compound
     Data from PubChem.
 
     :param mol_name:
         The molecule name string.
+    :param timeout:
+        Timeout in seconds for the PubChem request.
 
     :return all_conformer_info:
         The coordinates for all of the conformers of the molecule.
     """
 
-    conformerID_list = get_all_conformer_IDs(mol_name)
+    conformerID_list = get_all_conformer_IDs(mol_name, timeout=timeout)
     all_conformer_info = {}
     for key in conformerID_list:
-        all_conformer_info.update({key: get_conformer_data(key)})
+        all_conformer_info.update(
+            {key: get_conformer_data(key, timeout=timeout)})
     return all_conformer_info
 
 
@@ -2169,6 +2239,7 @@ Molecule.number_of_beta_electrons = _Molecule_number_of_beta_electrons
 Molecule.number_of_alpha_occupied_orbitals = _Molecule_number_of_alpha_occupied_orbitals
 Molecule.number_of_beta_occupied_orbitals = _Molecule_number_of_beta_occupied_orbitals
 Molecule.partition_atoms = _Molecule_partition_atoms
+Molecule.partition_atoms_by_weight = _Molecule_partition_atoms_by_weight
 Molecule.is_water_molecule = _Molecule_is_water_molecule
 Molecule.contains_water_molecule = _Molecule_contains_water_molecule
 

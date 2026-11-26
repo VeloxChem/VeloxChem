@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from contextlib import nullcontext
 import numpy as np
 import sys
 
@@ -39,9 +40,9 @@ from .veloxchemlib import mpi_master
 from .griddriver import GridDriver
 from .outputstream import OutputStream
 from .molecule import Molecule
-from .dftutils import get_default_grid_level
+from .dftutils import get_default_grid_level, get_optimal_grid_box_size
 from .inputparser import parse_input, read_unparsed_input_from_hdf5
-from .sanitychecks import dft_sanity_check
+from .sanitychecks import dft_and_ri_sanity_check
 
 
 class GradientDriver:
@@ -141,7 +142,7 @@ class GradientDriver:
 
         parse_input(self, method_keywords, method_dict)
 
-        dft_sanity_check(self, 'update_settings')
+        dft_and_ri_sanity_check(self, 'update_settings')
 
     def read_settings(self, checkpoint_file):
         """
@@ -182,6 +183,45 @@ class GradientDriver:
     def compute_numerical(self, molecule, *args):
         """
         Performs calculation of numerical gradient.
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the "compute" function.
+        """
+
+        # NOTE: the SCF at every displaced geometry, and what is formed on it,
+        # takes the choice between RI and the four-center integrals that the
+        # SCF made at the reference geometry; see
+        # ScfDriver._ri_kept_for_displacements. A driver with no SCF driver
+        # has no such choice.
+        scf_drv = self._get_displaced_scf_driver(*args)
+
+        if scf_drv is not None:
+            ri_kept = scf_drv._ri_kept_for_displacements()
+        else:
+            ri_kept = nullcontext()
+
+        with ri_kept:
+            self._compute_numerical_gradient(molecule, *args)
+
+    def _get_displaced_scf_driver(self, *args):
+        """
+        Gets the SCF driver which compute_energy runs at displaced geometries.
+
+        :param args:
+            The same arguments as the "compute" function.
+
+        :return:
+            The SCF driver, or None for a driver with no SCF.
+        """
+
+        return getattr(self, 'scf_driver', None)
+
+    def _compute_numerical_gradient(self, molecule, *args):
+        """
+        Computes the numerical gradient from the energies at displaced
+        geometries.
 
         :param molecule:
             The molecule.
@@ -292,7 +332,9 @@ class GradientDriver:
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        xcfun_ldstaging = get_optimal_grid_box_size(
+            ao_basis.get_dimensions_of_basis())
+        mol_grid = grid_drv.generate(molecule, xcfun_ldstaging)
 
         xc_molgrad_drv = XCMolecularGradient()
         vxc_contrib = xc_molgrad_drv.integrate_vxc_gradient(
@@ -329,7 +371,9 @@ class GradientDriver:
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        xcfun_ldstaging = get_optimal_grid_box_size(
+            ao_basis.get_dimensions_of_basis())
+        mol_grid = grid_drv.generate(molecule, xcfun_ldstaging)
 
         xc_molgrad_drv = XCMolecularGradient()
         vxc2_contrib = xc_molgrad_drv.integrate_fxc_gradient(
@@ -369,7 +413,9 @@ class GradientDriver:
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        xcfun_ldstaging = get_optimal_grid_box_size(
+            ao_basis.get_dimensions_of_basis())
+        mol_grid = grid_drv.generate(molecule, xcfun_ldstaging)
 
         xc_molgrad_drv = XCMolecularGradient()
         vxc3_contrib = xc_molgrad_drv.integrate_kxc_gradient(
@@ -407,7 +453,9 @@ class GradientDriver:
         grid_level = (get_default_grid_level(self.xcfun)
                       if self.grid_level is None else self.grid_level)
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        xcfun_ldstaging = get_optimal_grid_box_size(
+            ao_basis.get_dimensions_of_basis())
+        mol_grid = grid_drv.generate(molecule, xcfun_ldstaging)
 
         xcgrad_drv = XCMolecularGradient()
         tddft_xcgrad = xcgrad_drv.integrate_vxc_gradient(

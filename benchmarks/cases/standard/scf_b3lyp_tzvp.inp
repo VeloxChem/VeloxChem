@@ -1,0 +1,15 @@
+# Caffeine, B3LYP, def2-TZVP: closed-shell SCF in a triple-zeta basis (RI-JK).
+@jobs
+task: scf
+@end
+
+@method settings
+xcfun: b3lyp
+basis: def2-tzvp
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end

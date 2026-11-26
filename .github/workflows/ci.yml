@@ -10,7 +10,7 @@ on:
       - dft-update
       - hessian-update
       - ri-test
-      - ri-grad-test
+      - rijk-test
       - tddft_vibanalysis_test
       - tddft_grad_test
       - feature-test
@@ -26,10 +26,12 @@ jobs:
         shell: bash -l -e -o pipefail {0}
 
     container:
-      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-2074132
+      image: ghcr.io/veloxchem/meta-vlx/vlx-ci_gnu:sha-0e81798
 
     env:
-      VLX_NUM_BUILD_JOBS: 4
+      VLX_NUM_BUILD_JOBS: "4"
+      OMPI_ALLOW_RUN_AS_ROOT: "1"
+      OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
 
     steps:
       - name: checkout code
@@ -46,11 +48,11 @@ jobs:
           ulimit -a
           ulimit -s unlimited
           lscpu | egrep 'Thread|Core|Socket|^CPU\('
+          echo "=== OpenMPI ==="
+          which mpicc mpiexec mpicc.openmpi mpiexec.openmpi
+          mpicc.openmpi --showme:version
+          mpiexec.openmpi --version | head -2
           echo "=== GNU Compiler ==="
-          #mpicc --version
-          #mpicc -show
-          #mpicxx --version
-          #mpicxx -show
           gcc --version
           g++ --version
           echo "=== Python ==="
@@ -63,27 +65,35 @@ jobs:
           python -V
           echo "=== Python dependencies ==="
           python -m pip install --upgrade pip setuptools wheel
-          CC=gcc MPICC=mpicc python -m pip install mpi4py --no-binary=mpi4py
-          CC=gcc CXX=g++ python -m pip install MDAnalysis "networkx<3.7"
+          CC=gcc MPICC=mpicc.openmpi python -m pip install --no-cache-dir mpi4py --no-binary=mpi4py
+          echo "--- MPI sanity check ---"
+          mpiexec.openmpi --bind-to none -n 2 python -c "from mpi4py import MPI; size = MPI.COMM_WORLD.Get_size(); assert size == 2, size"
+          CC=gcc CXX=g++ python -m pip install MDAnalysis
           git config --global --add safe.directory $PWD
-          git clone -b 3.4.0 https://gitlab.com/libeigen/eigen.git
-          git clone -b boost-1.90.0 https://github.com/boostorg/math.git boost-math
-          cd eigen && test "$(git rev-parse HEAD)" = "3147391d946bb4b6c68edd901f2add6ac1f31f8c" && cd ..
-          cd boost-math && test "$(git rev-parse HEAD)" = "e0fcd19f7227d81391770ea46015acc3c80af810" && cd ..
+          # retry with backoff, cloning into a fresh directory each attempt and renaming on success
+          for i in 1 2 3 4 5; do
+            git clone --depth 1 -b 3.4.0 https://gitlab.com/libeigen/eigen.git eigen-$i && mv eigen-$i eigen && break
+            sleep $((i * 30))
+          done
+          for i in 1 2 3 4 5; do
+            git clone --depth 1 -b boost-1.90.0 https://github.com/boostorg/math.git boost-math-$i && mv boost-math-$i boost-math && break
+            sleep $((i * 30))
+          done
+          test "$(git -C eigen rev-parse HEAD)" = "3147391d946bb4b6c68edd901f2add6ac1f31f8c"
+          test "$(git -C boost-math rev-parse HEAD)" = "e0fcd19f7227d81391770ea46015acc3c80af810"
           export EIGEN_INCLUDE_DIR=$(pwd)/eigen
           export BOOST_INCLUDE_DIR=$(pwd)/boost-math/include
-          CXX=g++ python -m pip install git+https://github.com/VeloxChem/PyFraME.git
-          python -m pip install dftd4 xtb
+          python -m pip install dftd4
           python -m pip install openmm rdkit pymbar
           echo "=== VeloxChem build ==="
           export CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH:/usr/local
-          SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=g++" \
+          SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=g++ -DVLX_USE_MATHLIB=ON -DVLX_MATH_LIBRARY=/usr/lib/x86_64-linux-gnu/openblas-openmp/libopenblas.so" \
             python -m pip install -v .[test,qmmm]
           echo "=== VeloxChem test ==="
           python -c "import veloxchem; print(veloxchem.__version__)"
-          OMP_NUM_THREADS=2 mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO \
-            -m "solvers" --durations=10
+          OMP_NUM_THREADS=2 mpiexec.openmpi --bind-to none -n 2 python -m pytest --capture=no --log-cli-level=INFO \
+            -m "solvers" --durations=100
           OMP_NUM_THREADS=4 python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO \
-            -m "not timeconsuming" --durations=10
+            -m "not timeconsuming" --durations=100
           git clone https://github.com/VeloxChem/vlx-extra-tests.git
           OMP_NUM_THREADS=4 python -m pytest --capture=no --log-cli-level=INFO vlx-extra-tests/tests

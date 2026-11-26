@@ -1,0 +1,19 @@
+# Caffeine, B3LYP, def2-SVP: analytical static polarizability gradient (RI-JK).
+@jobs
+task: polarizability_gradient
+@end
+
+@method settings
+xcfun: b3lyp
+basis: def2-svp
+@end
+
+@polarizability_gradient
+frequencies: 0.0
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end

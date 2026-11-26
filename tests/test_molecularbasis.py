@@ -615,6 +615,20 @@ class TestMolecularBasis:
         b_indexes = [0]
         assert a_indexes == b_indexes
 
+    def test_total_number_of_basis_functions(self):
+
+        basis = self.get_h2o_svp()
+
+        # total count matches the sum over angular momenta
+
+        assert basis.number_of_basis_functions() == 12
+        assert basis.number_of_basis_functions() == sum(
+            [basis.number_of_basis_functions(i) for i in range(4)])
+
+        # and matches the number of basis functions actually returned
+
+        assert basis.number_of_basis_functions() == len(basis.basis_functions())
+
     def test_number_of_basis_functions(self):
 
         # set up basis for water
@@ -787,3 +801,29 @@ class TestMolecularBasis:
         a_basis = comm.bcast(a_basis)
         b_basis = self.get_h2o_svp()
         assert a_basis == b_basis
+
+    def test_read_auxiliary_basis(self):
+
+        # NOTE: the basis set label given to an atom in the molecule names its
+        # orbital basis set. An auxiliary basis set is the basis set asked for
+        # on every atom; it once took the labelled atom's orbital basis set as
+        # its fitting functions.
+        labelled = Molecule.read_molecule_string(
+            """O   0.000   0.000  -1.000  def2-svpd
+               H   0.000   1.400  -2.100
+               H   0.000  -1.400  -2.100""",
+            units='au')
+
+        orbital = MolecularBasis.read(labelled, 'def2-svp', ostream=None)
+        assert orbital.get_label() == 'MIXED-BASIS-SETS'
+
+        for aux_label in ('def2-universal-jkfit', 'def2-universal-jfit'):
+            aux = MolecularBasis.read(labelled,
+                                      aux_label,
+                                      ostream=None,
+                                      auxiliary_basis=True)
+            expected = MolecularBasis.read(self.get_h2o(),
+                                           aux_label,
+                                           ostream=None)
+            assert aux.get_label() == aux_label.upper()
+            assert aux == expected

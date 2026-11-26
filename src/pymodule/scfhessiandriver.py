@@ -66,7 +66,7 @@ from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 from .oneeints import compute_electric_dipole_integrals
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           dft_sanity_check, pe_sanity_check)
+                           dft_and_ri_sanity_check)
 
 
 class ScfHessianDriver(HessianDriver):
@@ -80,6 +80,8 @@ class ScfHessianDriver(HessianDriver):
         - hessian: The Hessian in Hartree per Bohr**2.
         - flag: The type of Hessian driver.
         - perturbed_density: The perturbed density
+        - xc_screening_threshold: The value a basis function must reach over a
+          grid box to be kept for it.
     """
 
     def __init__(self, scf_drv):
@@ -103,6 +105,8 @@ class ScfHessianDriver(HessianDriver):
         # self._block_size_factor = 4
 
         self._xcfun_ldstaging = scf_drv._xcfun_ldstaging
+
+        self.xc_screening_threshold = scf_drv.xc_screening_threshold
 
         self.use_subcomms = False
 
@@ -149,11 +153,6 @@ class ScfHessianDriver(HessianDriver):
             For backward compatibility.
         """
 
-        # TODO: enable RI-JK
-        assert_msg_critical(
-            not self.scf_driver.ri_jk,
-            f'{type(self).__name__}.compute: RI-JK is not yet supported')
-
         assert_msg_critical(
             self.scf_driver.electric_field is None,
             f'{type(self).__name__}.compute: electric_field is not supported')
@@ -172,6 +171,9 @@ class ScfHessianDriver(HessianDriver):
             scf_energy_not_used = self.compute_energy(molecule, ao_basis)
             scf_results = self.scf_driver.scf_results
 
+        # use the grid box size chosen by the SCF driver
+        self._xcfun_ldstaging = self.scf_driver._xcfun_ldstaging
+
         # Save the electronic energy
         self.elec_energy = self.scf_driver.get_scf_energy()
 
@@ -179,7 +181,7 @@ class ScfHessianDriver(HessianDriver):
         # that the DFT state is up to date before the setup header is printed
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, scf_results)
-        dft_sanity_check(self, 'compute')
+        dft_and_ri_sanity_check(self, 'compute')
 
         if self.rank == mpi_master():
             self.print_header()
@@ -252,7 +254,7 @@ class ScfHessianDriver(HessianDriver):
         # sanity checks
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self.scf_driver.scf_results)
-        dft_sanity_check(self, 'compute')
+        dft_and_ri_sanity_check(self, 'compute')
 
         # use _determine_xc_hessian_grid_level here to ensure early exit for
         # unsupported cases
@@ -267,6 +269,11 @@ class ScfHessianDriver(HessianDriver):
         hess_ref += ' Chem. Phys. Lett. 2002, 362, 511-518.'
         self.ostream.print_reference('Reference: ' + hess_ref)
         self.ostream.print_blank()
+        if (self.scf_driver._uses_ri_jk() or
+                self.scf_driver._uses_ri_coulomb()):
+            self.ostream.print_info('The derivative integrals are computed '
+                                    'without the resolution of the identity.')
+            self.ostream.print_blank()
         self.ostream.flush()
 
         # Preparation
@@ -295,25 +302,10 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver = HessianOrbitalResponse(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
-        # TODO: double check analytical Hessian with PE
         assert_msg_critical(
             not self.scf_driver._pe,
-            'ScfHessianDriver: Analytical Hessian with ' +
-            'polarizable embedding (PE) not yet available')
-
-        if self.scf_driver._pe:
-
-            cphf_solver.embedding = self.scf_driver.embedding
-            pe_sanity_check(cphf_solver, molecule=molecule)
-
-            # TODO: double check
-            from .embedding import PolarizableEmbeddingHess
-            cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
-                molecule=molecule,
-                ao_basis=ao_basis,
-                options=self.scf_driver.embedding,
-                comm=self.comm,
-                density=density * 2)
+            'ScfHessianDriver: Hessians with the fika embedding are ' +
+            'not available yet')
 
         # TODO: double check propagation of cphf settings
         cphf_keywords = {
@@ -326,6 +318,10 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver.compute(molecule, ao_basis, scf_results, atom_pairs)
 
         cphf_solution_dict = cphf_solver.cphf_results
+
+        # NOTE: the CPHF solve is done and the rest of the Hessian reads only
+        # cphf_results; its RI set is let go before the second derivatives.
+        cphf_solver.release_ri()
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
         dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
 
@@ -416,6 +412,12 @@ class ScfHessianDriver(HessianDriver):
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
             ]
 
+        # NOTE: the derivative integrals of the electron repulsion are
+        # four-center also where the SCF and the orbital response use the
+        # resolution of the identity. The Hessian is then the analytical
+        # Hessian of the four-center energy evaluated with the RI density
+        # and response, not the derivative of the RI gradient, and differs
+        # from a Hessian by finite differences of RI gradients.
         fock_hess_2000_drv = FockGeom2000Driver()
         fock_hess_1100_drv = FockGeom1100Driver()
         fock_hess_1010_drv = FockGeom1010Driver()
@@ -778,13 +780,25 @@ class ScfHessianDriver(HessianDriver):
                 molecule, ao_basis, grid_level)
 
             grid_drv.set_level(grid_level)
-            mol_grid = grid_drv.generate(molecule)
+            mol_grid = grid_drv.generate(molecule, self._xcfun_ldstaging)
 
             xc_mol_hess = XCMolecularHessian()
+
+            if self.xc_screening_threshold is not None:
+                xc_mol_hess.set_screening_threshold(
+                    self.xc_screening_threshold)
+
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(
                 molecule, ao_basis, [density], mol_grid,
                 self.scf_driver.xcfun.get_func_label())
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
+
+            # only the XC energy term is rebuilt: with point charges the full
+            # Hessian has nonzero row sums. The rebuild reads every block of a
+            # row, and the blocks outside atom_pairs are zeroed after it.
+            if self.rank == mpi_master():
+                hessian_dft_xc = self._rebuild_xc_hessian_same_atom_blocks(
+                    hessian_dft_xc)
 
         # dft-d4 contribution
         if self.scf_driver.dispersion or (
@@ -913,18 +927,6 @@ class ScfHessianDriver(HessianDriver):
 
             self.hessian = self.hessian.reshape(natm * 3, natm * 3)
 
-            # add pe contr to hessian
-            if self.scf_driver._pe:
-                from .embedding import PolarizableEmbeddingHess
-                embedding_drv = PolarizableEmbeddingHess(
-                    molecule=molecule,
-                    ao_basis=ao_basis,
-                    options=self.scf_driver.embedding,
-                    density=density * 2,
-                    comm=self.comm)
-                self.hessian += embedding_drv.compute_pe_energy_hess_contributions(
-                    density_matrix=density * 2)
-
             if self._dft:
                 self.hessian += hessian_dft_xc
 
@@ -1011,6 +1013,38 @@ class ScfHessianDriver(HessianDriver):
 
         return grid_level
 
+    @staticmethod
+    def _rebuild_xc_hessian_same_atom_blocks(hessian_xc):
+        """
+        Rebuilds the same-atom blocks of the XC energy Hessian term from
+        translational invariance.
+
+        :param hessian_xc:
+            The XC energy Hessian term, shape (3 * natoms, 3 * natoms).
+
+        :return:
+            The XC energy Hessian term with rebuilt same-atom blocks.
+        """
+
+        # integrate_exc_hessian differentiates the basis functions on a grid
+        # that is held fixed. The grid of a calculation moves with the atoms,
+        # and the derivatives of its points and weights are not included.
+        # Without these terms the 3x3 blocks of a row of the computed matrix
+        # do not sum to zero, and the deviation lies in the same-atom blocks.
+        # The XC energy does not change under a rigid translation of the
+        # molecule, so the exact blocks of each row sum to zero. Each
+        # same-atom block H[A,A] is set to -sum_{B!=A} H[A,B], symmetrized;
+        # the off-diagonal blocks are kept as computed.
+
+        natoms = hessian_xc.shape[0] // 3
+        hess = hessian_xc.reshape(natoms, 3, natoms, 3).copy()
+
+        for a in range(natoms):
+            block = -(hess[a].sum(axis=1) - hess[a, :, a, :])
+            hess[a, :, a, :] = 0.5 * (block + block.T)
+
+        return hess.reshape(natoms * 3, natoms * 3)
+
     def compute_analytical_unrestricted(self,
                                         molecule,
                                         ao_basis,
@@ -1036,7 +1070,7 @@ class ScfHessianDriver(HessianDriver):
         # sanity checks
         molecule_sanity_check(molecule)
         scf_results_sanity_check(self, self.scf_driver.scf_results)
-        dft_sanity_check(self, 'compute')
+        dft_and_ri_sanity_check(self, 'compute')
 
         # use _determine_xc_hessian_grid_level here to ensure early exit for
         # unsupported cases
@@ -1051,6 +1085,11 @@ class ScfHessianDriver(HessianDriver):
         hess_ref += ' Chem. Phys. Lett. 2002, 362, 511-518.'
         self.ostream.print_reference('Reference: ' + hess_ref)
         self.ostream.print_blank()
+        if (self.scf_driver._uses_ri_jk() or
+                self.scf_driver._uses_ri_coulomb()):
+            self.ostream.print_info('The derivative integrals are computed '
+                                    'without the resolution of the identity.')
+            self.ostream.print_blank()
         self.ostream.flush()
 
         # Preparation
@@ -1091,25 +1130,10 @@ class ScfHessianDriver(HessianDriver):
             self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
-        # TODO: double check analytical Hessian with PE
         assert_msg_critical(
             not self.scf_driver._pe,
-            'ScfHessianDriver: Analytical Hessian with ' +
-            'polarizable embedding (PE) not yet available')
-
-        if self.scf_driver._pe:
-
-            cphf_solver.embedding = self.scf_driver.embedding
-            pe_sanity_check(cphf_solver, molecule=molecule)
-
-            # TODO: double check
-            from .embedding import PolarizableEmbeddingHess
-            cphf_solver._embedding_hess_drv = PolarizableEmbeddingHess(
-                molecule=molecule,
-                ao_basis=ao_basis,
-                options=self.scf_driver.embedding,
-                comm=self.comm,
-                density=density_a + density_b)
+            'ScfHessianDriver: Hessians with the fika embedding are ' +
+            'not available yet')
 
         # TODO: double check propagation of cphf settings
         cphf_keywords = {
@@ -1122,6 +1146,10 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver.compute(molecule, ao_basis, scf_results, atom_pairs)
 
         cphf_solution_dict = cphf_solver.cphf_results
+
+        # NOTE: the CPHF solve is done and the rest of the Hessian reads only
+        # cphf_results; its RI set is let go before the second derivatives.
+        cphf_solver.release_ri()
         dist_cphf_ov = cphf_solution_dict['dist_cphf_ov']
         dist_cphf_rhs = cphf_solution_dict['dist_cphf_rhs']
 
@@ -1212,6 +1240,12 @@ class ScfHessianDriver(HessianDriver):
                 idx for idx, nelec in enumerate(core_electrons) if nelec > 0
             ]
 
+        # NOTE: the derivative integrals of the electron repulsion are
+        # four-center also where the SCF and the orbital response use the
+        # resolution of the identity. The Hessian is then the analytical
+        # Hessian of the four-center energy evaluated with the RI density
+        # and response, not the derivative of the RI gradient, and differs
+        # from a Hessian by finite differences of RI gradients.
         fock_hess_2000_drv = FockGeom2000Driver()
         fock_hess_1100_drv = FockGeom1100Driver()
         fock_hess_1010_drv = FockGeom1010Driver()
@@ -1638,13 +1672,25 @@ class ScfHessianDriver(HessianDriver):
                 molecule, ao_basis, grid_level)
 
             grid_drv.set_level(grid_level)
-            mol_grid = grid_drv.generate(molecule)
+            mol_grid = grid_drv.generate(molecule, self._xcfun_ldstaging)
 
             xc_mol_hess = XCMolecularHessian()
+
+            if self.xc_screening_threshold is not None:
+                xc_mol_hess.set_screening_threshold(
+                    self.xc_screening_threshold)
+
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(
                 molecule, ao_basis, [density_a, density_b], mol_grid,
                 self.scf_driver.xcfun.get_func_label())
             hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
+
+            # only the XC energy term is rebuilt: with point charges the full
+            # Hessian has nonzero row sums. The rebuild reads every block of a
+            # row, and the blocks outside atom_pairs are zeroed after it.
+            if self.rank == mpi_master():
+                hessian_dft_xc = self._rebuild_xc_hessian_same_atom_blocks(
+                    hessian_dft_xc)
 
         # dft-d4 contribution
         if self.scf_driver.dispersion or (
@@ -1772,18 +1818,6 @@ class ScfHessianDriver(HessianDriver):
                 self.hessian += dftd4_hessian
 
             self.hessian = self.hessian.reshape(natm * 3, natm * 3)
-
-            # add pe contr to hessian
-            if self.scf_driver._pe:
-                from .embedding import PolarizableEmbeddingHess
-                embedding_drv = PolarizableEmbeddingHess(
-                    molecule=molecule,
-                    ao_basis=ao_basis,
-                    options=self.scf_driver.embedding,
-                    density=density_a + density_b,
-                    comm=self.comm)
-                self.hessian += embedding_drv.compute_pe_energy_hess_contributions(
-                    density_matrix=density_a + density_b)
 
             if self._dft:
                 self.hessian += hessian_dft_xc
@@ -2087,10 +2121,11 @@ class ScfHessianDriver(HessianDriver):
 
         return gradient_driver.gradient.copy()
 
-    def compute_electric_dipole_moment(self, molecule, basis):
+    def _compute_electric_dipole_moment(self, molecule, basis):
         """
-        Computes the electric dipole moment calculated in
-        compute_gradient.
+        Computes the electric dipole moment of the SCF density calculated in
+        compute_gradient, about the fixed origin (0,0,0), for the dipole
+        gradient of compute_numerical.
 
         :param molecule:
             The molecule.
@@ -2103,7 +2138,15 @@ class ScfHessianDriver(HessianDriver):
 
         scf_results = self.scf_driver.scf_results
 
-        prop = FirstOrderProperties(self.comm, self.ostream)
+        # NOTE: a fixed origin, the one of the analytical dipole gradient
+        # (compute_dipole_gradient_restricted and _unrestricted). The default
+        # origin of FirstOrderProperties, the center of nuclear charge, moves
+        # with the atoms; for a charged molecule the finite differences of
+        # compute_numerical would then add -q Z_A / sum(Z) to the derivative
+        # with respect to atom A.
+        prop = FirstOrderProperties(self.comm,
+                                    self.ostream,
+                                    origin=[0.0, 0.0, 0.0])
         prop.compute_scf_prop(molecule, basis, scf_results)
 
         if self.rank == mpi_master():

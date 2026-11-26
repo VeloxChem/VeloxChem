@@ -575,25 +575,25 @@ export_dft(py::module& m)
         .def(
             "x_to_numpy",
             [](const CMolecularGrid& self) -> py::array_t<double> {
-                return vlx_general::pointer_to_numpy(self.getCoordinatesX(), std::vector<int>{self.getNumberOfGridPoints()});
+                return vlx_general::pointer_to_numpy(self.getCoordinatesX(), std::vector<py::ssize_t>{self.getNumberOfGridPoints()});
             },
             "Gets X coordinates of grid as numpy array.")
         .def(
             "y_to_numpy",
             [](const CMolecularGrid& self) -> py::array_t<double> {
-                return vlx_general::pointer_to_numpy(self.getCoordinatesY(), std::vector<int>{self.getNumberOfGridPoints()});
+                return vlx_general::pointer_to_numpy(self.getCoordinatesY(), std::vector<py::ssize_t>{self.getNumberOfGridPoints()});
             },
             "Gets Y coordinates of grid as numpy array.")
         .def(
             "z_to_numpy",
             [](const CMolecularGrid& self) -> py::array_t<double> {
-                return vlx_general::pointer_to_numpy(self.getCoordinatesZ(), std::vector<int>{self.getNumberOfGridPoints()});
+                return vlx_general::pointer_to_numpy(self.getCoordinatesZ(), std::vector<py::ssize_t>{self.getNumberOfGridPoints()});
             },
             "Gets Z coordinates of grid as numpy array.")
         .def(
             "w_to_numpy",
             [](const CMolecularGrid& self) -> py::array_t<double> {
-                return vlx_general::pointer_to_numpy(self.getWeights(), std::vector<int>{self.getNumberOfGridPoints()});
+                return vlx_general::pointer_to_numpy(self.getWeights(), std::vector<py::ssize_t>{self.getNumberOfGridPoints()});
             },
             "Gets weights of grid as numpy array.")
         .def(
@@ -631,6 +631,14 @@ export_dft(py::module& m)
 
     PyClass<CXCIntegrator>(m, "XCIntegrator")
         .def(py::init<>())
+        .def(
+            "set_screening_threshold", &CXCIntegrator::setScreeningThresholdForGTOValues,
+            "Sets the value a basis function has to reach over a box of the grid to be kept for it. "
+            "What this keeps is what the matrix phases of the quadrature are quadratic in.",
+            "threshold"_a)
+        .def(
+            "get_screening_threshold", &CXCIntegrator::getScreeningThresholdForGTOValues,
+            "Gets the value a basis function has to reach to be kept.")
         .def(
             "integrate_vxc_fock",
             [](const CXCIntegrator&                    self,
@@ -746,6 +754,26 @@ export_dft(py::module& m)
             },
             "Integrates 4th-order exchange-correlation contribution.")
         .def("integrate_vxc_pdft", &CXCIntegrator_integrate_vxc_pdft)
+        .def("get_largest_box_ao_counts_for_response_fock_xc",
+             &CXCIntegrator::getLargestBoxAOCountsForResponseFockXC,
+             "Gets the numbers of basis functions the largest boxes of this rank's share of the grid keep in the "
+             "exchange-correlation part of response Fock matrices (integrate_fxc_fock, integrate_kxc_fock, "
+             "integrate_kxclxc_fock), largest first.",
+             "molecule"_a,
+             "basis"_a,
+             "molecular_grid"_a,
+             "xc_functional"_a,
+             "count"_a)
+        .def("get_largest_boxes_for_response_fock_xc",
+             &CXCIntegrator::getLargestBoxesForResponseFockXC,
+             "Gets the (numbers of basis functions, numbers of grid points) of the largest boxes of this rank's share "
+             "of the grid in the exchange-correlation part of response Fock matrices (integrate_fxc_fock, "
+             "integrate_kxc_fock, integrate_kxclxc_fock), most functions first.",
+             "molecule"_a,
+             "basis"_a,
+             "molecular_grid"_a,
+             "xc_functional"_a,
+             "count"_a)
         .def(
             "compute_gto_values",
             [](CXCIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
@@ -784,6 +812,13 @@ export_dft(py::module& m)
 
     PyClass<CXCMolecularGradient>(m, "XCMolecularGradient")
         .def(py::init<>())
+        .def(
+            "set_screening_threshold", &CXCMolecularGradient::setScreeningThresholdForGTOValues,
+            "Sets the value a basis function has to reach over a box of the grid to be kept for it.",
+            "threshold"_a)
+        .def(
+            "get_screening_threshold", &CXCMolecularGradient::getScreeningThresholdForGTOValues,
+            "Gets the value a basis function has to reach to be kept.")
         .def(
             "integrate_vxc_gradient",
             [](CXCMolecularGradient&      self,
@@ -846,6 +881,13 @@ export_dft(py::module& m)
 
     PyClass<CXCMolecularHessian>(m, "XCMolecularHessian")
         .def(py::init<>())
+        .def(
+            "set_screening_threshold", &CXCMolecularHessian::setScreeningThresholdForGTOValues,
+            "Sets the value a basis function has to reach over a box of the grid to be kept for it.",
+            "threshold"_a)
+        .def(
+            "get_screening_threshold", &CXCMolecularHessian::getScreeningThresholdForGTOValues,
+            "Gets the value a basis function has to reach to be kept.")
         .def(
             "integrate_exc_hessian",
             [](CXCMolecularHessian&                    self,

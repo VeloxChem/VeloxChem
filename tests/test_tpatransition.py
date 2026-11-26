@@ -17,7 +17,7 @@ from veloxchem.tpatransitiondriver import TpaTransitionDriver
 @pytest.mark.solvers
 class TestTpaTransition:
 
-    def run_scf(self, xcfun_label, ri_coulomb=False):
+    def run_scf(self, xcfun_label, ri_coulomb=False, ri_jk=False):
 
         molecule_string = """
             O  0.0           0.0  0.0
@@ -32,7 +32,7 @@ class TestTpaTransition:
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
-        scf_drv.ri_coulomb = ri_coulomb
+        scf_drv.ri = ri_coulomb or ri_jk
         scf_drv.conv_thresh = scf_conv_thresh
         scf_drv.ostream.mute()
         scf_results = scf_drv.compute(molecule, basis)
@@ -40,18 +40,21 @@ class TestTpaTransition:
         return scf_results, molecule, basis
 
     def run_tpatransition(self, xcfun_label, ref_energies, ref_strengths,
-                          ri_coulomb=False):
+                          ri_coulomb=False, ri_jk=False):
 
         tpa_nstates = 2
         tpa_conv_thresh = 1.0e-7
 
         scf_results, molecule, ao_basis = self.run_scf(xcfun_label,
-                                                       ri_coulomb=ri_coulomb)
+                                                       ri_coulomb=ri_coulomb,
+                                                       ri_jk=ri_jk)
 
         tpa_drv = TpaTransitionDriver()
         tpa_drv.xcfun = xcfun_label
         tpa_drv.nstates = tpa_nstates
         tpa_drv.conv_thresh = tpa_conv_thresh
+        if ri_jk:
+            tpa_drv.ri_auxiliary_basis = 'def2-universal-jkfit'
         tpa_drv.ostream.mute()
         tpa_results = tpa_drv.compute(molecule, ao_basis, scf_results)
 
@@ -86,7 +89,7 @@ class TestTpaTransition:
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
-        scf_drv.ri_coulomb = ri_coulomb
+        scf_drv.ri = ri_coulomb
         scf_drv.conv_thresh = 1.0e-8
         scf_drv.filename = filename
         scf_drv.ostream.mute()
@@ -130,6 +133,15 @@ class TestTpaTransition:
                                ref_energies,
                                ref_strengths,
                                ri_coulomb=True)
+
+    def test_tpatransition_ri_jk_hf(self):
+
+        ref_energies = [0.16569606746912344, 0.21191135775840889]
+        ref_strengths = [4.134118567278221, 15.847818280617608]
+        self.run_tpatransition('hf',
+                               ref_energies,
+                               ref_strengths,
+                               ri_jk=True)
 
     def test_get_spectrum(self):
 

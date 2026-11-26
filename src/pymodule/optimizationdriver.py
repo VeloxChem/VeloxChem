@@ -1559,10 +1559,13 @@ class OptimizationDriver:
                 key: value
                 for key, value in opt_results.items() if key != 'final_molecule'
             }
+
+            write_t0 = tm.time()
+
             write_opt_results_to_hdf5(fname, h5_opt_results)
 
-            valstr = 'Optimization results written to file: '
-            valstr += fname
+            valstr = f'Optimization results written to file: {fname} '
+            valstr += f'(took {tm.time() - write_t0:.2f} sec).'
             self.ostream.print_info(valstr)
             self.ostream.print_blank()
             self.ostream.flush()

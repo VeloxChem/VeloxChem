@@ -19,8 +19,7 @@ except ImportError:
 
 @pytest.mark.skipif(('openmm' not in sys.modules)
                     or (not XtbDriver.is_available()),
-                    reason='openmm or xtb-python not available')
-@pytest.mark.timeconsuming
+                    reason='openmm or tblite-python not available')
 class TestEvb:
 
     def test_forcefield_builder(self):
@@ -84,12 +83,23 @@ class TestEvb:
         self._compare_dict(reactant.bonds, reactant_ref.bonds)
         self._compare_dict(reactant.angles, reactant_ref.angles)
         self._compare_dict(reactant.dihedrals, reactant_ref.dihedrals)
-        self._compare_dict(reactant.impropers, reactant_ref.impropers)
+        self._compare_dict(self._sort_improper_keys(reactant.impropers),
+                           self._sort_improper_keys(reactant_ref.impropers))
 
         self._compare_dict(product.bonds, product_ref.bonds)
         self._compare_dict(product.angles, product_ref.angles)
         self._compare_dict(product.dihedrals, product_ref.dihedrals)
-        self._compare_dict(product.impropers, product_ref.impropers)
+        self._compare_dict(self._sort_improper_keys(product.impropers),
+                           self._sort_improper_keys(product_ref.impropers))
+
+    @staticmethod
+    def _sort_improper_keys(impropers):
+        # The order of the outer atoms of an improper follows the mapping of equivalent atoms, such as the hydrogens
+        # of ethene, which depends on the networkx version. Only the central atom, which comes first, is fixed.
+        sorted_impropers = {(k[0], ) + tuple(sorted(k[1:])): v
+                            for k, v in impropers.items()}
+        assert len(sorted_impropers) == len(impropers)
+        return sorted_impropers
 
     def _compare_dict(self, dict1, dict2, float_tol=1e-2):
 
@@ -249,6 +259,9 @@ class TestEvb:
                 # skip the line with openmm version
                 if 'openmmVersion' in sys_line:
                     continue
+                # OpenMM 8.6 writes the default rigidScaling of the barostat, older versions do not
+                sys_line = sys_line.replace(' rigidScaling="1"', '')
+                ref_line = ref_line.replace(' rigidScaling="1"', '')
 
                 if sys_line.startswith('<A x=') and ref_line.startswith(
                         '<A x=') or sys_line.startswith(

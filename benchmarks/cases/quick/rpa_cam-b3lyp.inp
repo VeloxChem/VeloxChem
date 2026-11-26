@@ -1,0 +1,20 @@
+# Caffeine, CAM-B3LYP, def2-SVP: RPA, 5 states, range-separated response (RI-JK).
+@jobs
+task: response
+@end
+
+@method settings
+xcfun: cam-b3lyp
+basis: def2-svp
+@end
+
+@response
+property: absorption
+nstates: 5
+@end
+
+@molecule
+charge: 0
+multiplicity: 1
+xyzfile: caffeine.xyz
+@end

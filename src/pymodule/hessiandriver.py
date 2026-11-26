@@ -31,6 +31,7 @@
 #  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from mpi4py import MPI
+from contextlib import nullcontext
 import numpy as np
 import sys
 
@@ -38,7 +39,7 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .dftutils import get_default_grid_level
 from .inputparser import parse_input
-from .sanitychecks import dft_sanity_check
+from .sanitychecks import dft_and_ri_sanity_check
 from .molecule import Molecule
 
 
@@ -163,7 +164,7 @@ class HessianDriver:
 
         parse_input(self, method_keywords, method_dict)
 
-        dft_sanity_check(self, 'update_settings')
+        dft_and_ri_sanity_check(self, 'update_settings')
 
         self.method_dict = dict(method_dict)
         self.hess_dict = dict(hess_dict)
@@ -365,6 +366,32 @@ class HessianDriver:
         :param args:
             The same arguments as the compute function.
         """
+
+        # NOTE: the SCF at every displaced geometry, and what is formed on it,
+        # takes the choice between RI and the four-center integrals that the
+        # SCF made at the reference geometry; see
+        # ScfDriver._ri_kept_for_displacements. A driver with no SCF driver
+        # has no such choice.
+        scf_drv = getattr(self, 'scf_driver', None)
+
+        if scf_drv is not None:
+            ri_kept = scf_drv._ri_kept_for_displacements()
+        else:
+            ri_kept = nullcontext()
+
+        with ri_kept:
+            self._compute_numerical_hessian(molecule, *args)
+
+    def _compute_numerical_hessian(self, molecule, *args):
+        """
+        Computes the numerical Hessian from the analytical gradients at
+        displaced geometries.
+
+        :param molecule:
+            The molecule.
+        :param args:
+            The same arguments as the compute function.
+        """
         # atom ids
         labels = molecule.get_labels()
 
@@ -406,7 +433,7 @@ class HessianDriver:
                 grad_plus = self.compute_gradient(new_mol, *args)
 
                 if self.do_dipole_gradient:
-                    dipmom_plus = (self.compute_electric_dipole_moment(
+                    dipmom_plus = (self._compute_electric_dipole_moment(
                         new_mol, *args))
 
                 coords[i, d] -= 2.0 * self.delta_h
@@ -417,7 +444,7 @@ class HessianDriver:
                 grad_minus = self.compute_gradient(new_mol, *args)
 
                 if self.do_dipole_gradient:
-                    dipmom_minus = (self.compute_electric_dipole_moment(
+                    dipmom_minus = (self._compute_electric_dipole_moment(
                         new_mol, *args))
 
                 if self.do_four_point:
@@ -429,7 +456,7 @@ class HessianDriver:
                     grad_minus2 = self.compute_gradient(new_mol, *args)
 
                     if self.do_dipole_gradient:
-                        dipmom_minus2 = (self.compute_electric_dipole_moment(
+                        dipmom_minus2 = (self._compute_electric_dipole_moment(
                             new_mol, *args))
 
                     coords[i, d] += 4.0 * self.delta_h
@@ -440,7 +467,7 @@ class HessianDriver:
                     grad_plus2 = self.compute_gradient(new_mol, *args)
 
                     if self.do_dipole_gradient:
-                        dipmom_plus2 = (self.compute_electric_dipole_moment(
+                        dipmom_plus2 = (self._compute_electric_dipole_moment(
                             new_mol, *args))
 
                     coords[i, d] -= 2.0 * self.delta_h
@@ -505,9 +532,10 @@ class HessianDriver:
 
         return
 
-    def compute_electric_dipole_moment(self, molecule, *args):
+    def _compute_electric_dipole_moment(self, molecule, *args):
         """
-        Computes the electric dipole moment at current geometry.
+        Computes the electric dipole moment at current geometry, about the
+        fixed origin (0,0,0), for the dipole gradient of compute_numerical.
 
         :param molecule:
             The molecule.

@@ -5,6 +5,8 @@ import pytest
 
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
+from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfhessiandriver import ScfHessianDriver
 from veloxchem.vibrationalanalysis import VibrationalAnalysis
@@ -12,18 +14,30 @@ from veloxchem.vibrationalanalysis import VibrationalAnalysis
 
 class TestScfHessianDriver:
 
-    @pytest.mark.timeconsuming
-    def test_scf_hessian_driver(self):
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
+    def test_scf_hessian_driver(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
-        h5file = str(here / 'data' / 'water_hessian_scf.h5')
+        h5file = str(here / 'data' / {
+            False: 'water_hessian_scf.h5',
+            True: 'water_hessian_scf_ri.h5'
+        }[ri])
 
         task = MpiTask([inpfile, None])
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.acc_type = 'l2_c2diis'
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_drv.ri = ri
+        scf_drv.acc_type = 'diis'
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vib_settings = {
             'do_ir': 'yes',
@@ -63,8 +77,11 @@ class TestScfHessianDriver:
 
         task.finish()
 
-    @pytest.mark.timeconsuming
-    def test_numerical_vib_resets_final_h5_geometry(self, tmp_path):
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
+    def test_numerical_vib_resets_final_h5_geometry(self, tmp_path, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
@@ -75,9 +92,15 @@ class TestScfHessianDriver:
         filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.ri = ri
+        scf_drv.acc_type = 'l2_diis'
         scf_drv.filename = filename
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vib_settings = {
             'do_ir': 'yes',
@@ -100,9 +123,12 @@ class TestScfHessianDriver:
 
         task.finish()
 
-    @pytest.mark.timeconsuming
+    @pytest.mark.parametrize('ri', [
+        False,
+        pytest.param(True, marks=pytest.mark.timeconsuming),
+    ])
     def test_numerical_vib_results_include_legacy_vib_domain_fields(
-            self, tmp_path):
+            self, tmp_path, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
@@ -113,9 +139,15 @@ class TestScfHessianDriver:
         filename = task.mpi_comm.bcast(filename, root=mpi_master())
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.acc_type = 'l2_c2diis'
+        scf_drv.ri = ri
+        scf_drv.acc_type = 'l2_diis'
         scf_drv.filename = filename
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         vibanalysis_drv = VibrationalAnalysis(scf_drv)
         vibanalysis_drv.update_settings({}, {
@@ -151,16 +183,27 @@ class TestScfHessianDriver:
         task.finish()
 
     @pytest.mark.solvers
-    def test_analytical_scf_hessian(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_analytical_scf_hessian(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
-        h5file = str(here / 'data' / 'water_analytical_hessian_scf.h5')
+        h5file = str(
+            here / 'data' / {
+                False: 'water_analytical_hessian_scf.h5',
+                True: 'water_analytical_hessian_scf_ri.h5'
+            }[ri])
 
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.ri = ri
 
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         method_settings = {}
         cphf_settings = {'conv_thresh': 1e-8}
@@ -189,19 +232,30 @@ class TestScfHessianDriver:
             assert diff_hessian < 1e-6
 
     @pytest.mark.solvers
-    def test_analytical_pbe_hessian(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_analytical_pbe_hessian(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
-        h5file = str(here / 'data' / 'water_analytical_hessian_pbe.h5')
+        h5file = str(
+            here / 'data' / {
+                False: 'water_analytical_hessian_pbe.h5',
+                True: 'water_analytical_hessian_pbe_ri.h5'
+            }[ri])
 
         task = MpiTask([inpfile, None])
 
         method_settings = {'xcfun': 'pbe', 'grid_level': 7}
         scf_settings = {}
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.ri = ri
         scf_drv.update_settings(scf_settings, method_settings)
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         cphf_settings = {'conv_thresh': 1e-8}
         hess_settings = {'numerical': 'no'}
@@ -230,19 +284,30 @@ class TestScfHessianDriver:
             assert diff_hessian < 1e-6
 
     @pytest.mark.solvers
-    def test_analytical_camb3lyp_hessian(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_analytical_camb3lyp_hessian(self, ri):
 
         here = Path(__file__).parent
         inpfile = str(here / 'data' / 'water_hessian_scf.inp')
-        h5file = str(here / 'data' / 'water_analytical_hessian_camb3lyp.h5')
+        h5file = str(
+            here / 'data' / {
+                False: 'water_analytical_hessian_camb3lyp.h5',
+                True: 'water_analytical_hessian_camb3lyp_ri.h5'
+            }[ri])
 
         task = MpiTask([inpfile, None])
 
         method_settings = {'xcfun': 'cam-b3lyp', 'grid_level': 7}
         scf_settings = {}
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.ri = ri
         scf_drv.update_settings(scf_settings, method_settings)
-        scf_drv.compute(task.molecule, task.ao_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         cphf_settings = {'conv_thresh': 1e-8}
         hess_settings = {'numerical': 'no'}
@@ -269,3 +334,80 @@ class TestScfHessianDriver:
             hf.close()
             diff_hessian = np.max(np.abs(hessian_drv.hessian - ref_hessian))
             assert diff_hessian < 1e-6
+
+    @pytest.mark.solvers
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_analytical_mgga_hessian_translational_invariance(self, ri):
+        """For each atom, the 3x3 blocks of its row of the M06-L Hessian sum
+        to zero within 1e-4, with the default grid levels (level 6 for the
+        SCF and the XC Hessian here). This needs the same-atom blocks of the
+        XC energy term to be rebuilt in ScfHessianDriver. Water/def2-SVP, one
+        rank and 12 threads, with and without RI: the largest row sum is
+        9.3e-6 with the rebuild and 4.5e-3 (on O) without it."""
+
+        mol = Molecule.read_xyz_string("""3
+
+        O          -0.047424118711       -0.000000000360       -0.033716003849
+        H           0.034041961427        0.000000000693        0.952334284820
+        H           0.909380965625       -0.000000000444       -0.285619983969""")
+        basis = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = ri
+        scf_drv.xcfun = 'm06-l'
+        scf_drv.ostream.mute()
+        scf_results = scf_drv.compute(mol, basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
+
+        hessian_drv = ScfHessianDriver(scf_drv)
+        hessian_drv.ostream.mute()
+        hessian_drv.update_settings({}, cphf_dict={'conv_thresh': 1e-8})
+        hessian_drv.compute(mol, basis)
+
+        if scf_drv.rank == mpi_master():
+            natoms = mol.number_of_atoms()
+            row_sums = hessian_drv.hessian.reshape(natoms, 3, natoms,
+                                                   3).sum(axis=2)
+            assert np.max(np.abs(row_sums)) < 1e-4
+
+    def test_restricted_ri_jk_hessian(self):
+        """The RI-JK analytical Hessian must run and stay within the RI-JK
+        approximation error of the no-RI Hessian.  This exercises the RI-JK
+        factors of the CPHF sigma and of the fock_uij right-hand side."""
+
+        mol = Molecule.read_xyz_string("""3
+        water
+        O    0.000000    0.000000    0.000000
+        H    0.000000   -0.757160    0.586260
+        H    0.000000    0.757160    0.586260
+        """)
+        bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
+
+        scf_ref = ScfRestrictedDriver()
+        scf_ref.ri = False
+        scf_ref.ostream.mute()
+        scf_ref.xcfun = 'hf'
+        scf_ref.compute(mol, bas)
+
+        hess_ref = ScfHessianDriver(scf_ref)
+        hess_ref.ostream.mute()
+        hess_ref.compute(mol, bas)
+
+        scf_rijk = ScfRestrictedDriver()
+        scf_rijk.ri = True
+        scf_rijk.ostream.mute()
+        scf_rijk.xcfun = 'hf'
+        scf_rijk.compute(mol, bas)
+
+        hess_rijk = ScfHessianDriver(scf_rijk)
+        hess_rijk.ostream.mute()
+        hess_rijk.compute(mol, bas)
+
+        if scf_rijk.rank == mpi_master():
+            rel_diff = (np.linalg.norm(hess_rijk.hessian - hess_ref.hessian) /
+                        np.linalg.norm(hess_ref.hessian))
+            assert rel_diff < 1.0e-3

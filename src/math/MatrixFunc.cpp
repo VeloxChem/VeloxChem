@@ -38,11 +38,20 @@
 #include "TensorComponents.hpp"
 #include "StringFormat.hpp"
 
+#include "ErrorHandler.hpp"
+
 namespace matfunc {  // matfunc namespace
 
 auto
 make_matrix(const CMolecularBasis& basis, const mat_t mtype) -> CMatrix
 {
+    // NOTE: a lower triangular matrix is stored by CPackedMatrix alone. This
+    // matrix expands a stored triangle into both halves, which would turn the
+    // zeros above the diagonal into the elements below it.
+
+    errors::assertMsgCritical(mtype != mat_t::lower_triangular,
+                              std::string("matfunc::make_matrix: A lower triangular matrix is not supported"));
+
     if ((mtype == mat_t::symmetric) || (mtype == mat_t::antisymmetric))
     {
         auto matrix = CMatrix();

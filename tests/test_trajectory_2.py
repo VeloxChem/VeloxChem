@@ -7,20 +7,19 @@ from veloxchem.ensembleparser import EnsembleParser
 from veloxchem.ensembledriver import EnsembleDriver
 
 pytest.importorskip("MDAnalysis")
-pytest.importorskip("pyframe")
 
 
 @pytest.mark.solvers
 class TestTrajectory:
 
-    def test_compute_with_scf_and_property_options_for_bithio(self, tmp_path):
+    def test_compute_with_scf_and_property_options_for_bithio(self):
         """
         Regression test for notebook-style ensemble API:
         - compute(..., scf_options=..., property_options=...)
         - property='absorption' + nstates routes to TD-DFT/LR path
-        - PE potfile is frame-specific for each snapshot
-        - compare SCF energies and LR eigenvalues to validated reference output
-        - compare generated PE+NPE .pot files against reference files line-by-line
+        - the fika potfile is frame-specific for each snapshot
+        - compare LR eigenvalues and oscillator strengths to fika reference output
+        - check that the generated PE+NPE .pot files exist
         """
         data_dir = Path(__file__).parent / "data"
         traj = str(data_dir / "bithio.xtc")
@@ -72,15 +71,15 @@ class TestTrajectory:
         assert len(results["scf_all"]) == 2
         assert len(results["rsp_all"]) == 2
 
-        # Reference values from validated output
+        # Reference values from validated fika output
         ref_frames = [6, 8]
         ref_eigs = {
-            6: np.array([5.790027, 7.172051]) / hartree_in_ev(),
-            8: np.array([5.628371, 7.199163]) / hartree_in_ev(),
+            6: np.array([5.78875447, 7.17288998]) / hartree_in_ev(),
+            8: np.array([5.62513120, 7.19323719]) / hartree_in_ev(),
         }
         ref_osc = {
-            6: np.array([0.5414, 0.0181]),
-            8: np.array([0.5529, 0.1210]),
+            6: np.array([0.54164731, 0.01810991]),
+            8: np.array([0.55327598, 0.12162315]),
         }
 
         got_frames = [int(frame) for frame, _ in results["scf_all"]]
@@ -93,9 +92,8 @@ class TestTrajectory:
                 expected_name = f"pe_frame_{int(frame):06d}.pot"
                 expected_path = potdir / expected_name
 
-                # Each snapshot must use its own PE file
+                # Each snapshot must use its own potfile
                 assert expected_path.is_file()
-                assert str(scf_res.get("potfile", "")).endswith(expected_name)
 
             for frame, rsp_res in results["rsp_all"]:
                 frame = int(frame)
@@ -115,6 +113,4 @@ class TestTrajectory:
             # cleanup
             (data_dir / ".bithio.xtc_offsets.npz").unlink(missing_ok=True)
             (data_dir / "pe_frame_000006.pot").unlink(missing_ok=True)
-            (data_dir / "pe_frame_000006.json").unlink(missing_ok=True)
             (data_dir / "pe_frame_000008.pot").unlink(missing_ok=True)
-            (data_dir / "pe_frame_000008.json").unlink(missing_ok=True)

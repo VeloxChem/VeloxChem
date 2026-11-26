@@ -1,0 +1,1276 @@
+//
+//                                   VELOXCHEM
+//              ----------------------------------------------------
+//                          An Electronic Structure Code
+//
+//  SPDX-License-Identifier: BSD-3-Clause
+//
+//  Copyright 2018-2025 VeloxChem developers
+//
+//  Redistribution and use in source and binary forms, with or without modification,
+//  are permitted provided that the following conditions are met:
+//
+//  1. Redistributions of source code must retain the above copyright notice, this
+//     list of conditions and the following disclaimer.
+//  2. Redistributions in binary form must reproduce the above copyright notice,
+//     this list of conditions and the following disclaimer in the documentation
+//     and/or other materials provided with the distribution.
+//  3. Neither the name of the copyright holder nor the names of its contributors
+//     may be used to endorse or promote products derived from this software without
+//     specific prior written permission.
+//
+//  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+//  ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+//  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+//  DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+//  FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//  DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+//  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//  HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+//  OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+
+#include "ExportSimdIntegrals.hpp"
+
+#include <pybind11/numpy.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+
+#include <vector>
+
+#include "ExportGeneral.hpp"
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
+#include "PackedMatrix.hpp"
+#include "SparseTensor.hpp"
+#include "TripleSparsityPattern.hpp"
+#include "SimdKineticEnergyDriver.hpp"
+#include "SimdNuclearPotentialDriver.hpp"
+#include "SimdOverlapDriver.hpp"
+#include "SimdRIFockDriver.hpp"
+#include "SimdRIJFockDriver.hpp"
+#include "SimdRIJKFockDriver.hpp"
+#include "SimdRIJGradientDriver.hpp"
+#include "SimdRIJKGradientDriver.hpp"
+#include "SimdRIJKResponseDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionGradientDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionGradientRsDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionGradientDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionGradientRsDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionDriver.hpp"
+#include "SimdThreeCenterElectronRepulsionRsDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionDriver.hpp"
+#include "SimdTwoCenterElectronRepulsionRsDriver.hpp"
+#include "SparseMatrix.hpp"
+
+namespace vlx_simdintegrals {  // vlx_simdintegrals namespace
+
+auto
+export_simdintegrals(py::module &m) -> void
+{
+    // CSimdOverlapDriver class
+
+    PyClass<CSimdOverlapDriver>(m, "SimdOverlapDriver")
+        .def(py::init<>())
+        .def(py::init<const double, const size_t>(),
+             "Creates an overlap driver with given screening threshold and target block size.",
+             py::arg("threshold"),
+             py::arg("block_size") = 0)
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &>(&CSimdOverlapDriver::compute_matrix, py::const_),
+             "Computes sparse overlap matrix for given molecule and basis.",
+             py::arg("molecule"),
+             py::arg("basis"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CMolecularBasis &>(
+                 &CSimdOverlapDriver::compute_matrix, py::const_),
+             "Computes sparse overlap matrix for given molecule and pair of bases.",
+             py::arg("molecule"),
+             py::arg("bra_basis"),
+             py::arg("ket_basis"))
+        .def("get_threshold", &CSimdOverlapDriver::get_threshold, "Gets screening threshold of the integrals.")
+        .def("get_block_size", &CSimdOverlapDriver::get_block_size, "Gets target number of atom pairs of a block.");
+
+    // CSimdKineticEnergyDriver class
+
+    PyClass<CSimdKineticEnergyDriver>(m, "SimdKineticEnergyDriver")
+        .def(py::init<>())
+        .def(py::init<const double, const size_t>(),
+             "Creates a kinetic energy driver with given screening threshold and target block size.",
+             py::arg("threshold"),
+             py::arg("block_size") = 0)
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &>(&CSimdKineticEnergyDriver::compute_matrix, py::const_),
+             "Computes sparse kinetic energy matrix for given molecule and basis.",
+             py::arg("molecule"),
+             py::arg("basis"))
+        .def("get_threshold", &CSimdKineticEnergyDriver::get_threshold, "Gets screening threshold of the integrals.")
+        .def("get_block_size", &CSimdKineticEnergyDriver::get_block_size, "Gets target number of atom pairs of a block.");
+
+    // CSimdNuclearPotentialDriver class
+
+    PyClass<CSimdNuclearPotentialDriver>(m, "SimdNuclearPotentialDriver")
+        .def(py::init<>())
+        .def(py::init<const double, const size_t>(),
+             "Creates a nuclear potential driver with given screening threshold and target block size.",
+             py::arg("threshold"),
+             py::arg("block_size") = 0)
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const std::vector<double> &,
+                               const std::vector<double> &>(&CSimdNuclearPotentialDriver::compute_matrix, py::const_),
+             "Computes sparse nuclear potential matrix for given molecule, basis and set of point charges. "
+             "The positions of the charges are a flat array of three coordinates each, in bohr.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("charges"),
+             py::arg("points"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &>(
+                 &CSimdNuclearPotentialDriver::compute_matrix, py::const_),
+             "Computes sparse nuclear potential matrix for given molecule and basis, the point charges being "
+             "the nuclei of the molecule.",
+             py::arg("molecule"),
+             py::arg("basis"))
+        .def("get_threshold", &CSimdNuclearPotentialDriver::get_threshold, "Gets screening threshold of the integrals.")
+        .def("get_block_size", &CSimdNuclearPotentialDriver::get_block_size, "Gets target number of atom pairs of a block.");
+
+    // CSimdTwoCenterElectronRepulsionDriver class
+
+    PyClass<CSimdTwoCenterElectronRepulsionDriver>(m, "SimdTwoCenterElectronRepulsionDriver")
+        .def(py::init<>())
+        .def(py::init<const size_t>(),
+             "Creates a two-center electron repulsion driver with given target block size.",
+             py::arg("block_size"))
+        .def("compute",
+             &CSimdTwoCenterElectronRepulsionDriver::compute,
+             "Computes packed two-center electron repulsion matrix for given molecule and basis.",
+             py::arg("molecule"),
+             py::arg("basis"))
+        .def("get_block_size",
+             &CSimdTwoCenterElectronRepulsionDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
+
+    // CSimdTwoCenterElectronRepulsionRsDriver class
+
+    PyClass<CSimdTwoCenterElectronRepulsionRsDriver>(m, "SimdTwoCenterElectronRepulsionRsDriver")
+        .def(py::init<>())
+        .def(py::init<const size_t>(),
+             "Creates a range separated two-center electron repulsion driver with given target block size.",
+             py::arg("block_size"))
+        .def("compute",
+             &CSimdTwoCenterElectronRepulsionRsDriver::compute,
+             "Computes the packed two-center matrices of the Coulomb operator and of the range separated "
+             "Coulomb operator for given molecule and basis, in that order.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("omega"))
+        .def("get_block_size",
+             &CSimdTwoCenterElectronRepulsionRsDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
+
+    // CSimdThreeCenterElectronRepulsionRsDriver class
+
+    PyClass<CSimdThreeCenterElectronRepulsionRsDriver>(m, "SimdThreeCenterElectronRepulsionRsDriver")
+        .def(py::init<>())
+        .def("make_pattern",
+             static_cast<CTripleSparsityPattern (CSimdThreeCenterElectronRepulsionRsDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double) const>(
+                 &CSimdThreeCenterElectronRepulsionRsDriver::make_pattern),
+             "Creates the sparsity pattern the integrals are computed in, from the Coulomb bound, which "
+             "both tensors are built on.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"))
+        .def("compute",
+             static_cast<std::pair<CSparseTensor, CSparseTensor> (CSimdThreeCenterElectronRepulsionRsDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double,
+                 const double) const>(&CSimdThreeCenterElectronRepulsionRsDriver::compute),
+             "Computes the sparse tensors of the Coulomb and of the range separated Coulomb three-center "
+             "integrals, in that order, both on the one pattern.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("omega"))
+        .def("compute",
+             static_cast<std::pair<CSparseTensor, CSparseTensor> (CSimdThreeCenterElectronRepulsionRsDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double,
+                 const double, const std::vector<int> &) const>(
+                 &CSimdThreeCenterElectronRepulsionRsDriver::compute),
+             "Computes them for the given atoms on the auxiliary side.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("omega"),
+             py::arg("atoms"));
+
+    // CSimdThreeCenterElectronRepulsionDriver class
+
+    // CTripleSparsityPattern, which the gradient of the three-center integrals is
+    // asked for rather than forming: it must be the one the calculation already
+    // holds, so that the derivative indexes the same atom pairs as the B vectors.
+
+    PyClass<CTripleSparsityPattern>(m, "TripleSparsityPattern")
+        .def("number_of_blocks", &CTripleSparsityPattern::number_of_blocks,
+             "Gets the number of blocks of the pattern.")
+        .def("get_threshold", &CTripleSparsityPattern::get_threshold,
+             "Gets the screening threshold the pattern was described with.");
+
+    PyClass<CSimdThreeCenterElectronRepulsionDriver>(m, "SimdThreeCenterElectronRepulsionDriver")
+        .def(py::init<>())
+        .def("make_pattern",
+             static_cast<CTripleSparsityPattern (CSimdThreeCenterElectronRepulsionDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double) const>(
+                 &CSimdThreeCenterElectronRepulsionDriver::make_pattern),
+             "Creates the sparsity pattern the integrals are computed in.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"))
+        .def("make_pattern",
+             static_cast<CTripleSparsityPattern (CSimdThreeCenterElectronRepulsionDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double,
+                 const std::vector<int> &) const>(&CSimdThreeCenterElectronRepulsionDriver::make_pattern),
+             "Creates it for the given atoms on the auxiliary side.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("atoms"))
+        .def("compute",
+             static_cast<CSparseTensor (CSimdThreeCenterElectronRepulsionDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double) const>(
+                 &CSimdThreeCenterElectronRepulsionDriver::compute),
+             "Computes sparse tensor of three-center electron repulsion integrals.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"))
+        .def("compute",
+             static_cast<CSparseTensor (CSimdThreeCenterElectronRepulsionDriver::*)(
+                 const CMolecule &, const CMolecularBasis &, const CMolecularBasis &, const double,
+                 const std::vector<int> &) const>(&CSimdThreeCenterElectronRepulsionDriver::compute),
+             "Computes sparse tensor of three-center electron repulsion integrals for given atoms on c side.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("atoms"));
+
+    // CSimdRIFockDriver class
+
+    PyClass<CSimdRIFockDriver>(m, "SimdRIFockDriver")
+        .def(py::init<>())
+        .def("compute_bq_vectors",
+             &CSimdRIFockDriver::compute_bq_vectors,
+             "Computes sparse tensor of the B vectors of the resolution of the identity.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("inverse_metric"),
+             py::arg("threshold"),
+             py::arg("aux_atoms"))
+        .def("compute_bq_vectors_rs",
+             &CSimdRIFockDriver::compute_bq_vectors_rs,
+             "Computes the B vectors of the Coulomb operator and of the attenuated one, on one pattern.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("inverse_metric"),
+             py::arg("inverse_metric_erf"),
+             py::arg("threshold"),
+             py::arg("omega"),
+             py::arg("aux_atoms"))
+        .def("compute_y_vector",
+             &CSimdRIFockDriver::compute_y_vector,
+             "Contracts the B vectors with a density matrix.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("density"))
+        .def("compute_fock_matrix",
+             static_cast<CPackedMatrix (CSimdRIFockDriver::*)(
+                 const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
+                 const CPackedMatrix &) const>(&CSimdRIFockDriver::compute_fock_matrix),
+             "Computes the Coulomb matrix of the resolution of the identity for a density.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("density"))
+        .def("compute_fock_matrix",
+             static_cast<CPackedMatrix (CSimdRIFockDriver::*)(
+                 const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
+                 const std::vector<double> &) const>(&CSimdRIFockDriver::compute_fock_matrix),
+             "Computes the Coulomb matrix of the resolution of the identity for a Y vector.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("y_vector"))
+        .def("compute_w_vectors",
+             static_cast<std::vector<CPackedMatrix> (CSimdRIFockDriver::*)(
+                 const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
+                 const CPackedMatrix &, const size_t, const size_t) const>(
+                 &CSimdRIFockDriver::compute_w_vectors),
+             "Transforms one index of the B vectors into the molecular orbitals.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("coefficients"),
+             py::arg("qfirst"),
+             py::arg("qlast"))
+        .def("set_dense_threshold", &CSimdRIFockDriver::set_dense_threshold,
+             "Sets the density at which the transformation expands the B vectors.",
+             py::arg("threshold"))
+        .def("get_dense_threshold", &CSimdRIFockDriver::get_dense_threshold,
+             "Gets the density at which the transformation expands the B vectors.")
+        .def("bq_density", &CSimdRIFockDriver::bq_density,
+             "The fraction of the B vectors which is actually filled.",
+             py::arg("bq_vectors"), py::arg("basis"), py::arg("aux_basis"), py::arg("held") = 0)
+        .def("compute_exchange_matrix",
+             [](const CSimdRIFockDriver &self, const std::vector<CPackedMatrix> &w_vectors, CPackedMatrix &matrix,
+                const double factor) { self.compute_exchange_matrix(w_vectors, matrix, factor); },
+             "Adds the exchange contribution of a range of the auxiliary basis to a matrix.",
+             py::arg("w_vectors"),
+             py::arg("matrix"),
+             py::arg("factor") = 1.0);
+
+    // the way the resolution of the identity driver forms its Fock matrices
+
+    py::enum_<rimode>(m, "rimode")
+        .value("automatic", rimode::automatic)
+        .value("in_memory", rimode::in_memory)
+        .value("direct", rimode::direct);
+
+    // CSimdRIJKFockDriver class
+
+    PyClass<CSimdRIJKFockDriver>(m, "SimdRIJKFockDriver")
+        .def(py::init<>())
+        .def("required_memory",
+             &CSimdRIJKFockDriver::required_memory,
+             "Gets the memory of the B vectors of the given auxiliary atoms in bytes. The whole molecule is a "
+             "list of every atom, and an empty list holds nothing.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("aux_atoms"),
+             py::arg("range_separated") = false)
+        .def("peak_memory",
+             &CSimdRIJKFockDriver::peak_memory,
+             "Gets the most memory in bytes the driver reaches when it holds the B vectors, while forming them or "
+             "in a Fock build, for the number of threads of the caller.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("aux_atoms"),
+             py::arg("range_separated"),
+             py::arg("memory_budget"),
+             py::arg("norbitals"))
+        .def("make_metric",
+             &CSimdRIJKFockDriver::make_metric,
+             "Forms the metric a way of building asks for, and answers the way it is for, "
+             "which is the way asked for unless a fallback has changed it.",
+             py::arg("molecule"),
+             py::arg("aux_basis"),
+             py::arg("metric_threshold") = 1.0e-12,
+             py::arg("use_inverse_square_root") = false,
+             py::arg("mode") = rimode::in_memory)
+        .def("make_metric_rs",
+             &CSimdRIJKFockDriver::make_metric_rs,
+             "Forms the inverted metric of the Coulomb operator and that of the attenuated one, "
+             "for the way which holds the B vectors.",
+             py::arg("molecule"),
+             py::arg("aux_basis"),
+             py::arg("metric_threshold"),
+             py::arg("use_inverse_square_root"),
+             py::arg("mode"),
+             py::arg("omega"))
+        .def("prepare",
+             &CSimdRIJKFockDriver::prepare,
+             "Forms the inverted factor of the metric and the B vectors. aux_atoms are the atoms of the "
+             "auxiliary basis this driver holds, a list of every atom for the whole molecule and an empty "
+             "list for none. They have no default, and neither have the arguments before them.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("memory_budget"),
+             py::arg("metric_threshold"),
+             py::arg("use_inverse_square_root"),
+             py::arg("mode"),
+             py::arg("aux_atoms"),
+             py::arg("metric") = CPackedMatrix(),
+             py::arg("min_parts") = 1,
+             py::arg("omega") = 0.0,
+             py::arg("metric_erf") = CPackedMatrix())
+        .def("compute",
+             py::overload_cast<const CPackedMatrix &, const CPackedMatrix &, const double, const double>(
+                 &CSimdRIJKFockDriver::compute),
+             "Computes the Fock matrix, twice the Coulomb less the scaled exchange, and less the scaled "
+             "exchange of the attenuated operator where one is asked for.",
+             py::arg("density"),
+             py::arg("coefficients"),
+             py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor") = 0.0)
+        .def("compute",
+             py::overload_cast<const CPackedMatrix &, const CPackedMatrix &, const CPackedMatrix &, const double,
+                               const double>(&CSimdRIJKFockDriver::compute),
+             "Computes the Fock matrices of the two spins of an open shell, the Coulomb of the total density "
+             "less each spin's scaled exchange, and less each spin's attenuated exchange where one is asked "
+             "for. The way which forms the integrals again on every call does not serve this.",
+             py::arg("density"),
+             py::arg("coefficients_alpha"),
+             py::arg("coefficients_beta"),
+             py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor") = 0.0)
+        .def("compute_exchange",
+             &CSimdRIJKFockDriver::compute_exchange,
+             "Computes the exchange of a range of the orbitals, and the right hand side of the fitting it "
+             "closes on the way. The ranks of a communicator take a range each and add what they answer.",
+             py::arg("coefficients"),
+             py::arg("exchange_scaling_factor"),
+             py::arg("ofirst"),
+             py::arg("olast"))
+        .def("solve_fitting",
+             &CSimdRIJKFockDriver::solve_fitting,
+             "Solves the metric against the right hand side of the fitting, which has to be complete.",
+             py::arg("gamma"))
+        .def("compute_coulomb",
+             &CSimdRIJKFockDriver::compute_coulomb,
+             "Adds the Coulomb matrix of the given parts of the auxiliary basis to a matrix. The ranks of a "
+             "communicator take some parts each.",
+             py::arg("gamma"),
+             py::arg("parts"),
+             py::arg("matrix"))
+        .def("aux_atom_weights",
+             &CSimdRIJKFockDriver::aux_atom_weights,
+             "Gets the memory of the B vectors each atom of the auxiliary basis carries, in bytes, "
+             "which is what a communicator should divide by rather than the count of the atoms.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"))
+        .def("number_of_aux_functions", &CSimdRIJKFockDriver::number_of_aux_functions,
+             "Gets the number of auxiliary basis functions a build sweeps, which is what says whether a "
+             "division over the ranks divided the work and not only the memory.")
+        .def("get_aux_functions", &CSimdRIJKFockDriver::get_aux_functions,
+             py::return_value_policy::reference_internal,
+             "Gets the auxiliary basis functions this driver's B vectors carry, as their dense indices, "
+             "which is what a consumer of them sweeps rather than the whole basis.")
+        .def("number_of_parts", &CSimdRIJKFockDriver::number_of_parts,
+             "Gets the number of parts the Coulomb pass of the direct way is divided over, which is what "
+             "compute_coulomb indexes into.")
+        .def("number_of_sweep_parts", &CSimdRIJKFockDriver::number_of_sweep_parts,
+             "Gets the number of parts the exchange pass sweeps the auxiliary basis in. Every rank sweeps "
+             "every one of them, so asking for more parts of the Coulomb pass must not add any here.")
+        .def("release_work_storage", &CSimdRIJKFockDriver::release_work_storage,
+             "Releases the W matrices and the squares of the threads a Fock build keeps for the next one. The "
+             "next build forms them again; the B vectors and the metrics are kept.")
+        .def("is_prepared", &CSimdRIJKFockDriver::is_prepared, "Checks that the driver has been prepared.")
+        .def("get_mode", &CSimdRIJKFockDriver::get_mode, "Gets the way the driver forms the Fock matrices.")
+        .def("get_bq_vectors", &CSimdRIJKFockDriver::get_bq_vectors,
+             py::return_value_policy::reference_internal, "Gets the B vectors the driver holds.")
+        .def("get_bq_vectors_erf", &CSimdRIJKFockDriver::get_bq_vectors_erf,
+             py::return_value_policy::reference_internal,
+             "Gets the B vectors of the attenuated operator, which are empty unless the driver was "
+             "prepared for a hybrid range separated functional.")
+        .def("get_omega", &CSimdRIJKFockDriver::get_omega,
+             "Gets the range separation parameter the driver was prepared at, or zero.")
+        .def("get_metric", &CSimdRIJKFockDriver::get_metric,
+             py::return_value_policy::reference_internal, "Gets the inverted factor of the metric.")
+        .def("get_metric_erf", &CSimdRIJKFockDriver::get_metric_erf,
+             py::return_value_policy::reference_internal,
+             "Gets the inverted metric of the attenuated operator, which is empty unless the driver "
+             "was prepared for a hybrid range separated functional.")
+        .def("set_dense_threshold", &CSimdRIJKFockDriver::set_dense_threshold,
+             "Sets the density of the B vectors at which the exchange half transformation expands "
+             "them into a square. Zero or less expands always, above one walks the values always.",
+             py::arg("threshold"))
+        .def("get_dense_threshold", &CSimdRIJKFockDriver::get_dense_threshold,
+             "Gets the density at which the exchange half transformation expands the B vectors.")
+        .def("bq_density", &CSimdRIJKFockDriver::bq_density,
+             "The fraction of the B vectors the driver holds which is actually filled. This is the "
+             "quantity the exchange half transformation compares against the threshold.");
+
+    // CSimdRIJFockDriver class
+
+    PyClass<CSimdRIJFockDriver>(m, "SimdRIJFockDriver")
+        .def(py::init<>())
+        .def("required_memory", &CSimdRIJFockDriver::required_memory,
+             "Gets the memory the driver would hold, in bytes. One tensor and nothing else: there is "
+             "no transformation of the integrals to keep.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("threshold"),
+             py::arg("aux_atoms"))
+        .def("peak_memory", &CSimdRIJFockDriver::peak_memory,
+             "Gets the most memory in bytes the driver reaches on this rank when it holds the integrals, while "
+             "forming them or in a build, for the number of threads of the caller.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("threshold"),
+             py::arg("memory_budget"), py::arg("rank"), py::arg("nodes"))
+        .def("make_metric", &CSimdRIJFockDriver::make_metric,
+             "Forms the metric of the auxiliary basis for the fitting: its Cholesky factor (lower triangular), "
+             "or its pseudo inverse (symmetric) when it is close to singular.",
+             py::arg("molecule"), py::arg("aux_basis"), py::arg("metric_threshold"))
+        .def("prepare", &CSimdRIJFockDriver::prepare,
+             "Prepares the driver for a molecule and its bases.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("threshold"),
+             py::arg("memory_budget"), py::arg("metric_threshold"), py::arg("mode"), py::arg("metric"),
+             py::arg("rank"), py::arg("nodes"))
+        .def("is_prepared", &CSimdRIJFockDriver::is_prepared, "Checks that the driver has been prepared.")
+        .def("get_mode", &CSimdRIJFockDriver::get_mode, "Gets the way the driver builds.")
+        .def("get_metric", &CSimdRIJFockDriver::get_metric, py::return_value_policy::reference_internal,
+             "Gets the metric the driver holds: its Cholesky factor (lower triangular) or an inverse (symmetric).")
+        .def("number_of_parts", &CSimdRIJFockDriver::number_of_parts,
+             "Gets the number of parts of the auxiliary basis the sweeps take.")
+        .def("owned_parts", &CSimdRIJFockDriver::owned_parts,
+             "Gets the parts this rank owns, which are the ones it is to sweep. Asked of the driver "
+             "rather than worked out again by the caller, which held these and no others.")
+        .def("compute", &CSimdRIJFockDriver::compute,
+             "Computes the Coulomb matrix of a density, once and not twice: the caller of a restricted "
+             "calculation hands one spin's density and doubles what comes back.",
+             py::arg("density"))
+        .def("compute_gamma", &CSimdRIJFockDriver::compute_gamma,
+             "Sweeps the given parts and sums the right hand side of the fitting over them.",
+             py::arg("density"), py::arg("parts"))
+        .def("solve_fitting", &CSimdRIJFockDriver::solve_fitting,
+             "Solves the fitting for its right hand side, with the Cholesky factor or an inverse of the metric.",
+             py::arg("gamma"))
+        .def("compute_coulomb", &CSimdRIJFockDriver::compute_coulomb,
+             "Adds the Coulomb matrix of the given parts to a matrix.",
+             py::arg("gamma"), py::arg("parts"), py::arg("matrix"));
+
+    // CSimdThreeCenterElectronRepulsionGradientDriver class
+
+    PyClass<CSimdThreeCenterElectronRepulsionGradientDriver>(m, "SimdThreeCenterElectronRepulsionGradientDriver")
+        .def(py::init<>())
+        .def(py::init<const size_t>(),
+             "Creates a driver with given target block size.",
+             py::arg("block_size"))
+        .def("compute",
+             &CSimdThreeCenterElectronRepulsionGradientDriver::compute,
+             "Computes the derivative of the three-center electron repulsion integrals with respect to "
+             "the two atoms on bra side, over a pattern the caller already holds. The tensor carries six "
+             "components an element; the derivative of the auxiliary center is the negative of the two.",
+             py::arg("pattern"),
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"))
+        .def("get_block_size", &CSimdThreeCenterElectronRepulsionGradientDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
+
+    // CSimdThreeCenterElectronRepulsionGradientRsDriver class
+
+    PyClass<CSimdThreeCenterElectronRepulsionGradientRsDriver>(
+        m, "SimdThreeCenterElectronRepulsionGradientRsDriver")
+        .def(py::init<>())
+        .def(py::init<const size_t>(),
+             "Creates a driver with given target block size.",
+             py::arg("block_size"))
+        .def("compute",
+             &CSimdThreeCenterElectronRepulsionGradientRsDriver::compute,
+             "Computes the derivatives of the three-center integrals of the Coulomb operator and of the "
+             "attenuated one with respect to the two atoms on bra side, as two tensors on one pattern "
+             "with six components an element. The derivative of the auxiliary center is the negative of "
+             "the two.",
+             py::arg("pattern"),
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("omega"))
+        .def("get_block_size", &CSimdThreeCenterElectronRepulsionGradientRsDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
+
+    // CSimdTwoCenterElectronRepulsionGradientDriver class
+
+    PyClass<CSimdTwoCenterElectronRepulsionGradientDriver>(m, "SimdTwoCenterElectronRepulsionGradientDriver")
+        .def(py::init<>())
+        .def(py::init<const size_t>(),
+             "Creates a gradient driver with given target block size.",
+             py::arg("block_size"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CPackedMatrix &,
+                               const std::vector<int> &>(
+                 &CSimdTwoCenterElectronRepulsionGradientDriver::compute, py::const_),
+             "Computes the gradient of the two-center electron repulsion integrals of an auxiliary basis "
+             "contracted with Omega, for the given atoms. No sign is applied: the term of an RI-JK "
+             "gradient is the negative of what is returned.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("omega"),
+             py::arg("atoms"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CPackedMatrix &>(
+                 &CSimdTwoCenterElectronRepulsionGradientDriver::compute, py::const_),
+             "Computes it for every atom of the molecule.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("omega"))
+        .def("get_block_size", &CSimdTwoCenterElectronRepulsionGradientDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
+
+    // CSimdTwoCenterElectronRepulsionGradientRsDriver class
+
+    PyClass<CSimdTwoCenterElectronRepulsionGradientRsDriver>(m, "SimdTwoCenterElectronRepulsionGradientRsDriver")
+        .def(py::init<>())
+        .def(py::init<const size_t>(),
+             "Creates a gradient driver with given target block size.",
+             py::arg("block_size"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CPackedMatrix &,
+                               const CPackedMatrix &, const double, const std::vector<int> &>(
+                 &CSimdTwoCenterElectronRepulsionGradientRsDriver::compute, py::const_),
+             "Computes the gradients of the two-center integrals of the Coulomb operator and of the "
+             "attenuated one, each contracted with its own Omega, for the given atoms. They come back "
+             "apart because the two carry different coefficients in a range separated functional.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("omega_coulomb"),
+             py::arg("omega_attenuated"),
+             py::arg("omega"),
+             py::arg("atoms"))
+        .def("compute",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CPackedMatrix &,
+                               const CPackedMatrix &, const double>(
+                 &CSimdTwoCenterElectronRepulsionGradientRsDriver::compute, py::const_),
+             "Computes them for every atom of the molecule.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("omega_coulomb"),
+             py::arg("omega_attenuated"),
+             py::arg("omega"))
+        .def("get_block_size", &CSimdTwoCenterElectronRepulsionGradientRsDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
+
+    // TFittedDensities, what the first phase of the gradient forms
+
+    py::class_<TFittedDensities>(m, "FittedDensities")
+        .def_readonly("coefficients", &TFittedDensities::coefficients,
+                      "The fitting coefficients, one per auxiliary basis function.")
+        .def_readonly("orbital_densities", &TFittedDensities::orbital_densities,
+                      "The fitted densities of the occupied orbitals, one matrix per auxiliary function.")
+        .def_readonly("omega", &TFittedDensities::omega,
+                      "The two-index fitted density the derivative of the metric is contracted against.");
+
+    // CSimdRIJGradientDriver class
+
+    PyClass<CSimdRIJGradientDriver>(m, "SimdRIJGradientDriver")
+        .def(py::init<>())
+        .def(py::init<const double, const size_t>(),
+             "Creates a Coulomb only gradient driver with given screening threshold and target block size. "
+             "The threshold must be the one the calculation fitted with, so that the derivative runs over "
+             "the atom pairs the energy did.",
+             py::arg("threshold"),
+             py::arg("block_size") = 0)
+        .def("get_threshold", &CSimdRIJGradientDriver::get_threshold, "Gets the screening threshold of the integrals.")
+        .def("get_block_size", &CSimdRIJGradientDriver::get_block_size, "Gets the target number of atom pairs of a block.")
+        .def("peak_memory", &CSimdRIJGradientDriver::peak_memory,
+             "Gets the most memory a gradient reaches beside the fitting coefficients and the density it is "
+             "handed, in bytes, for the number of threads of the caller and with a margin of a tenth.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("aux_atoms"),
+             py::arg("with_metric"))
+        .def("compute",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const std::vector<double> &,
+                               const CPackedMatrix &,
+                               const std::vector<int> &,
+                               const std::vector<int> &,
+                               const bool>(&CSimdRIJGradientDriver::compute, py::const_),
+             "Computes the Coulomb contribution to the gradient of the given atoms, from the fitting "
+             "coefficients a Coulomb only Fock driver solved for. The rows of the atoms not asked for are "
+             "zero. aux_atoms names the share of the auxiliary basis this rank holds, which makes the "
+             "gradient a partial one the ranks reduce: a list of every atom for the whole molecule, and an "
+             "empty list for none.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("fitting"),
+             py::arg("density"),
+             py::arg("atoms"),
+             py::arg("aux_atoms"),
+             py::arg("with_metric") = true)
+        .def("compute",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const std::vector<double> &,
+                               const CPackedMatrix &>(&CSimdRIJGradientDriver::compute, py::const_),
+             "Computes the Coulomb contribution to the gradient of every atom of the molecule.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("fitting"),
+             py::arg("density"))
+        .def("compute_open_shell",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const std::vector<double> &,
+                               const CPackedMatrix &,
+                               const std::vector<int> &,
+                               const std::vector<int> &,
+                               const bool>(&CSimdRIJGradientDriver::compute_open_shell, py::const_),
+             "Computes the Coulomb contribution to an open shell's gradient. The density is the total one, "
+             "of both spins added, and the fitting coefficients are of that density.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("fitting"),
+             py::arg("density"),
+             py::arg("atoms"),
+             py::arg("aux_atoms"),
+             py::arg("with_metric") = true)
+        .def("compute_open_shell",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const std::vector<double> &,
+                               const CPackedMatrix &>(&CSimdRIJGradientDriver::compute_open_shell, py::const_),
+             "Computes the Coulomb contribution to an open shell's gradient over every atom.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("fitting"),
+             py::arg("density"));
+
+    // CSimdRIJKGradientDriver class
+
+    // TDistributedFit, the share of the fitted densities a rank holds
+
+    PyClass<TDistributedFit>(m, "DistributedFit")
+        .def_readonly("naux", &TDistributedFit::naux, "The dimensions of the auxiliary basis.")
+        .def_readonly("nelements", &TDistributedFit::nelements, "The elements of one fitted density.")
+        .def_readonly("npanel", &TDistributedFit::npanel, "The elements a panel carries.")
+        .def("panels", &TDistributedFit::panels, "The number of panels the elements are divided into.")
+        .def("functions", [](const TDistributedFit &self) { return self.functions; },
+             "The auxiliary functions this rank owns.")
+        .def("fitting", [](const TDistributedFit &self) { return self.fitting; },
+             "The fitting coefficients, partial until the ranks have added theirs.")
+        .def("gram_rows",
+             [](const TDistributedFit &self) -> py::array_t<double> {
+                 const auto nrows = static_cast<int>(self.functions.size());
+                 return vlx_general::pointer_to_numpy(self.gram_rows.data(),
+                                                      {nrows, static_cast<int>(self.naux)});
+             },
+             "This rank's rows of the Gram product.");
+
+    PyClass<TGeneralDistributedFit>(m, "GeneralDistributedFit")
+        .def_readonly("naux", &TGeneralDistributedFit::naux, "The dimensions of the auxiliary basis.")
+        .def_readonly("norbs", &TGeneralDistributedFit::norbs, "The rank of the density factorisation.")
+        .def_readonly("nelements", &TGeneralDistributedFit::nelements, "The elements of one fitted density.")
+        .def_readonly("npanel", &TGeneralDistributedFit::npanel, "The elements a panel carries.")
+        .def("panels", &TGeneralDistributedFit::panels, "The number of panels the elements are divided into.")
+        .def("functions", [](const TGeneralDistributedFit &self) { return self.functions; },
+             "The auxiliary functions this rank owns.")
+        .def("fitting", [](const TGeneralDistributedFit &self) { return self.fitting; },
+             "The fitting coefficients, partial until the ranks have added theirs.")
+        .def("gram_rows",
+             [](const TGeneralDistributedFit &self) -> py::array_t<double> {
+                 const auto nrows = static_cast<int>(self.functions.size());
+                 return vlx_general::pointer_to_numpy(self.gram_rows.data(),
+                                                      {nrows, static_cast<int>(self.naux)});
+             },
+             "This rank's rows of the Gram product.");
+
+    PyClass<CSimdRIJKGradientDriver>(m, "SimdRIJKGradientDriver")
+        .def(py::init<>())
+        .def(py::init<const double, const size_t, const size_t>(),
+             "Creates a gradient driver with given screening threshold, target block size and memory "
+             "budget. The budget bounds the batch of auxiliary functions the transformation into the "
+             "occupied orbitals holds at a time, and nothing else.",
+             py::arg("threshold"),
+             py::arg("block_size")    = 0,
+             py::arg("memory_budget") = size_t{4} * 1024 * 1024 * 1024)
+        .def("get_memory_budget", &CSimdRIJKGradientDriver::get_memory_budget,
+             "Gets the memory the driver may hold, in bytes.")
+        .def("peak_memory", &CSimdRIJKGradientDriver::peak_memory,
+             "Gets the most memory a gradient reaches beside the B vectors, the metrics and the densities it "
+             "is handed, in bytes, for the number of threads of the caller and with a margin of a tenth. "
+             "norbitals is the occupied orbitals of each spin, one number for a closed shell and two for an "
+             "open one. distributed follows the phases of the mpi_* entries, sized from panel_budget, and "
+             "otherwise those of compute, sized from the driver's own budget.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("aux_atoms"),
+             py::arg("norbitals"),
+             py::arg("range_separated"),
+             py::arg("distributed"),
+             py::arg("panel_budget"),
+             py::arg("with_metric"))
+        .def("peak_memory_general", &CSimdRIJKGradientDriver::peak_memory_general,
+             "Gets the most memory the gradient of one general density D = L R transposed reaches through "
+             "mpi_local_densities_general and the calls that follow it, beside the B vectors, the metrics, "
+             "the factors and the density it is handed, in bytes, for the number of threads of the caller "
+             "and with a margin of a tenth. norbs is the number of columns of each factor.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("aux_atoms"),
+             py::arg("norbs"),
+             py::arg("range_separated"),
+             py::arg("panel_budget"),
+             py::arg("with_metric"))
+        .def("mpi_local_densities", &CSimdRIJKGradientDriver::mpi_local_densities,
+             "Forms this rank's share of the fitted densities, with no metric applied and nothing "
+             "communicated. The `fitting` of what comes back is this rank's partial sum of the right "
+             "hand side of the fitting, which the caller adds across the ranks.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("bq_vectors"),
+             py::arg("density"), py::arg("coefficients"), py::arg("coefficients_beta"),
+             py::arg("aux_atoms"), py::arg("budget"))
+        .def("mpi_set_fitting", &CSimdRIJKGradientDriver::mpi_set_fitting,
+             "Applies the transposed factor to the fitting coefficients the ranks have added together.",
+             py::arg("fit"), py::arg("metric"), py::arg("total"))
+        .def("mpi_local_densities_general", &CSimdRIJKGradientDriver::mpi_local_densities_general,
+             "Forms this rank's share of the fitted densities of a general density D = L R transposed.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("bq_vectors"),
+             py::arg("density_for_coulomb"), py::arg("left"), py::arg("right"),
+             py::arg("aux_atoms"), py::arg("budget"), py::arg("with_coulomb"))
+        .def("mpi_set_fitting_general", &CSimdRIJKGradientDriver::mpi_set_fitting_general,
+             "Applies the transposed factor to the general fitting coefficients.",
+             py::arg("fit"), py::arg("metric"), py::arg("total"))
+        .def("mpi_clear_fitting_general", &CSimdRIJKGradientDriver::mpi_clear_fitting_general,
+             "Empties the fitting coefficients of a general share.", py::arg("fit"))
+        .def("mpi_panel_partial_general",
+             [](const CSimdRIJKGradientDriver &self, const TGeneralDistributedFit &fit,
+                const CPackedMatrix &metric, const size_t ipanel) -> py::array_t<double> {
+                 auto values = self.mpi_panel_partial_general(fit, metric, ipanel);
+                 const auto count = fit.panel_range(ipanel).second;
+                 return vlx_general::pointer_to_numpy(values.data(),
+                                                      {static_cast<int>(fit.naux), static_cast<int>(count)});
+             },
+             "This rank's contribution to one panel of the transposed factor applied to the general "
+             "fitted densities.",
+             py::arg("fit"), py::arg("metric"), py::arg("ipanel"))
+        .def("mpi_panel_absorb_general",
+             [](const CSimdRIJKGradientDriver &self, TGeneralDistributedFit &fit, const size_t ipanel,
+                const py::array_t<double> &reduced) -> void {
+                 self.mpi_panel_absorb_general(fit, ipanel, reduced.data(),
+                                               static_cast<size_t>(reduced.size()));
+             },
+             "Takes one general panel the ranks have added together.",
+             py::arg("fit"), py::arg("ipanel"), py::arg("reduced"))
+        .def("mpi_gram_panel_partial_general",
+             [](const CSimdRIJKGradientDriver &self, const TGeneralDistributedFit &fit,
+                const size_t ipanel) -> py::array_t<double> {
+                 auto values = self.mpi_gram_panel_partial_general(fit, ipanel);
+                 const auto count = fit.panel_range(ipanel).second;
+                 return vlx_general::pointer_to_numpy(values.data(),
+                                                      {static_cast<int>(fit.naux), static_cast<int>(count)});
+             },
+             "This rank's transposed panel contribution to the general Gram.",
+             py::arg("fit"), py::arg("ipanel"))
+        .def("mpi_gram_panel_absorb_general",
+             [](const CSimdRIJKGradientDriver &self, TGeneralDistributedFit &fit, const size_t ipanel,
+                const py::array_t<double> &reduced) -> void {
+                 self.mpi_gram_panel_absorb_general(fit, ipanel, reduced.data(),
+                                                     static_cast<size_t>(reduced.size()));
+             },
+             "Accumulates one reduced transposed panel into the general Gram.",
+             py::arg("fit"), py::arg("ipanel"), py::arg("reduced"))
+        .def("mpi_omega_general",
+             [](const CSimdRIJKGradientDriver &self, const TGeneralDistributedFit &fit,
+                const py::array_t<double> &gram, const double exchange_scaling_factor) -> CPackedMatrix {
+                 return self.mpi_omega_general(fit, gram.data(), static_cast<size_t>(gram.size()),
+                                               exchange_scaling_factor);
+             },
+             "Assembles the two-index fitted density of a general density.",
+             py::arg("fit"), py::arg("gram"), py::arg("exchange_scaling_factor"))
+        .def("mpi_compute_share_general", &CSimdRIJKGradientDriver::mpi_compute_share_general,
+             "This rank's share of the gradient of a general density.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("fit"),
+             py::arg("density_for_coulomb"), py::arg("left"), py::arg("right"), py::arg("omega"),
+             py::arg("exchange_scaling_factor"), py::arg("atoms"), py::arg("aux_atoms"))
+        .def("mpi_compute_share_rs_general", &CSimdRIJKGradientDriver::mpi_compute_share_rs_general,
+             "This rank's share of a range separated gradient of a general density.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("fit"),
+             py::arg("fit_erf"), py::arg("density_for_coulomb"), py::arg("left"), py::arg("right"),
+             py::arg("omega_plain"), py::arg("omega_erf"), py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor"), py::arg("omega"), py::arg("atoms"),
+             py::arg("aux_atoms"))
+        .def("mpi_clear_fitting", &CSimdRIJKGradientDriver::mpi_clear_fitting,
+             "Empties the fitting coefficients of a share, which is how the attenuated operator says it "
+             "has no Coulomb term.",
+             py::arg("fit"))
+        .def("mpi_panel_partial",
+             [](const CSimdRIJKGradientDriver &self, const TDistributedFit &fit, const CPackedMatrix &metric,
+                const size_t ipanel, const bool beta) -> py::array_t<double> {
+                 auto values = self.mpi_panel_partial(fit, metric, ipanel, beta);
+                 // NOTE: the shape follows the spin the panel belongs to. Taking it
+                 // from the first spin's geometry gave the second spin an array of
+                 // the wrong width, which the absorbing side then refused.
+                 const auto count = fit.panel_range(ipanel, beta).second;
+                 return vlx_general::pointer_to_numpy(values.data(),
+                                                      {static_cast<int>(fit.naux), static_cast<int>(count)});
+             },
+             "This rank's contribution to one panel of the transposed factor applied to the fitted "
+             "densities. The caller adds the ranks' panels and hands the sum to mpi_panel_absorb.",
+             py::arg("fit"), py::arg("metric"), py::arg("ipanel"), py::arg("beta") = false)
+        .def("mpi_panel_absorb",
+             [](const CSimdRIJKGradientDriver &self, TDistributedFit &fit, const size_t ipanel,
+                const py::array_t<double> &reduced, const bool beta) -> void {
+                 self.mpi_panel_absorb(fit, ipanel, reduced.data(), static_cast<size_t>(reduced.size()), beta);
+             },
+             "Takes one panel the ranks have added together, keeping the rows this rank owns and "
+             "accumulating its rows of the Gram product from the whole of it.",
+             py::arg("fit"), py::arg("ipanel"), py::arg("reduced"), py::arg("beta") = false)
+        .def("mpi_omega",
+             [](const CSimdRIJKGradientDriver &self, const TDistributedFit &fit,
+                const py::array_t<double> &gram, const double exchange_scaling_factor,
+                const bool open_shell) -> CPackedMatrix {
+                 return self.mpi_omega(fit, gram.data(), static_cast<size_t>(gram.size()),
+                                       exchange_scaling_factor, open_shell);
+             },
+             "Assembles the two-index fitted density from the fitting coefficients and the Gram the "
+             "ranks have gathered.",
+             py::arg("fit"), py::arg("gram"), py::arg("exchange_scaling_factor"), py::arg("open_shell"))
+        .def("mpi_compute_share_rs", &CSimdRIJKGradientDriver::mpi_compute_share_rs,
+             "This rank's share of a range separated gradient, from the plain and the attenuated fitted "
+             "densities it owns. An empty omega_plain leaves the two-center terms out, which every rank "
+             "but one does.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("fit"),
+             py::arg("fit_erf"), py::arg("density"), py::arg("coefficients"),
+             py::arg("coefficients_beta"), py::arg("omega_plain"), py::arg("omega_erf"),
+             py::arg("exchange_scaling_factor"), py::arg("erf_exchange_scaling_factor"),
+             py::arg("omega"), py::arg("atoms"), py::arg("aux_atoms"))
+        .def("mpi_compute_share", &CSimdRIJKGradientDriver::mpi_compute_share,
+             "This rank's share of the gradient. An empty omega leaves the two-center term out, which "
+             "every rank but one does.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("fit"),
+             py::arg("density"), py::arg("coefficients"), py::arg("coefficients_beta"),
+             py::arg("omega"), py::arg("exchange_scaling_factor"), py::arg("atoms"),
+             py::arg("aux_atoms"))
+        .def("compute",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const CSparseTensor &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const double,
+                               const std::vector<int> &,
+                               const std::vector<int> &>(&CSimdRIJKGradientDriver::compute, py::const_),
+             "Computes the Coulomb and exchange contributions to the gradient of the given atoms, from the "
+             "B vectors and the metric a Fock driver holds. The rows of the atoms not asked for are zero. "
+             "aux_atoms names the share of the auxiliary basis the B vectors span, which under MPI makes "
+             "the gradient a partial one for the ranks to reduce: a list of every atom for the whole "
+             "molecule, and an empty list for none.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("bq_vectors"),
+             py::arg("metric"),
+             py::arg("density"),
+             py::arg("coefficients"),
+             py::arg("exchange_scaling_factor"),
+             py::arg("atoms"),
+             py::arg("aux_atoms"))
+        .def("compute",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const CSparseTensor &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const double>(&CSimdRIJKGradientDriver::compute, py::const_),
+             "Computes the Coulomb and exchange contributions to the gradient of every atom of the molecule.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("bq_vectors"),
+             py::arg("metric"),
+             py::arg("density"),
+             py::arg("coefficients"),
+             py::arg("exchange_scaling_factor"))
+        .def("compute_open_shell",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const CSparseTensor &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const double,
+                               const std::vector<int> &,
+                               const std::vector<int> &>(&CSimdRIJKGradientDriver::compute_open_shell,
+                                                         py::const_),
+             "Computes the gradient of an open shell over the given atoms. The density is the total one, "
+             "of both spins, and each spin brings the orbitals it occupies.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("bq_vectors"),
+             py::arg("metric"),
+             py::arg("density"),
+             py::arg("coefficients_alpha"),
+             py::arg("coefficients_beta"),
+             py::arg("exchange_scaling_factor"),
+             py::arg("atoms"),
+             py::arg("aux_atoms"))
+        .def("compute_open_shell",
+             py::overload_cast<const CMolecule &,
+                               const CMolecularBasis &,
+                               const CMolecularBasis &,
+                               const CSparseTensor &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const CPackedMatrix &,
+                               const double>(&CSimdRIJKGradientDriver::compute_open_shell, py::const_),
+             "Computes the gradient of an open shell over every atom of the molecule.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("bq_vectors"),
+             py::arg("metric"),
+             py::arg("density"),
+             py::arg("coefficients_alpha"),
+             py::arg("coefficients_beta"),
+             py::arg("exchange_scaling_factor"))
+        .def("fitted_densities",
+             &CSimdRIJKGradientDriver::fitted_densities,
+             "Forms the fitted densities the derivative integrals are contracted against: the fitting "
+             "coefficients, the fitted densities of the occupied orbitals, and the two-index fitted "
+             "density. Reads no integrals, being a transformation of the B vectors alone.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("metric"),
+             py::arg("density"),
+             py::arg("coefficients"),
+             py::arg("exchange_scaling_factor"))
+        .def("compute_rs",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CMolecularBasis &,
+                               const CSparseTensor &, const CSparseTensor &, const CPackedMatrix &,
+                               const CPackedMatrix &, const CPackedMatrix &, const CPackedMatrix &,
+                               const double, const double, const double, const std::vector<int> &,
+                               const std::vector<int> &>(
+                 &CSimdRIJKGradientDriver::compute_rs, py::const_),
+             "Computes the gradient of a hybrid range separated functional, the restricted form, for "
+             "the given atoms. Only the exchange is split: the Coulomb term is fitted in the plain "
+             "metric and appears once.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("bq_vectors"),
+             py::arg("bq_vectors_erf"), py::arg("metric"), py::arg("metric_erf"), py::arg("density"),
+             py::arg("coefficients"), py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor"), py::arg("omega"), py::arg("atoms"),
+             py::arg("aux_atoms"))
+        .def("compute_rs",
+             py::overload_cast<const CMolecule &, const CMolecularBasis &, const CMolecularBasis &,
+                               const CSparseTensor &, const CSparseTensor &, const CPackedMatrix &,
+                               const CPackedMatrix &, const CPackedMatrix &, const CPackedMatrix &,
+                               const double, const double, const double>(
+                 &CSimdRIJKGradientDriver::compute_rs, py::const_),
+             "Computes it for every atom of the molecule.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("bq_vectors"),
+             py::arg("bq_vectors_erf"), py::arg("metric"), py::arg("metric_erf"), py::arg("density"),
+             py::arg("coefficients"), py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor"), py::arg("omega"))
+        .def("compute_open_shell_rs",
+             &CSimdRIJKGradientDriver::compute_open_shell_rs,
+             "Computes the gradient of a hybrid range separated functional, the unrestricted form.",
+             py::arg("molecule"), py::arg("basis"), py::arg("aux_basis"), py::arg("bq_vectors"),
+             py::arg("bq_vectors_erf"), py::arg("metric"), py::arg("metric_erf"), py::arg("density"),
+             py::arg("coefficients_alpha"), py::arg("coefficients_beta"),
+             py::arg("exchange_scaling_factor"), py::arg("erf_exchange_scaling_factor"),
+             py::arg("omega"), py::arg("atoms"), py::arg("aux_atoms"))
+        .def("fitted_densities_rs",
+             &CSimdRIJKGradientDriver::fitted_densities_rs,
+             "Forms the fitted densities of the attenuated operator. The fitting coefficients come "
+             "back empty: the attenuated operator enters only through the exchange and has no Coulomb "
+             "term to fit a density against.",
+             py::arg("bq_vectors_erf"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("metric_erf"),
+             py::arg("coefficients"),
+             py::arg("erf_exchange_scaling_factor"))
+        .def("fitted_densities_open_shell_rs",
+             &CSimdRIJKGradientDriver::fitted_densities_open_shell_rs,
+             "The same for the two spins of an open shell.",
+             py::arg("bq_vectors_erf"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("metric_erf"),
+             py::arg("coefficients_alpha"),
+             py::arg("coefficients_beta"),
+             py::arg("erf_exchange_scaling_factor"))
+        .def("get_threshold", &CSimdRIJKGradientDriver::get_threshold,
+             "Gets screening threshold of the integrals.")
+        .def("get_block_size", &CSimdRIJKGradientDriver::get_block_size,
+             "Gets target number of atom pairs of a block.");
+
+    // CSimdRIJKResponseDriver class
+
+    PyClass<CSimdRIJKResponseDriver>(m, "SimdRIJKResponseDriver")
+        .def(py::init<>())
+        .def(py::init<const double, const size_t, const size_t>(),
+             "Creates a response driver with given threshold, block size and memory budget.",
+             py::arg("threshold"),
+             py::arg("block_size")    = 0,
+             py::arg("memory_budget") = size_t{4} * 1024 * 1024 * 1024)
+        .def("fixed_memory",
+             &CSimdRIJKResponseDriver::fixed_memory,
+             "Gets what forming the B vectors reaches and what a build holds beside its densities on this rank, in "
+             "bytes, for the number of threads of the caller and without a margin, and the auxiliary functions this "
+             "rank holds.",
+             py::arg("molecule"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("threshold"),
+             py::arg("aux_atoms"),
+             py::arg("range_separated"))
+        .def("chunk_memory",
+             &CSimdRIJKResponseDriver::chunk_memory,
+             "Gets the memory one call of a build holds for its densities, in bytes, without a margin.",
+             py::arg("nao"),
+             py::arg("nvec"),
+             py::arg("nterms"),
+             py::arg("ncalls"),
+             py::arg("nspins"),
+             py::arg("ndens"),
+             py::arg("nheld"))
+        .def("peak_memory",
+             &CSimdRIJKResponseDriver::peak_memory,
+             "Gets the most memory a build of a number of densities reaches on this rank, with a margin, in bytes.",
+             py::arg("forming"),
+             py::arg("build"),
+             py::arg("nao"),
+             py::arg("nvec"),
+             py::arg("nterms"),
+             py::arg("ncalls"),
+             py::arg("nspins"),
+             py::arg("ndens"),
+             py::arg("nheld"))
+        .def("max_densities",
+             &CSimdRIJKResponseDriver::max_densities,
+             "Gets the most densities one call of a build may take within a memory budget, or zero where none fits.",
+             py::arg("memory_budget"),
+             py::arg("forming"),
+             py::arg("build"),
+             py::arg("nao"),
+             py::arg("nvec"),
+             py::arg("nterms"),
+             py::arg("ncalls"),
+             py::arg("nspins"),
+             py::arg("nheld"))
+        .def("compute_exchange",
+             static_cast<std::vector<CPackedMatrix> (CSimdRIJKResponseDriver::*)(
+                 const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
+                 const CPackedMatrix &, const std::vector<CPackedMatrix> &) const>(
+                 &CSimdRIJKResponseDriver::compute_exchange),
+             "Computes the exchange matrices of densities given as their factors, the density of one "
+             "of them being the left factor times the transpose of its right factor. The matrices are "
+             "general and carry no scaling by the fraction of exact exchange.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("left"),
+             py::arg("rights"))
+        .def("compute_exchange",
+             static_cast<std::vector<CPackedMatrix> (CSimdRIJKResponseDriver::*)(
+                 const CSparseTensor &, const CSparseTensor &, const CMolecularBasis &,
+                 const CMolecularBasis &, const CPackedMatrix &, const std::vector<CPackedMatrix> &,
+                 const double, const double) const>(&CSimdRIJKResponseDriver::compute_exchange),
+             "Computes the exchange of the Coulomb operator and of the attenuated one together, each "
+             "scaled and added, in one pass over the auxiliary basis. Unlike the form above, what is "
+             "returned carries its scaling.",
+             py::arg("bq_vectors"),
+             py::arg("bq_vectors_erf"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("left"),
+             py::arg("rights"),
+             py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor"))
+        .def("compute",
+             static_cast<std::vector<CPackedMatrix> (CSimdRIJKResponseDriver::*)(
+                 const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
+                 const CPackedMatrix &, const std::vector<CPackedMatrix> &, const double,
+                 const CSparseTensor *, const double) const>(&CSimdRIJKResponseDriver::compute),
+             "Computes the Fock matrices of densities given as their factors, twice the Coulomb less "
+             "the scaled exchange, general and not symmetric. A hybrid range separated functional "
+             "hands over the attenuated B vectors and their coefficient as well.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("left"),
+             py::arg("rights"),
+             py::arg("exchange_scaling_factor"),
+             py::arg("bq_vectors_erf").none(true) = static_cast<const CSparseTensor *>(nullptr),
+             py::arg("erf_exchange_scaling_factor") = 0.0)
+        .def("compute",
+             static_cast<std::vector<CPackedMatrix> (CSimdRIJKResponseDriver::*)(
+                 const CSparseTensor &, const CMolecularBasis &, const CMolecularBasis &,
+                 const CPackedMatrix &, const std::vector<CPackedMatrix> &,
+                 const std::vector<CPackedMatrix> &, const double, const CSparseTensor *,
+                 const double) const>(&CSimdRIJKResponseDriver::compute),
+             "Computes them for densities of two terms, the density of a pair being the left factor "
+             "times the right one transposed, plus the transposed right one times the left factor "
+             "transposed.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("left"),
+             py::arg("rights"),
+             py::arg("transposed_rights"),
+             py::arg("exchange_scaling_factor"),
+             py::arg("bq_vectors_erf").none(true) = static_cast<const CSparseTensor *>(nullptr),
+             py::arg("erf_exchange_scaling_factor") = 0.0)
+        .def("compute_unrestricted",
+             &CSimdRIJKResponseDriver::compute_unrestricted,
+             "Computes the Fock matrices of the two spins of an unrestricted reference, from the "
+             "factors of each spin. The Coulomb is of both densities added and is not doubled.",
+             py::arg("bq_vectors"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("left_alpha"),
+             py::arg("rights_alpha"),
+             py::arg("transposed_rights_alpha"),
+             py::arg("left_beta"),
+             py::arg("rights_beta"),
+             py::arg("transposed_rights_beta"),
+             py::arg("exchange_scaling_factor"))
+        .def("compute_unrestricted_rs",
+             &CSimdRIJKResponseDriver::compute_unrestricted_rs,
+             "The same for a hybrid range separated functional, whose exchange is split between the "
+             "plain operator and the attenuated one.",
+             py::arg("bq_vectors"),
+             py::arg("bq_vectors_erf"),
+             py::arg("basis"),
+             py::arg("aux_basis"),
+             py::arg("left_alpha"),
+             py::arg("rights_alpha"),
+             py::arg("transposed_rights_alpha"),
+             py::arg("left_beta"),
+             py::arg("rights_beta"),
+             py::arg("transposed_rights_beta"),
+             py::arg("exchange_scaling_factor"),
+             py::arg("erf_exchange_scaling_factor"))
+        .def("get_threshold", &CSimdRIJKResponseDriver::get_threshold,
+             "Gets screening threshold of the integrals.")
+        .def("set_aux_functions", &CSimdRIJKResponseDriver::set_aux_functions,
+             "Tells the driver which auxiliary basis functions the B vectors carry, so that it sweeps "
+             "the share rather than the whole basis with the other ranks' functions in it as zeros. "
+             "An empty list is a rank holding nothing; leaving this uncalled sweeps all of them.",
+             py::arg("functions"))
+        .def("get_aux_functions", &CSimdRIJKResponseDriver::get_aux_functions,
+             py::return_value_policy::reference_internal,
+             "Gets the auxiliary functions the driver sweeps, empty where it was left to sweep all.")
+        .def("get_block_size", &CSimdRIJKResponseDriver::get_block_size,
+             "Gets target number of atom pairs of a block.")
+        .def("get_memory_budget", &CSimdRIJKResponseDriver::get_memory_budget,
+             "Gets the memory the driver may hold, in bytes.");
+}
+
+}  // namespace vlx_simdintegrals

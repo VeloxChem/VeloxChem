@@ -30,13 +30,19 @@ class TestPolgradEnvironmentGap:
         self.molecule = Molecule.read_xyz_string(xyz_string)
         self.basis = MolecularBasis.read(self.molecule, 'sto-3g')
 
-    def run_scf_and_lr(self, **env_settings):
+    def run_scf_and_lr(self, *, ri, **env_settings):
 
         scf_drv = ScfRestrictedDriver()
+        scf_drv.ri = ri
         scf_drv.ostream.mute()
         for key, value in env_settings.items():
             setattr(scf_drv, key, value)
         scf_results = scf_drv.compute(self.molecule, self.basis)
+
+        if scf_drv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         rsp_settings = {'conv_thresh': 1.0e-5, 'frequencies': (0.0,)}
         lr_drv = LinearResponseSolver()
@@ -59,10 +65,11 @@ class TestPolgradEnvironmentGap:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='pytest.raises only valid in serial')
-    def test_compute_analytical_rejects_electric_field(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_analytical_rejects_electric_field(self, ri):
 
         scf_drv, lr_results = self.run_scf_and_lr(
-            electric_field=[0.0, 0.0, 0.001])
+            electric_field=[0.0, 0.0, 0.001], ri=ri)
 
         errmsg = 'Analytical polarizability gradient is not supported '
         errmsg += 'with a static electric field'
@@ -71,12 +78,13 @@ class TestPolgradEnvironmentGap:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='pytest.raises only valid in serial')
-    def test_compute_analytical_rejects_point_charges(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_analytical_rejects_point_charges(self, ri):
 
         here = Path(__file__).parent
         potfile = str(here / 'data' / 'pe_water.pot')
 
-        scf_drv, lr_results = self.run_scf_and_lr(point_charges=potfile)
+        scf_drv, lr_results = self.run_scf_and_lr(point_charges=potfile, ri=ri)
 
         errmsg = 'Analytical polarizability gradient is not supported '
         errmsg += 'with point charges'
@@ -85,13 +93,31 @@ class TestPolgradEnvironmentGap:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='pytest.raises only valid in serial')
-    def test_compute_analytical_rejects_potfile(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_analytical_rejects_potfile(self, tmp_path, ri):
 
-        pytest.importorskip('pyframe')
-        here = Path(__file__).parent
-        potfile = str(here / 'data' / 'pe_water.json')
+        potfile = tmp_path / 'fika_water.pot'
+        potfile.write_text("""
+            @environment
+            units: angstrom
+            xyz:
+            O  3.000000  0.000000  0.000000  HOH_pe  1  O
+            H  3.757000  0.000000  0.586000  HOH_pe  1  H1
+            H  2.243000  0.000000  0.586000  HOH_pe  1  H2
+            @end
+            @charges
+            O  -0.66900000  HOH_pe
+            H   0.33450000  HOH_pe
+            H   0.33450000  HOH_pe
+            @end
+            @polarizabilities
+            O  9.718  0.0  0.0  9.718  0.0  9.718  HOH_pe
+            H  0.0    0.0  0.0  0.0    0.0  0.0    HOH_pe
+            H  0.0    0.0  0.0  0.0    0.0  0.0    HOH_pe
+            @end
+        """)
 
-        scf_drv, lr_results = self.run_scf_and_lr(potfile=potfile)
+        scf_drv, lr_results = self.run_scf_and_lr(potfile=str(potfile), ri=ri)
 
         errmsg = 'Analytical polarizability gradient is not supported '
         errmsg += 'with polarizable embedding'
@@ -100,10 +126,12 @@ class TestPolgradEnvironmentGap:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='pytest.raises only valid in serial')
-    def test_compute_analytical_rejects_solvation_model(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_analytical_rejects_solvation_model(self, ri):
 
         scf_drv, lr_results = self.run_scf_and_lr(solvation_model='cpcm',
-                                                  cpcm_epsilon=10.0)
+                                                  cpcm_epsilon=10.0,
+                                                  ri=ri)
 
         errmsg = 'Analytical polarizability gradient is not supported '
         errmsg += 'with CPCM/SMD solvation'
@@ -112,18 +140,20 @@ class TestPolgradEnvironmentGap:
 
     @pytest.mark.skipif(MPI.COMM_WORLD.Get_size() > 1,
                         reason='pytest.raises only valid in serial')
-    def test_compute_analytical_rejects_pressure(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_analytical_rejects_pressure(self, ri):
 
-        scf_drv, lr_results = self.run_scf_and_lr(pressure=20000.0)
+        scf_drv, lr_results = self.run_scf_and_lr(pressure=20000.0, ri=ri)
 
         errmsg = 'Analytical polarizability gradient is not supported '
         errmsg += 'with GOSTSHYP'
         with pytest.raises(VeloxChemError, match=errmsg):
             self.run_analytical_polgrad(scf_drv, lr_results)
 
-    def test_compute_analytical_accepts_vacuum(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_analytical_accepts_vacuum(self, ri):
 
-        scf_drv, lr_results = self.run_scf_and_lr()
+        scf_drv, lr_results = self.run_scf_and_lr(ri=ri)
 
         polgrad_results = self.run_analytical_polgrad(scf_drv, lr_results)
 
@@ -132,14 +162,15 @@ class TestPolgradEnvironmentGap:
             polgrad = polgrad_results[0.0].reshape(3, 3, 3, 3)
             assert np.max(np.abs(polgrad)) > 0.0
 
-    def test_compute_numerical_accepts_environment(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_compute_numerical_accepts_environment(self, ri):
         """The numerical path re-runs SCF + LR per displacement and stays
         implicitly consistent, so it must NOT reject environments."""
 
         here = Path(__file__).parent
         potfile = str(here / 'data' / 'pe_water.pot')
 
-        scf_drv, _ = self.run_scf_and_lr(point_charges=potfile)
+        scf_drv, _ = self.run_scf_and_lr(point_charges=potfile, ri=ri)
 
         num_drv = PolarizabilityGradient(scf_drv)
         num_drv.update_settings({'numerical': 'yes', 'frequencies': (0.0,)},

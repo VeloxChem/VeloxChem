@@ -33,6 +33,7 @@
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
+import time as tm
 import sys
 
 from .veloxchemlib import hartree_in_ev, mpi_master, fine_structure_constant
@@ -564,9 +565,11 @@ class RixsDriver(LinearSolver):
         if self.filename is not None and self.rank == mpi_master():
             final_h5_fname = f'{self.filename}.h5'
             if Path(final_h5_fname).is_file():
+                write_t0 = tm.time()
                 clear_group_in_hdf5(final_h5_fname, 'rsp')
                 write_rsp_results_to_hdf5(final_h5_fname, results_dict)
-                valstr = f'RIXS results written to file: {final_h5_fname}'
+                valstr = (f'RIXS results written to file: {final_h5_fname} ' +
+                          f'(took {tm.time() - write_t0:.2f} sec).')
                 self.ostream.print_info(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()

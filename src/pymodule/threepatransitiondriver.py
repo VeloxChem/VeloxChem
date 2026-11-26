@@ -38,6 +38,9 @@ import sys
 
 
 from .oneeints import compute_electric_dipole_integrals
+from .riresponse import lend_ri
+from .rijkresponse import initialize_ri_jk
+from .rijkresponse import ri_jk_general_factors
 from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_ev,
                            fine_structure_constant, speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
@@ -47,7 +50,7 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check,
+                           dft_and_ri_sanity_check,
                            nonlinear_response_environment_sanity_check)
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -117,6 +120,16 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
+    def _get_nonlinear_fock_modes(self):
+        """
+        Gets the modes of the nonlinear Fock builds this driver makes.
+
+        :return:
+            A tuple of modes.
+        """
+
+        return ('3pa', '3pa_ii')
+
     def compute(self, molecule, ao_basis, scf_results):
         """
         Computes a quadratic response function.
@@ -150,11 +163,8 @@ class ThreePATransitionDriver(NonlinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute', 'nonlinear')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute', 'nonlinear')
 
         profiler = Profiler({
             'timing': False,
@@ -216,6 +226,19 @@ class ThreePATransitionDriver(NonlinearSolver):
                 if operator == 'dipole':
                     b_grad[ind] *= -1.0
 
+        # NOTE: the B vectors are formed before the solvers this driver drives
+        # are made and lent to each of them (riresponse.lend_ri), rather than
+        # formed by each. The integral setup in compute_cubic_components
+        # uses them again. Not gated on _uses_ri_jk(), for the reason given
+        # in _init_eri.
+        # NOTE: before the RI-JK B vectors or the RI-J integrals are set up,
+        # which keep back from what they may hold the smallest batch of the
+        # nonlinear Fock builds.
+        self._set_ri_reserve_floor(molecule, ao_basis, scf_results)
+
+        if self.ri_jk and not self._ri_fallback:
+            initialize_ri_jk(self, molecule, ao_basis)
+
         rpa_drv = LinearResponseEigenSolver(self.comm, self.ostream)
         rpa_drv.nonlinear = True
 
@@ -224,7 +247,8 @@ class ThreePATransitionDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk',
+            'ri_auxiliary_basis'
         ]
 
         for key in rpa_keywords:
@@ -235,7 +259,8 @@ class ThreePATransitionDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             rpa_drv.checkpoint_file = str(fpath) + '_3patrans_1_rpa.h5'
 
-        rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
+        with lend_ri(self, rpa_drv):
+            rpa_results = rpa_drv.compute(molecule, ao_basis, scf_results)
 
         excitation_details = rpa_results['excitation_details']
         oscillator_strengths = rpa_results['oscillator_strengths']
@@ -281,7 +306,8 @@ class ThreePATransitionDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk',
+            'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -292,7 +318,8 @@ class ThreePATransitionDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             N_drv.checkpoint_file = str(fpath) + '_3patrans_1_cpp.h5'
 
-        N_results = N_drv.compute(molecule, ao_basis, scf_results, B)
+        with lend_ri(self, N_drv):
+            N_results = N_drv.compute(molecule, ao_basis, scf_results, B)
 
         self._is_converged = N_drv.is_converged
 
@@ -313,6 +340,12 @@ class ThreePATransitionDriver(NonlinearSolver):
         self.ostream.flush()
 
         profiler.end(self.ostream)
+
+        # NOTE: the RI memory check of this driver's own Fock builds; the
+        # solvers it drives print their own.
+        self._print_ri_memory_check()
+
+        self._release_freed_memory()
 
         if self.rank == mpi_master():
             ret_dict.update({
@@ -363,7 +396,7 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         nocc = molecule.number_of_alpha_occupied_orbitals(ao_basis)
 
-        eri_dict = self._init_eri(molecule, ao_basis)
+        eri_dict = self._init_eri(molecule, ao_basis, reuse_ri_jk=True)
 
         dft_dict = self._init_dft(molecule, scf_results)
 
@@ -373,9 +406,18 @@ class ThreePATransitionDriver(NonlinearSolver):
         profiler.check_memory_usage('Densities')
 
         # computing the compounded first-order Fock matrices
+        fock_profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         fock_dict = self.get_fock_dict(freqs, first_order_dens,
                                        second_order_dens, third_order_dens, F0, mo, molecule,
-                                       ao_basis, eri_dict, dft_dict, profiler)
+                                       ao_basis, eri_dict, dft_dict, fock_profiler)
+
+        fock_profiler.end(self.ostream)
 
         profiler.check_memory_usage('Focks')
 
@@ -386,8 +428,17 @@ class ThreePATransitionDriver(NonlinearSolver):
         # Needs tgo be fixed
         density_list1_two, density_list2_two = self.get_densities_II(freqs, Nx, Nxy, mo, nocc, norb,Xf)
 
+        fock_profiler_two = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         # Needs tgo be fixed
-        fock_dict_two = self.get_fock_dict_II(freqs, density_list1_two,density_list2_two, F0, mo,molecule, ao_basis, eri_dict,dft_dict)
+        fock_dict_two = self.get_fock_dict_II(freqs, density_list1_two,density_list2_two, F0, mo,molecule, ao_basis, eri_dict,dft_dict, fock_profiler_two)
+
+        fock_profiler_two.end(self.ostream)
 
         e3_dict = self.get_e3(freqs, Nx, Nxy, Focks, fock_dict_two, f_xy, nocc, norb, Xf)
 
@@ -480,7 +531,8 @@ class ThreePATransitionDriver(NonlinearSolver):
                             T_abc += - NaE3NbNcf
                             T_abc += -(NaE4NbNcNf - NaS4NbNcNd)
 
-                            T_tensors[(f"{a_comp}{b_comp}{c_comp}", round(float(w), 4))] = T_abc
+                            # State indices remain unique for nearly degenerate roots.
+                            T_tensors[(f"{a_comp}{b_comp}{c_comp}", w_ind)] = T_abc
 
         # diagonalized_tensors = {}
 
@@ -495,7 +547,8 @@ class ThreePATransitionDriver(NonlinearSolver):
         self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
 
-        # conversion factor for 3PA cross-sections in GM
+        # EXPERIMENTAL/UNVALIDATED 3PA conversion: do not report cross sections.
+        # Standard GM units apply to 2PA, not 3PA.
         # a0 in cm, c in cm/s, gamma (0.1 eV) in au
         alpha = fine_structure_constant()
         a0 = bohr_in_angstrom() * 1.0e-8
@@ -508,15 +561,15 @@ class ThreePATransitionDriver(NonlinearSolver):
             tpa_strengths = {'linear': {}, 'circular': {}}
             tpa_cross_sections = {'linear': {}, 'circular': {}}
 
-            for w in freqs:
+            for w_ind, w in enumerate(freqs):
                 Df = 0.0
                 Dg = 0.0
                 for i in 'xyz':
                     for j in 'xyz':
                         for k in 'xyz':
-                            Tiij = T_tensors[(f"{i}{i}{j}", round(float(w), 4))]
-                            Tkkj = T_tensors[(f"{k}{k}{j}", round(float(w), 4))]
-                            Tijk = T_tensors[(f"{i}{j}{k}", round(float(w), 4))]
+                            Tiij = T_tensors[(f"{i}{i}{j}", w_ind)]
+                            Tkkj = T_tensors[(f"{k}{k}{j}", w_ind)]
+                            Tijk = T_tensors[(f"{i}{j}{k}", w_ind)]
 
                             Df += (Tiij * Tkkj).real
                             Dg += (Tijk * Tijk).real
@@ -526,13 +579,15 @@ class ThreePATransitionDriver(NonlinearSolver):
                 D_linear = 2.0 * Dg + 3.0 * Df
                 D_circular = 5.0 * Dg - 3.0 * Df
 
-                tpa_strengths['linear'][w] = D_linear
-                tpa_strengths['circular'][w] = D_circular
+                tpa_strengths['linear'][w_ind] = D_linear
+                tpa_strengths['circular'][w_ind] = D_circular
 
                 # TODO: double check 3PA cross-sections
 
-                tpa_cross_sections['linear'][w] = au2gm * w**3 * D_linear
-                tpa_cross_sections['circular'][w] = au2gm * w**3 * D_circular
+                # Cross-section conversion is not validated or reported yet.
+                # w is negative here; use positive photon energy in the cube.
+                tpa_cross_sections['linear'][w_ind] = au2gm * (-w)**3 * D_linear
+                tpa_cross_sections['circular'][w_ind] = au2gm * (-w)**3 * D_circular
 
             profiler.check_memory_usage('End of 3PA')
 
@@ -907,7 +962,8 @@ class ThreePATransitionDriver(NonlinearSolver):
             'max_iter', 'eri_thresh', 'timing', 'memory_profiling',
             'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
             'electric_field', 'program_end_time', '_debug', '_block_size_factor',
-            'ri_coulomb'
+            'ri_coulomb', 'ri_jk',
+            'ri_auxiliary_basis'
         }
 
         for key in cpp_keywords:
@@ -918,7 +974,8 @@ class ThreePATransitionDriver(NonlinearSolver):
             fpath = fpath.with_name(fpath.stem)
             Nxy_drv.checkpoint_file = str(fpath) + '_3patrans_2.h5'
 
-        Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_results, XY)
+        with lend_ri(self, Nxy_drv):
+            Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_results, XY)
 
         self._is_converged = (self._is_converged and Nxy_drv.is_converged)
 
@@ -951,6 +1008,14 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         distributed_density_1 = None
         distributed_density_2 = None
+
+        # NOTE: the factors of the densities which reach the Fock build. Only the
+        # two-time perturbed ones are built from here, so this is the one set of
+        # the general shape and not the two of the pass before.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self._uses_ri_jk():
+            self._ri_jk_factors = (mo[:, :nocc], [], mo[:, nocc:], [])
 
         for w_ind, w in enumerate(freq):
 
@@ -1059,31 +1124,53 @@ class ThreePATransitionDriver(NonlinearSolver):
                 Df_yz = self.commut(kf, Dyz)
                 Dyz_f = self.commut(kyz, Df)
 
-                # density transformation from MO to AO basis
+                # NOTE: named in the molecular orbitals rather than transformed
+                # where they are formed, so that the factors below and the
+                # matrices are the one expression and cannot drift apart.
 
                 # xx
                 # 0.5 * fxfx.T + 0.5 * fxfx.T + 0.5 * ffxx.T
-                Dfxx = np.linalg.multi_dot([mo, (2.0 * (Dx_fx + Dfx_x) + Df_xx + Dxx_f), mo.T])
+                mo_Dfxx = 2.0 * (Dx_fx + Dfx_x) + Df_xx + Dxx_f
 
                 # yy
                 # 0.5 * fyfy.T + 0.5 * fyfy.T + 0.5 * ffyy.T
-                Dfyy = np.linalg.multi_dot([mo, (2.0 * (Dy_fy + Dfy_y) + Df_yy + Dyy_f), mo.T])
+                mo_Dfyy = 2.0 * (Dy_fy + Dfy_y) + Df_yy + Dyy_f
 
                 # zz
                 # 0.5 * fzfz.T + 0.5 * fzfz.T + 0.5 * ffzz.T
-                Dfzz = np.linalg.multi_dot([mo, (2.0 * (Dz_fz + Dfz_z) + Df_zz + Dzz_f), mo.T])
+                mo_Dfzz = 2.0 * (Dz_fz + Dfz_z) + Df_zz + Dzz_f
 
                 # xy
                 # 0.5 * fxfy.T + 0.5 * fyfx.T + 0.5 * ffxy.T
-                Dfxy = np.linalg.multi_dot([mo, (Dx_fy + Dfy_x) + (Dy_fx + Dfx_y) + (Df_xy + Dxy_f), mo.T])
+                mo_Dfxy = (Dx_fy + Dfy_x) + (Dy_fx + Dfx_y) + (Df_xy + Dxy_f)
 
                 # xz
                 # 0.5 * fxfz.T + 0.5 * fzfx.T + 0.5 * ffxz.T
-                Dfxz = np.linalg.multi_dot([mo, (Dx_fz + Dfz_x) + (Dz_fx + Dfx_z) + (Df_xz + Dxz_f), mo.T])
+                mo_Dfxz = (Dx_fz + Dfz_x) + (Dz_fx + Dfx_z) + (Df_xz + Dxz_f)
 
                 # yz
                 # 0.5 * fyfz.T + 0.5 * fzyf.T + 0.5 * ffyz.T
-                Dfyz = np.linalg.multi_dot([mo, (Dy_fz + Dfz_y) + (Dz_fy + Dfy_z) + (Df_yz + Dyz_f), mo.T])
+                mo_Dfyz = (Dy_fz + Dfz_y) + (Dz_fy + Dfy_z) + (Df_yz + Dyz_f)
+
+                # NOTE: the factors, in the order the columns are laid out below.
+                # The first-order densities beside them are there for the
+                # quadrature alone and no Fock matrix is asked of them.
+                if self._ri_jk_factors is not None:
+                    for mat in (mo_Dfxx, mo_Dfyy, mo_Dfzz, mo_Dfxy, mo_Dfxz,
+                                mo_Dfyz):
+                        ra, rb = ri_jk_general_factors(
+                            mo, nocc, np.real(mat))
+                        self._ri_jk_factors[1].append(ra)
+                        self._ri_jk_factors[3].append(rb)
+
+                # density transformation from MO to AO basis
+
+                Dfxx = np.linalg.multi_dot([mo, mo_Dfxx, mo.T])
+                Dfyy = np.linalg.multi_dot([mo, mo_Dfyy, mo.T])
+                Dfzz = np.linalg.multi_dot([mo, mo_Dfzz, mo.T])
+                Dfxy = np.linalg.multi_dot([mo, mo_Dfxy, mo.T])
+                Dfxz = np.linalg.multi_dot([mo, mo_Dfxz, mo.T])
+                Dfyz = np.linalg.multi_dot([mo, mo_Dfyz, mo.T])
 
                 Dx = np.linalg.multi_dot([mo, Dx, mo.T])
                 Dy = np.linalg.multi_dot([mo, Dy, mo.T])
@@ -1174,6 +1261,20 @@ class ThreePATransitionDriver(NonlinearSolver):
         distributed_density_2 = None
         distributed_density_3 = None
 
+        # NOTE: the factors of the two orders which reach the Fock build, kept
+        # apart as lists of the occupied and the virtual right factor. The
+        # densities of this driver are real, so each of them is one factor and
+        # not the two a complex one is carried by.
+        self._ri_jk_factors = None
+
+        if self.rank == mpi_master() and self._uses_ri_jk():
+            self._ri_jk_factors = {
+                'left_occ': mo[:, :nocc],
+                'left_vir': mo[:, nocc:],
+                'second': ([], []),
+                'third': ([], []),
+            }
+
         for w_ind, w in enumerate(freqs):
 
             nx = ComplexResponseSolver.get_full_solution_vector(Nx[('x', w)])
@@ -1240,6 +1341,26 @@ class ThreePATransitionDriver(NonlinearSolver):
                 Dbcf_yz = self.commut(ky, Dbfz)  # bcd + bdc
                 Dbcf_yz += self.commut(kz, Dbfy)  # cbd + cdb
                 Dbcf_yz += self.commut(kf, Dbc_yz)  # dbc + dcb
+
+                # NOTE: the factors, taken before the transformation to the
+                # atomic orbitals and in the order the columns are laid out
+                # below. The two orders are collected apart because the array of
+                # each is cut with a stride of its own where there is a
+                # functional, and laid end to end where there is not, which is
+                # the order they are joined in at the call.
+                if self._ri_jk_factors is not None:
+                    for name, mat in (('second', Dbfx), ('second', Dbfy),
+                                      ('second', Dbfz), ('second', Dbc_xx),
+                                      ('second', Dbc_yy), ('second', Dbc_zz),
+                                      ('second', Dbc_xy), ('second', Dbc_xz),
+                                      ('second', Dbc_yz), ('third', Dbcf_xx),
+                                      ('third', Dbcf_yy), ('third', Dbcf_zz),
+                                      ('third', Dbcf_xy), ('third', Dbcf_xz),
+                                      ('third', Dbcf_yz)):
+                        ra, rb = ri_jk_general_factors(
+                            mo, nocc, np.real(mat))
+                        self._ri_jk_factors[name][0].append(ra)
+                        self._ri_jk_factors[name][1].append(rb)
 
                 # Density transformation from MO to AO basis
 
@@ -1328,7 +1449,7 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         return distributed_density_1, distributed_density_2, distributed_density_3
 
-    def get_fock_dict_II(self, wi, density_list1, density_list2, F0, mo,molecule, ao_basis, eri_dict, dft_dict):
+    def get_fock_dict_II(self, wi, density_list1, density_list2, F0, mo,molecule, ao_basis, eri_dict, dft_dict, profiler=None):
         """
         Computes the Fock matrices for a cubic response function
 
@@ -1348,6 +1469,8 @@ class ThreePATransitionDriver(NonlinearSolver):
             The dictionary containing ERI information
         :param dft_dict:
             The dictionary containing DFT information
+        :param profiler:
+            The profiler.
 
         :return:
             A dictonary of compounded first-order Fock-matrices
@@ -1388,15 +1511,15 @@ class ThreePATransitionDriver(NonlinearSolver):
             time_start_fock = time.time()
 
             if self._dft:
-                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real', eri_dict,
-                                                 dft_dict, density_list1,
-                                                 density_list2, None, '3pa_ii')
+                dist_focks = self._comp_nlr_fock(
+                    mo, molecule, ao_basis, 'real', eri_dict, dft_dict,
+                    density_list1, density_list2, None, '3pa_ii', profiler,
+                    dens_factors=self._ri_jk_factors)
             else:
-                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                                 'real', eri_dict,
-                                                 None, None, density_list2,
-                                                 None, '3pa_ii')
+                dist_focks = self._comp_nlr_fock(
+                    mo, molecule, ao_basis, 'real', eri_dict, None, None,
+                    density_list2, None, '3pa_ii', profiler,
+                    dens_factors=self._ri_jk_factors)
 
             self._print_fock_time(time.time() - time_start_fock)
 
@@ -1505,22 +1628,49 @@ class ThreePATransitionDriver(NonlinearSolver):
         else:
             time_start_fock = time.time()
 
+            factors = self._ri_jk_factors
+
             if self._dft:
+                # NOTE: two arrays, each cut with a stride of its own, so the
+                # factors go as the two sets they were collected as.
+                split = None
+
+                if factors is not None:
+                    split = {
+                        'second': (factors['left_occ'], factors['second'][0],
+                                   factors['left_vir'], factors['second'][1]),
+                        'third': (factors['left_occ'], factors['third'][0],
+                                  factors['left_vir'], factors['third'][1]),
+                    }
+
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real', eri_dict,
                                                  dft_dict, first_order_dens,
                                                  second_order_dens, third_order_dens,
-                                                 '3pa',profiler)
+                                                 '3pa', profiler,
+                                                 dens_factors=split)
             else:
                 density_list_23 = DistributedArray(second_order_dens.data,
                                                    self.comm,
                                                    distribute=False)
 
                 density_list_23.append(third_order_dens, axis=1)
+
+                # NOTE: one array of the two orders laid end to end, cut with one
+                # stride, so the factors are one set joined in the same order.
+                joined = None
+
+                if factors is not None:
+                    joined = (factors['left_occ'],
+                              factors['second'][0] + factors['third'][0],
+                              factors['left_vir'],
+                              factors['second'][1] + factors['third'][1])
+
                 dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                                  'real', eri_dict,
                                                  None, None, None,
-                                                 density_list_23, '3pa')
+                                                 density_list_23, '3pa', profiler,
+                                                 dens_factors=joined)
 
             self._print_fock_time(time.time() - time_start_fock)
 
@@ -1763,8 +1913,7 @@ class ThreePATransitionDriver(NonlinearSolver):
 
         self.ostream.print_header('Three-Photon Absorption (3PA) Transition Moments (a.u.)')
 
-        # Extract unique frequency values directly from stored tensor keys
-        unique_freqs = sorted(set(w for _, w in T_tensors.keys()), reverse=True)
+        # State indices (rather than rounded frequencies) define tensor rows.
 
         xyz_triples = [f'{x}{y}{z}'
                        for i, x in enumerate('xyz')
@@ -1786,11 +1935,11 @@ class ThreePATransitionDriver(NonlinearSolver):
             # Print a separator line with correct spacing
             self.ostream.print_header('-' * len(header_str))
 
-            for w_ind, w in enumerate(unique_freqs):
-                row_values = [f'  {w_ind + 1:<5d}', f'{- 3 * w * hartree_in_ev():>11.5f} eV']
+            for w_ind, w in enumerate(freqs):
+                row_values = [f'  {w_ind + 1:<5d}', f'{3 * w * hartree_in_ev():>11.5f} eV']
 
                 for label in tensor_labels:
-                    tensor_key = (label, w)
+                    tensor_key = (label, w_ind)
 
                     if tensor_key in T_tensors:
                         row_values.append(f'{T_tensors[tensor_key].real:11.4f}')
@@ -1818,8 +1967,8 @@ class ThreePATransitionDriver(NonlinearSolver):
         for w_ind, w in enumerate(freqs):
             exec_str = '  {:<4d}'.format(w_ind + 1)
             exec_str += '{:15.6f} eV'.format(3 * w * hartree_in_ev())
-            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][-w])
-            # exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][-w])
+            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][w_ind])
+            # Cross-section conversion requires independent validation.
             self.ostream.print_header(exec_str)
 
         self.ostream.print_blank()
@@ -1838,8 +1987,8 @@ class ThreePATransitionDriver(NonlinearSolver):
         for w_ind, w in enumerate(freqs):
             exec_str = '  {:<4d}'.format(w_ind + 1)
             exec_str += '{:15.6f} eV'.format(3 * w * hartree_in_ev())
-            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][-w])
-            # exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
+            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][w_ind])
+            # Cross-section conversion requires independent validation.
             self.ostream.print_header(exec_str)
         self.ostream.print_blank()
 

@@ -31,13 +31,14 @@ target_sources(vlxobjs
     XCIntegratorForLDA.cpp
     XCIntegratorForMGGA.cpp
     XCMolecularGradient.cpp
-    XCMolecularGradientForLDA.cpp
     XCMolecularGradientForGGA.cpp
+    XCMolecularGradientForLDA.cpp
     XCMolecularGradientForMGGA.cpp
     XCMolecularHessian.cpp
-    XCMolecularHessianForLDA.cpp
     XCMolecularHessianForGGA.cpp
+    XCMolecularHessianForLDA.cpp
     XCMolecularHessianForMGGA.cpp
+    XCTimingReport.cpp
   )
 
 target_include_directories(vlxobjs

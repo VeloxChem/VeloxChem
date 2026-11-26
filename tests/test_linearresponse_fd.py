@@ -10,10 +10,9 @@ from veloxchem.rsppolarizability import Polarizability
 from veloxchem.firstorderprop import FirstOrderProperties
 
 
-@pytest.mark.timeconsuming
 class TestLrfFD:
 
-    def run_lrf_fd(self, xcfun_label):
+    def run_lrf_fd(self, xcfun_label, ri):
 
         comm = MPI.COMM_WORLD
         ostream = OutputStream(None)
@@ -37,8 +36,14 @@ class TestLrfFD:
         method_settings = {'xcfun': xcfun_label}
 
         scfdrv = ScfRestrictedDriver(comm, ostream)
+        scfdrv.ri = ri
         scfdrv.update_settings(scf_settings, method_settings)
         scf_results = scfdrv.compute(molecule, basis)
+
+        if scfdrv.rank == mpi_master():
+            if ri:
+                assert scf_results['ri_jk'] or scf_results['ri_coulomb']
+                assert not scf_results['ri_fallback']
 
         lr_prop = Polarizability(rsp_settings, method_settings)
         lr_prop.init_driver(comm, ostream)
@@ -60,6 +65,7 @@ class TestLrfFD:
         method_dict_minus['electric_field'] = efield_minus
 
         scf_drv_plus = ScfRestrictedDriver(comm, ostream)
+        scf_drv_plus.ri = ri
         scf_drv_plus.update_settings(scf_settings, method_dict_plus)
         scf_results_plus = scf_drv_plus.compute(molecule, basis)
 
@@ -67,6 +73,7 @@ class TestLrfFD:
         scf_prop_plus.compute_scf_prop(molecule, basis, scf_results_plus)
 
         scf_drv_minus = ScfRestrictedDriver(comm, ostream)
+        scf_drv_minus.ri = ri
         scf_drv_minus.update_settings(scf_settings, method_dict_minus)
         scf_results_minus = scf_drv_minus.compute(molecule, basis)
 
@@ -81,18 +88,25 @@ class TestLrfFD:
             rel_diff = abs(alpha_zz - alpha_zz_fd) / abs(alpha_zz_fd)
             assert rel_diff < 1.0e-6
 
-    def test_hf_lrf_fd(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_hf_lrf_fd(self, ri):
 
-        self.run_lrf_fd('hf')
+        self.run_lrf_fd('hf', ri)
 
-    def test_lda_lrf_fd(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_lda_lrf_fd(self, ri):
 
-        self.run_lrf_fd('slater')
+        self.run_lrf_fd('slater', ri)
 
-    def test_gga_lrf_fd(self):
+    @pytest.mark.parametrize('ri', [False, True])
+    def test_gga_lrf_fd(self, ri):
 
-        self.run_lrf_fd('pbe0')
+        self.run_lrf_fd('pbe0', ri)
 
-    def test_mgga_lrf_fd(self):
+    @pytest.mark.parametrize('ri', [
+        pytest.param(False, marks=pytest.mark.timeconsuming),
+        True,
+    ])
+    def test_mgga_lrf_fd(self, ri):
 
-        self.run_lrf_fd('scan')
+        self.run_lrf_fd('scan', ri)

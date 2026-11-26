@@ -45,7 +45,7 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .linearsolver import LinearSolver
 from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
-                           ri_sanity_check, dft_sanity_check, pe_sanity_check,
+                           dft_and_ri_sanity_check, pe_sanity_check,
                            solvation_model_sanity_check, gostshyp_sanity_check,
                            environment_compatibility_sanity_check)
 from .errorhandler import assert_msg_critical
@@ -321,11 +321,8 @@ class ComplexResponseTdaSolver(LinearSolver):
         if self.filename is not None and self.checkpoint_file is None:
             self.checkpoint_file = f'{self.filename}_rsp.h5'
 
-        # check RI setup
-        ri_sanity_check(self)
-
-        # check dft setup
-        dft_sanity_check(self, 'compute')
+        # check DFT and RI setup
+        dft_and_ri_sanity_check(self, 'compute')
 
         # check pe setup
         pe_sanity_check(self, molecule=molecule)
@@ -472,9 +469,12 @@ class ComplexResponseTdaSolver(LinearSolver):
 
             tdens = self._get_trans_densities(bger_loc, scf_results, molecule,
                                               basis)
+            tfactors = self._get_trans_density_factors(
+                bger_loc, scf_results, molecule, basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict)
+                                      dft_dict, pe_dict, profiler,
+                                      dens_factors=tfactors)
 
             if self.rank == mpi_master():
                 sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
@@ -701,9 +701,12 @@ class ComplexResponseTdaSolver(LinearSolver):
 
             tdens = self._get_trans_densities(new_trials_ger_loc, scf_results,
                                               molecule, basis)
+            tfactors = self._get_trans_density_factors(
+                new_trials_ger_loc, scf_results, molecule, basis)
 
             fock = self._comp_lr_fock(tdens, molecule, basis, eri_dict,
-                                      dft_dict, pe_dict)
+                                      dft_dict, pe_dict, profiler,
+                                      dens_factors=tfactors)
 
             if self.rank == mpi_master():
                 sig_mat = self._get_sigmas(fock, scf_results, molecule, basis,
@@ -733,11 +736,14 @@ class ComplexResponseTdaSolver(LinearSolver):
 
         profiler.check_memory_usage('End of CPP solver')
         profiler.print_memory_usage(self.ostream)
+        self._print_ri_memory_check()
 
         self._dist_bger = None
         self._dist_e2bger = None
 
         self._dist_fock_ger = None
+
+        self._release_freed_memory()
 
         # calculate response functions
         if not self.nonlinear:
@@ -749,6 +755,8 @@ class ComplexResponseTdaSolver(LinearSolver):
                 if self.rank == mpi_master():
                     va = {op: v for op, v in zip(self.a_components, a_grad)}
                     rsp_funcs = {}
+
+                    solutions_write_time = 0.0
 
                     # final h5 file for response solutions
                     if self.filename is not None:
@@ -771,15 +779,18 @@ class ComplexResponseTdaSolver(LinearSolver):
 
                         # write solutions to h5 file
                         if (self.save_solutions and final_h5_fname is not None):
+                            write_t0 = tm.time()
                             write_rsp_full_solution_to_hdf5(
                                 final_h5_fname, x, op_w_ind, len(solutions))
+                            solutions_write_time += tm.time() - write_t0
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
                     if (self.save_solutions and final_h5_fname is not None):
                         self.ostream.print_info(
                             'Response solution vectors written to file: ' +
-                            final_h5_fname)
+                            f'{final_h5_fname} ' +
+                            f'(took {solutions_write_time:.2f} sec).')
                         self.ostream.print_blank()
                         self.ostream.flush()
 
@@ -887,6 +898,56 @@ class ComplexResponseTdaSolver(LinearSolver):
             tdens = None
 
         return tdens
+
+    def _get_trans_density_factors(self, trial_mat, tensors, molecule, basis):
+        """
+        Computes the transition densities as the factors they are made from.
+
+        The density of a trial vector is the occupied orbitals times the vector
+        times the virtual orbitals transposed, and the resolution of the identity
+        wants those factors rather than their product: its exchange of a density
+        of rank k costs the basis squared times k where its exchange of the same
+        density as a matrix costs the basis cubed. The occupied orbitals are the
+        left factor of every density of the batch, which is what lets them be
+        transformed once for all of it.
+
+        :param trial_mat:
+            The matrix containing the Z vectors as columns.
+        :param tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+
+        :return:
+            The left factor and one right factor for each trial vector, or None
+            away from the master rank or where the resolution of the identity
+            will not use them.
+        """
+
+        if self.rank != mpi_master():
+            return None
+
+        # NOTE: the dense path does not take the factors, so they are formed only
+        # where the resolution of the identity will contract them.
+        if not self._uses_ri_jk():
+            return None
+
+        nocc = molecule.number_of_alpha_occupied_orbitals(basis)
+        norb = tensors['C_alpha'].shape[1]
+        nvir = norb - nocc
+
+        mo_occ = tensors['C_alpha'][:, :nocc].copy()
+        mo_vir = tensors['C_alpha'][:, nocc:].copy()
+
+        rights = []
+
+        for k in range(trial_mat.shape[1]):
+            mat = trial_mat[:, k].reshape(nocc, nvir)
+            rights.append(np.matmul(mo_vir, mat.T))
+
+        return (mo_occ, rights)  # D = mo_occ times rights transposed
 
     def _get_sigmas(self, fock, tensors, molecule, basis, trial_mat):
         """
@@ -1533,8 +1594,10 @@ class ComplexResponseTdaSolver(LinearSolver):
         t0 = tm.time()
 
         if self.rank == mpi_master():
+            # NOTE: no ostream, as the arrays are added below and the line
+            # about the file is printed after them.
             success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
-                                     basis, dft_dict, pe_dict, self.ostream)
+                                     basis, dft_dict, pe_dict, None)
         else:
             success = False
         success = self.comm.bcast(success, root=mpi_master())
@@ -1552,9 +1615,9 @@ class ComplexResponseTdaSolver(LinearSolver):
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
-            checkpoint_text = 'Time spent in writing checkpoint file: '
-            checkpoint_text += f'{(tm.time() - t0):.2f} sec'
-            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_info(
+                f'Checkpoint written to file: {self.checkpoint_file} ' +
+                f'(took {tm.time() - t0:.2f} sec).')
             self.ostream.print_blank()
 
     def _read_checkpoint(self, rsp_vector_labels):

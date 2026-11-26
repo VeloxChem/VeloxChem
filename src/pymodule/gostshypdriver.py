@@ -44,7 +44,7 @@ from .veloxchemlib import compute_screened_tco_f_values
 from .veloxchemlib import compute_screened_contracted_tco_s_gradient
 from .veloxchemlib import compute_screened_contracted_tco_p_gradient
 from .outputstream import OutputStream
-from .tessellation import TessellationDriver
+from .tessellation import GostshypCavityDriver
 from .errorhandler import assert_msg_critical
 
 
@@ -436,7 +436,7 @@ class GostshypDriver:
         """
 
         # tessellation driver needed for area gradients
-        tessellation_drv = TessellationDriver(self.comm, self.ostream)
+        tessellation_drv = GostshypCavityDriver(self.comm, self.ostream)
         tessellation_drv.update_settings(tessellation_settings)
 
         # tessellation data is generated
@@ -587,7 +587,7 @@ class GostshypDriver:
         if tessellation_settings is None:
             tessellation_settings = {}
 
-        tessellation_drv = TessellationDriver(self.comm, self.ostream)
+        tessellation_drv = GostshypCavityDriver(self.comm, self.ostream)
         tessellation_drv.update_settings(tessellation_settings)
 
         self.tessellation = tessellation_drv.compute(self.molecule)
