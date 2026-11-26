@@ -5002,12 +5002,14 @@ class ScfDriver:
 
         self.cpcm_drv.visualize_cpcm_grid(molecule)
 
-    def show_cpcm_charges(self, molecule):
+    def show_cpcm_charges(self, molecule, colorbar=True):
         """
         Show the C-PCM grid charges.
 
         :param molecule:
             The molecule.
+        :param colorbar:
+            show colorbar or not.
         """
 
         # check if converged
@@ -5022,7 +5024,7 @@ class ScfDriver:
         assert_msg_critical(
             self._cpcm and not self._smd, 'SCF driver: the C-PCM solvation model was not used.')
 
-        self.cpcm_drv.visualize_cpcm_charges(molecule)
+        self.cpcm_drv.visualize_cpcm_charges(molecule, colorbar)
 
     def get_scf_type_str(self):
         """
