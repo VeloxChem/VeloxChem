@@ -1635,6 +1635,11 @@ class RedoxCalculator:
         Use RI-JK density fitting for single-points. Default: ``True``.
     sp_dispersion : bool
         Apply D3BJ dispersion to single-points. Default: ``True``.
+    from_neutral_geometry : bool
+        Build M+ / M- and the protonated / deprotonated states from the
+        optimised neutral geometry and optimise them directly, instead of
+        running a separate conformer search for each state.
+        Default: ``False``.
     """
 
     def __init__(
@@ -1671,6 +1676,7 @@ class RedoxCalculator:
         conformer_explicit_sampling_temperature: float = 1000.0,
         conformer_explicit_langevin_friction_ps: float = 1.0,
         conformer_explicit_timestep_fs: float = 0.5,
+        from_neutral_geometry: bool = False,
 
     ) -> None:
         self.output_folder = output_folder
@@ -1700,6 +1706,7 @@ class RedoxCalculator:
         self.ri_jk = ri_jk
         self.sp_dispersion = sp_dispersion
         self.rerun_spin_density = rerun_spin_density
+        self.from_neutral_geometry = bool(from_neutral_geometry)
 
         # OpenMM conformer-dynamics solvent model.  The large-conformer branch
         # defaults to explicit CSPC/E water.  Set conformer_dynamics_solvent=
@@ -2001,7 +2008,17 @@ class RedoxCalculator:
 
             return existing
 
-        seed = self._conformer_search(mol_obj, label)
+        if (
+            self.from_neutral_geometry
+            and label in ("M+", "M-")
+            and vertical_fallback_xyz
+        ):
+            _status("%s: skipping conformer search, optimising from neutral geometry", label)
+            seed = vlx.Molecule.read_xyz_string(vertical_fallback_xyz)
+            seed.set_charge(charge)
+            seed.set_multiplicity(mult)
+        else:
+            seed = self._conformer_search(mol_obj, label)
         return self.compute_gibbs(
             seed,
             label,
@@ -2012,7 +2029,8 @@ class RedoxCalculator:
             vertical_fallback_corr_available=vertical_fallback_corr_available,
         )
 
-    def _get_or_compute_state(self, mol_obj, label: str, file_tag: str = "") -> Optional[GibbsResult]:
+    def _get_or_compute_state(self, mol_obj, label: str, file_tag: str = "",
+                              conformer_search: bool = False) -> Optional[GibbsResult]:
         """
         Reuse a saved GibbsResult by exact filename first, then by structural
         identity, otherwise compute it.
@@ -2053,6 +2071,8 @@ class RedoxCalculator:
         existing = _mpi_root_value(load_existing, f"{label}: cached state lookup")
         if existing is not None:
             return existing
+        if conformer_search:
+            mol_obj = self._conformer_search(mol_obj, label)
         return self.compute_gibbs(mol_obj, label, file_tag=file_tag)
 
 
@@ -2118,6 +2138,7 @@ class RedoxCalculator:
         init_charge: int,
         basic_atoms: list[int],
         run_tag: str,
+        conformer_search: bool = True,
     ) -> None:
         """
         Ensure MH_plus and MH_rad are present. Reuse any existing state files
@@ -2147,6 +2168,7 @@ class RedoxCalculator:
                     self.protonate(mol_obj, idx, init_charge + 1),
                     f"MH+_site{idx}",
                     file_tag=run_tag,
+                    conformer_search=conformer_search,
                 )
                 if res_p and res_p.g_total < min_gp:
                     min_gp, best_plus = res_p.g_total, res_p
@@ -2156,6 +2178,7 @@ class RedoxCalculator:
                     self.protonate(mol_obj, idx, init_charge),
                     f"MH_rad_site{idx}",
                     file_tag=run_tag,
+                    conformer_search=conformer_search,
                 )
                 if res_r and res_r.g_total < min_gr:
                     min_gr, best_rad = res_r.g_total, res_r
@@ -2177,6 +2200,7 @@ class RedoxCalculator:
         init_charge: int,
         acidic_H: list[int],
         run_tag: str,
+        conformer_search: bool = True,
     ) -> None:
         """
         Ensure M_deprot and M_deprot_rad are present. Reuse any existing state
@@ -2206,6 +2230,7 @@ class RedoxCalculator:
                     self.deprotonate(mol_obj, h_idx, init_charge - 1),
                     f"M_deprot_site{h_idx}",
                     file_tag=run_tag,
+                    conformer_search=conformer_search,
                 )
                 if res_d and res_d.g_total < min_gd:
                     min_gd, best_dep = res_d.g_total, res_d
@@ -2215,6 +2240,7 @@ class RedoxCalculator:
                     self.deprotonate(mol_obj, h_idx, init_charge),
                     f"M_deprot_rad_site{h_idx}",
                     file_tag=run_tag,
+                    conformer_search=conformer_search,
                 )
                 if res_dr and res_dr.g_total < min_gdr:
                     min_gdr, best_dep_rad = res_dr.g_total, res_dr
@@ -3736,7 +3762,23 @@ class RedoxCalculator:
             setattr(profile, attr, res)
             _status("========== END ET state %s (%s): %s ==========", lbl, attr, "OK" if res is not None else "FAILED")
 
-        acidic_H, basic_atoms = self.find_protic_sites(mol_obj)
+        # Protonated/deprotonated states start either from the input
+        # geometry (each followed by its own conformer search) or, with
+        # from_neutral_geometry, from the optimised neutral geometry.
+        use_neutral = bool(
+            self.from_neutral_geometry
+            and profile.M is not None
+            and profile.M.geometry_xyz
+        )
+        if use_neutral:
+            _status("Building protonated/deprotonated states from the optimised neutral geometry")
+            site_mol = vlx.Molecule.read_xyz_string(profile.M.geometry_xyz)
+            site_mol.set_charge(init_charge)
+            site_mol.set_multiplicity(_valid_multiplicity(site_mol, init_charge))
+        else:
+            site_mol = mol_obj
+
+        acidic_H, basic_atoms = self.find_protic_sites(site_mol)
         log.info("Basic atoms found: %s", basic_atoms)
         log.info("Acidic H found: %s", acidic_H)
 
@@ -3746,17 +3788,19 @@ class RedoxCalculator:
         # of silently stopping after loading only the ET states.
         self._scan_missing_protonation_states(
             profile,
-            mol_obj,
+            site_mol,
             init_charge,
             basic_atoms,
             run_tag,
+            conformer_search=not use_neutral,
         )
         self._scan_missing_deprotonation_states(
             profile,
-            mol_obj,
+            site_mol,
             init_charge,
             acidic_H,
             run_tag,
+            conformer_search=not use_neutral,
         )
 
         # ---- thermal correction normalisation --------------------------
@@ -3994,10 +4038,19 @@ class pKaCalculator(RedoxCalculator):
         )
         log.info("Using file tag %s for formula %s", run_tag, run_formula)
 
-        profile.M = self._get_or_compute_state(mol_obj, "M", file_tag=run_tag)
+        profile.M = self._get_or_compute_state(
+            mol_obj, "M", file_tag=run_tag, conformer_search=True,
+        )
 
         if profile.M is None:
             raise RuntimeError("Parent pKa state failed; see the preceding compute_gibbs traceback.")
+
+        use_neutral = bool(self.from_neutral_geometry and profile.M.geometry_xyz)
+        if use_neutral:
+            _status("Building protonated/deprotonated states from the optimised neutral geometry")
+            mol_obj = vlx.Molecule.read_xyz_string(profile.M.geometry_xyz)
+            mol_obj.set_charge(init_charge)
+            mol_obj.set_multiplicity(_valid_multiplicity(mol_obj, init_charge))
 
         acidic_H, basic_atoms = _mpi_root_value(
             lambda: self.find_protic_sites(mol_obj), "pKa site detection"
@@ -4010,6 +4063,7 @@ class pKaCalculator(RedoxCalculator):
                     self.protonate(mol_obj, idx, init_charge + 1),
                     f"MH+_site{idx}",
                     file_tag=run_tag,
+                    conformer_search=not use_neutral,
                 )
                 if res and res.g_total < min_g:
                     min_g, best_plus = res.g_total, res
@@ -4027,6 +4081,7 @@ class pKaCalculator(RedoxCalculator):
                     self.deprotonate(mol_obj, h_idx, init_charge - 1),
                     f"M_deprot_site{h_idx}",
                     file_tag=run_tag,
+                    conformer_search=not use_neutral,
                 )
                 if res and res.g_total < min_g:
                     min_g, best_dep = res.g_total, res
