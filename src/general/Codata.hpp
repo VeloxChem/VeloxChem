@@ -106,6 +106,20 @@ double getAtomicMassUnitInKg();
 double getSpeedOfLightInVacuumInSI();
 
 /**
+ Gets vacuum electric permittivity in SI.
+
+ @return the vacuum electric permittivity.
+ */
+double getVacuumElectricPermittivityInSI();
+
+/**
+ Gets the atomic unit of the electric polarizability in SI.
+
+ @return the atomic unit of the electric polarizability.
+ */
+double getAtomicUnitOfElectricPolarizibilityInSI();
+
+/**
  Gets Avogadro constant.
 
  @return Avogadro constant.
