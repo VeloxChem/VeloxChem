@@ -129,6 +129,22 @@ getSpeedOfLightInVacuumInSI()
 }
 
 double
+getVacuumElectricPermittivityInSI()
+{
+    // vacuum electric permittivity: 8.854 187 8128 e-12 [F m^-1]
+
+    return 8.8541878128e-12;
+}
+
+double
+getAtomicUnitOfElectricPolarizibilityInSI()
+{
+    // the atomic unit of electric polarizability: 1.648 777 274 36 e-41 [C^2 m^2 J^-1]
+
+    return 1.64877727436e-41;
+}
+
+double
 getAvogadroConstant()
 {
     // Avogadro constant: N_A = 6.022 140 76 e23 [mol^-1]
