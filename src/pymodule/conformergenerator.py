@@ -1113,7 +1113,8 @@ class ConformerGenerator:
         # freeze atoms if specified
         if self.freeze_atoms is not None:
             for atom_idx in self.freeze_atoms:
-                simulation.system.setParticleMass(atom_idx, 0.0 * dalton)
+                # atom_idx - 1 for 0-based indexing in OpenMM
+                simulation.system.setParticleMass(atom_idx - 1, 0.0 * dalton)
 
         simulation.minimizeEnergy(tolerance=em_tolerance)
 
