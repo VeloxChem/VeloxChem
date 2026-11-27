@@ -71,6 +71,7 @@ class EmbeddingPotfileWriter:
         db_dir = get_data_path() / "environment_parameters"
         if self.rank == mpi_master():
             sep_db = self._load_pe_db(db_dir / "pe_sep.csv")
+            pspc_db = self._load_pe_db(db_dir / "pe_pspc.csv")
             cp3_db = self._load_pe_db(db_dir / "pe_cp3.csv")
             tip3p_db = self._build_tip3p_db()
             ff19sb_db = self._build_ff19sb_db(
@@ -79,6 +80,7 @@ class EmbeddingPotfileWriter:
             )
         else:
             sep_db = None
+            pspc_db = None
             cp3_db = None
             tip3p_db = None
             ff19sb_db = None
@@ -86,6 +88,9 @@ class EmbeddingPotfileWriter:
         self.pe_models = {
             "SEP": {
                 "db": self.comm.bcast(sep_db, root=mpi_master())
+            },
+            "PSPC": {
+                "db": self.comm.bcast(pspc_db, root=mpi_master())
             },
             "CP3": {
                 "db": self.comm.bcast(cp3_db, root=mpi_master())
@@ -103,7 +108,7 @@ class EmbeddingPotfileWriter:
         self.npe_model = None
 
     def _load_pe_db(self, csv_path: Path) -> dict:
-        """Load a SEP or CP3 parameter database."""
+        """Load a SEP, PSPC or CP3 parameter database."""
         txt_path = csv_path.with_suffix(".txt")
         if not csv_path.is_file():
             raise FileNotFoundError(f"Parameter file not found: {csv_path}")

@@ -1,0 +1,13 @@
+molecule,res_name,atom_name,element
+water,WAT,OW,O
+water,WAT,HW,H
+water,WAT,HW1,H
+water,WAT,HW2,H
+water,HOH,OW,O
+water,HOH,HW,H
+water,HOH,HW1,H
+water,HOH,HW2,H
+water,SOL,OW,O
+water,SOL,HW,H
+water,SOL,HW1,H
+water,SOL,HW2,H

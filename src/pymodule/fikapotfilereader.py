@@ -213,9 +213,9 @@ class FikaPotfileReader:
                         f'{source}: polarizable residue {name} has no ' +
                         'polarizabilities')
                 if len(pol) != count:
-                    raise ValueError(
-                        f'{source}: residue {name} has {count} atoms, but ' +
-                        f'{len(pol)} polarizabilities')
+                    missing_pols = count - len(pol)
+                    for _ in range(missing_pols):
+                        pol.append(6 * [0.0])
                 alphas = {
                     i: (p[0] + p[3] + p[5]) / 3.0
                     for i, p in enumerate(pol)

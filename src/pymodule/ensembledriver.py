@@ -57,7 +57,7 @@ class EnsembleDriver:
     Implements ensemble calculations over a list of snapshots produced by
     :class EnsembleParser.
 
-    Each snapshot contains teh QM subsysem and (optionally) environment atoms.
+    Each snapshot contains the QM subsystem and (optionally) environment atoms.
     The driver can run, for each snapshot:
 
     - A SCF calculation (restricted or unrestricted)
