@@ -4957,6 +4957,75 @@ class ScfDriver:
 
         return self._scf_energy
 
+    def get_solvation_energy(self):
+        """
+        Get the solvation energy for an
+        SCF calculation with an implicit solvation model.
+
+        :return:
+            The solvation energy in Hartree.
+        """
+
+        # check if converged
+        assert_msg_critical(
+            self._is_converged, 'SCF driver: SCF not converged, cannot get solvation energy.')
+
+        # check if a solvation model is defined
+        if self.solvation_model is not None:
+            if self._cpcm:
+                if self._smd:
+                    return self.smd_energy
+                else:
+                    return self.cpcm_drv.cpcm_epol
+        else:
+            return 0
+
+    def show_cpcm_grid(self, molecule):
+        """
+        Show the C-PCM grid.
+
+        :param molecule:
+            The molecule.
+        """
+
+        # check if converged
+        assert_msg_critical(
+            self._is_converged, 'SCF driver: SCF not converged, cannot show the C-PCM grid.')
+
+        # check if a solvation model was set
+        assert_msg_critical(
+            self.solvation_model is not None, 'SCF driver: no solvation model was defined.')
+
+        # check if it is a CPCM solvation model
+        assert_msg_critical(
+            self._cpcm and not self._smd, 'SCF driver: the C-PCM solvation model was not used.')
+
+        self.cpcm_drv.visualize_cpcm_grid(molecule)
+
+    def show_cpcm_charges(self, molecule, colorbar=True):
+        """
+        Show the C-PCM grid charges.
+
+        :param molecule:
+            The molecule.
+        :param colorbar:
+            show colorbar or not.
+        """
+
+        # check if converged
+        assert_msg_critical(
+            self._is_converged, 'SCF driver: SCF not converged, cannot show the C-PCM charges.')
+
+        # check if a solvation model was set
+        assert_msg_critical(
+            self.solvation_model is not None, 'SCF driver: no solvation model was defined.')
+
+        # check if it is a CPCM solvation model
+        assert_msg_critical(
+            self._cpcm and not self._smd, 'SCF driver: the C-PCM solvation model was not used.')
+
+        self.cpcm_drv.visualize_cpcm_charges(molecule, colorbar)
+
     def get_scf_type_str(self):
         """
         Gets string with type of SCF calculation (defined in derived classes).
